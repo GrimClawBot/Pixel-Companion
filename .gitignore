@@ -1,0 +1,23 @@
+# Xcode / SwiftPM
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+build/
+
+# Quality gate artifacts
+quality-reports/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local secrets (never commit; see scripts/quality/secret_scan.py)
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
