@@ -54,6 +54,16 @@ class ClassifySensitiveTests(unittest.TestCase):
         diff = "+++ b/Sources/Lib/View.swift\n+    public func render() {}\n-@MainActor open class Foo {}\n+SecItemAdd(q, nil)\n"
         self.assertEqual(["public-api", "secrets"], gr.classify_sensitive(["Sources/Lib/View.swift"], diff))
 
+    def test_login_and_session_changes_require_human_review(self):
+        diff = "+++ b/Sources/App/LoginCoordinator.swift\n+    func signIn() { session = newSession }\n"
+        reasons = gr.classify_sensitive(["Sources/App/LoginCoordinator.swift"], diff)
+        self.assertTrue(any(reason.startswith("auth:") for reason in reasons))
+        self.assertIn("auth", reasons)
+
+    def test_allow_marker_pattern_is_registered(self):
+        patterns = [pattern.pattern for pattern, _ in gr.SENSITIVE_CONTENT]
+        self.assertTrue(any("allow" in pattern for pattern in patterns))
+
     def test_plain_change_is_not_sensitive(self):
         diff = "+++ b/Sources/App/NotchView.swift\n+    let width: CGFloat = 200\n context line public\n"
         self.assertEqual([], gr.classify_sensitive(["Sources/App/NotchView.swift"], diff))

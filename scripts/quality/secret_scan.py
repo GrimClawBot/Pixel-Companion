@@ -102,9 +102,8 @@ def scan_tracked(root: Path) -> list[Finding]:
             findings.append(Finding("forbidden-file", path, 0))
             continue
         data = (root / path).read_bytes() if (root / path).is_file() else b""
-        if b"\0" in data[:8192]:
-            continue  # binary
-        findings.extend(scan_text(path, data.decode("utf-8", errors="replace")))
+        encoding = "latin-1" if b"\0" in data[:8192] else "utf-8"
+        findings.extend(scan_text(path, data.decode(encoding, errors="replace")))
     return findings
 
 
