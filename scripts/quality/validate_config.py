@@ -33,12 +33,12 @@ def validate_file(path: Path) -> str | None:
     return None
 
 
-def lockfile_error(root: Path) -> str | None:
+def lockfile_error(root: Path, tracked: set[str] | None = None) -> str | None:
     manifest = root / "Package.swift"
     if not manifest.is_file():
         return None
     if re.search(r"\.package\s*\(\s*url\s*:", manifest.read_text(encoding="utf-8")):
-        if not (root / "Package.resolved").is_file():
+        if tracked is None or "Package.resolved" not in tracked:
             return "Package.swift declares remote dependencies but Package.resolved is not committed"
     return None
 
@@ -47,16 +47,17 @@ def main() -> int:
     root = Path(
         subprocess.run(["git", "rev-parse", "--show-toplevel"], check=True, capture_output=True, text=True).stdout.strip()
     )
-    tracked = subprocess.run(["git", "ls-files", "-z"], cwd=root, check=True, capture_output=True, text=True).stdout
+    tracked_output = subprocess.run(["git", "ls-files", "-z"], cwd=root, check=True, capture_output=True, text=True).stdout
+    tracked_paths = set(filter(None, tracked_output.split("\0")))
     errors: list[str] = []
     checked = 0
-    for rel in filter(None, tracked.split("\0")):
+    for rel in tracked_paths:
         path = root / rel
         if path.suffix.lower() in JSON_SUFFIXES | PLIST_SUFFIXES and path.is_file():
             checked += 1
             if (err := validate_file(path)) is not None:
                 errors.append(err)
-    if (err := lockfile_error(root)) is not None:
+    if (err := lockfile_error(root, tracked_paths)) is not None:
         errors.append(err)
     for err in errors:
         print(f"config: {err}", file=sys.stderr)
