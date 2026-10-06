@@ -1,0 +1,7 @@
+{
+  "strictness": 1,
+  "commentTypes": ["logic", "syntax", "style"],
+  "triggerOnUpdates": true,
+  "ignorePatterns": "*.xcassets/**\n*.png\n*.pdf",
+  "instructions": "Native macOS notch companion (Swift/SwiftUI/AppKit). Release-blocking: crashes, main-thread/concurrency violations, retain cycles, secret exposure, auth/keychain misuse, entitlement or App Transport Security loosening, missing tests for changed behaviour, and public API breaks. Changes to auth, secrets, CI (.github, scripts/quality), dependencies (Package.swift/Package.resolved), entitlements/Info.plist or public API must never be auto-approved; call them out explicitly for human review. See docs/QUALITY_GATE.md."
+}
