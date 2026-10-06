@@ -54,17 +54,23 @@ SENSITIVE_PATHS: list[tuple[str, str]] = [
     ("*.pbxproj", "build-config"),
     ("Package.swift", "dependencies"),
     ("Package.resolved", "dependencies"),
-    ("*Auth*", "auth"),
-    ("*Keychain*", "secrets"),
-    ("*Credential*", "secrets"),
-    ("*Secret*", "secrets"),
-    ("*Token*", "auth"),
-    ("*/Security/*", "security"),
+    ("*auth*", "auth"),
+    ("*login*", "auth"),
+    ("*signin*", "auth"),
+    ("*session*", "auth"),
+    ("*oauth*", "auth"),
+    ("*keychain*", "secrets"),
+    ("*credential*", "secrets"),
+    ("*secret*", "secrets"),
+    ("*token*", "auth"),
+    ("*/security/*", "security"),
 ]
 SENSITIVE_CONTENT: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s"), "public-api"),
     (re.compile(r"\b(?:SecItem\w*|kSecClass\w*|Keychain)\b"), "secrets"),
-    (re.compile(r"\b(?:Authorization|Bearer|apiKey|accessToken|password)\b"), "auth"),
+    (re.compile(r"\b(?:authorization|bearer|api[_-]?key|access[_-]?token|password|passwd|signin|sign_in|login|logout|session|oauth|credential)\b", re.IGNORECASE), "auth"),
+    (re.compile(r"quality:allow-secret", re.IGNORECASE), "secrets"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b", re.IGNORECASE), "secrets"),
     (re.compile(r"\b(?:NSAppTransportSecurity|NSAllowsArbitraryLoads|com\.apple\.security\.)"), "security"),
 ]
 
@@ -98,7 +104,7 @@ def classify_sensitive(paths: list[str], diff: str) -> list[str]:
     reasons: set[str] = set()
     for path in paths:
         for pattern, reason in SENSITIVE_PATHS:
-            if fnmatch.fnmatch(path, pattern):
+            if fnmatch.fnmatch(path.lower(), pattern.lower()):
                 reasons.add(f"{reason}: {path}")
     for line in diff.splitlines():
         if line.startswith(("+++", "---")) or not line.startswith(("+", "-")):
@@ -270,7 +276,9 @@ def main(argv: list[str] | None = None) -> int:
         {**asdict(report), "findings": [{**asdict(f), "blocking": f.blocking} for f in report.findings]}, indent=2
     )
     if args.out:
-        Path(args.out).write_text(payload + "\n", encoding="utf-8")
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(payload + "\n", encoding="utf-8")
     print(payload)
     print(f"greptile-review: {report.verdict}", file=sys.stderr)
     return EXIT_FOR_VERDICT[report.verdict]
