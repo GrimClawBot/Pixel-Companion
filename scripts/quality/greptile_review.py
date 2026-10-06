@@ -124,6 +124,8 @@ def parse_findings(message: str) -> list[Finding]:
         raise ValueError("Greptile findings payload is not a list")
     findings = []
     for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError(f"Greptile finding is not an object: {item!r}")
         severity = str(item.get("severity", "")).lower()
         if severity not in SEVERITIES:
             # Unknown severities are escalated, not ignored.

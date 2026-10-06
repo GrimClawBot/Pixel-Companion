@@ -22,7 +22,7 @@ class ParseFindingsTests(unittest.TestCase):
         self.assertEqual("blocker", f.severity)
 
     def test_unparseable_response_raises(self):
-        for msg in ["Looks good to me!", "[not json]", '{"severity": "nit"}']:
+        for msg in ["Looks good to me!", "[not json]", '{"severity": "nit"}', '["looks fine"]']:
             with self.assertRaises(ValueError, msg=msg):
                 gr.parse_findings(msg)
 
