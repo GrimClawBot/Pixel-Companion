@@ -124,6 +124,122 @@ final class PaperclipConnectorTests: XCTestCase {
         XCTAssertEqual(service.fetchCount, 2)
     }
 
+
+    func testCoreRefreshReleasesPollingBeforeSessionEnrichment() {
+        let service = DeferredPaperclipService()
+        let connector = PaperclipConnector(
+            configuration: PaperclipConfiguration(
+                baseURLString: "https://paperclip.example",
+                companyID: "company-1"
+            ),
+            service: service
+        )
+
+        connector.refresh()
+        service.finishCore(.success(PaperclipRemoteState(
+            companies: [PaperclipCompany(id: "company-1", name: "Example Co", status: "active")],
+            companyID: "company-1",
+            companyName: "Example Co",
+            activity: [],
+            approvals: [],
+            usage: nil,
+            agentSessions: []
+        )))
+
+        XCTAssertEqual(connector.connectionState, .connected)
+        connector.refresh()
+        XCTAssertEqual(service.fetchCount, 2, "Core completion must release the next poll before telemetry finishes")
+    }
+
+    func testLiveRunsRestoreActiveSessionOutsideRecentWindow() {
+        let service = makeService()
+        StubURLProtocol.handler = { request in
+            switch request.url?.path {
+            case "/api/companies/company-1/heartbeat-runs":
+                return (200, self.json([[
+                    "id": "recent-completed",
+                    "agentId": "agent-1",
+                    "status": "completed",
+                    "createdAt": "2026-10-07T19:00:00.000Z",
+                    "updatedAt": "2026-10-07T19:01:00.000Z"
+                ]]))
+            case "/api/companies/company-1/live-runs":
+                return (200, self.json([[
+                    "id": "older-live",
+                    "agentId": "agent-1",
+                    "status": "running",
+                    "startedAt": "2026-10-07T18:00:00.000Z",
+                    "createdAt": "2026-10-07T18:00:00.000Z",
+                    "updatedAt": "2026-10-07T18:30:00.000Z",
+                    "contextSnapshot": ["issueId": "issue-1"]
+                ]]))
+            default:
+                return self.dashboardResponse(for: request.url?.path)
+            }
+        }
+
+        let sessionExpectation = expectation(description: "Live session enrichment")
+        service.fetch(
+            configuration: selectedConfiguration(),
+            completion: { _ in },
+            sessionCompletion: { result in
+                guard case let .success(sessions) = result else {
+                    XCTFail("Expected live session enrichment")
+                    sessionExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(sessions.first?.runID, "older-live")
+                XCTAssertEqual(sessions.first?.runState, .running)
+                sessionExpectation.fulfill()
+            }
+        )
+        wait(for: [sessionExpectation], timeout: 2)
+    }
+
+    func testMalformedHeartbeatRunDoesNotDiscardValidRuns() {
+        let service = makeService()
+        StubURLProtocol.handler = { request in
+            switch request.url?.path {
+            case "/api/companies/company-1/heartbeat-runs":
+                return (200, self.json([
+                    [
+                        "id": "bad-run",
+                        "agentId": "agent-1",
+                        "status": "completed",
+                        "usageJson": ["inputTokens": "not-an-int"]
+                    ],
+                    [
+                        "id": "good-run",
+                        "agentId": "agent-1",
+                        "status": "completed",
+                        "createdAt": "2026-10-07T19:00:00.000Z",
+                        "updatedAt": "2026-10-07T19:01:00.000Z"
+                    ]
+                ]))
+            case "/api/companies/company-1/live-runs":
+                return (200, self.json([]))
+            default:
+                return self.dashboardResponse(for: request.url?.path)
+            }
+        }
+
+        let sessionExpectation = expectation(description: "Lossy session enrichment")
+        service.fetch(
+            configuration: selectedConfiguration(),
+            completion: { _ in },
+            sessionCompletion: { result in
+                guard case let .success(sessions) = result else {
+                    XCTFail("Expected lossy telemetry decoding to keep valid runs")
+                    sessionExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(sessions.first?.runID, "good-run")
+                sessionExpectation.fulfill()
+            }
+        )
+        wait(for: [sessionExpectation], timeout: 2)
+    }
+
     func testURLServiceMapsCoreAndSessionTelemetrySeparately() {
         let service = makeService()
         installDashboardFixture()
