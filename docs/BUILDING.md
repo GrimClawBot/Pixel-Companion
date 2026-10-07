@@ -8,7 +8,7 @@ third-party dependencies and no accounts or keys to configure.
 ```sh
 swift build                      # debug build
 swift run PixelCompanion         # build and launch the app
-swift test                       # PixelCompanionCore unit tests
+swift test                       # core + native macOS app tests
 scripts/quality/check.sh --base origin/main   # the full PC-000 gate (also: make quality)
 ```
 
