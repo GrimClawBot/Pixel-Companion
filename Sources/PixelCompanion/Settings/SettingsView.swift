@@ -36,6 +36,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             connectorSection
+            paperclipSection
             mockSection
             presentationSection
         }
@@ -54,6 +55,42 @@ struct SettingsView: View {
             Text(selectedSummary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var paperclipSection: some View {
+        if model.isPaperclipConnector {
+            Section {
+                TextField("Base URL", text: $model.paperclipBaseURL)
+                    .textFieldStyle(.roundedBorder)
+                if model.paperclipCompanies.isEmpty {
+                    TextField("Company ID", text: $model.paperclipCompanyID)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    Picker("Company", selection: $model.paperclipCompanyID) {
+                        Text("Choose a company").tag("")
+                        ForEach(model.paperclipCompanies) { company in
+                            Text(company.name).tag(company.id)
+                        }
+                    }
+                }
+                HStack {
+                    LabeledContent("Status", value: model.snapshot.connectionState.displayName)
+                    Spacer()
+                    Button("Refresh") { model.refreshConnector() }
+                }
+                if let error = model.snapshot.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Paperclip")
+            } footer: {
+                Text("Read-only. Pixel Companion sends GET requests only and stores no Paperclip credentials.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
