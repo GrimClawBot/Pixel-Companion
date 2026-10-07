@@ -34,15 +34,28 @@ struct SummaryHeader: View {
 struct SnapshotContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
+    var approvalLimit: Int? = 2
+
+    private var visibleApprovals: [ApprovalRequest] {
+        ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SummaryHeader(snapshot: snapshot, mood: mood)
             if let activity = snapshot.currentActivity {
-                ActivityRow(event: activity)
+                SectionTitle(text: "Now")
+                ActivityRow(event: activity, emphasizesTitle: true)
             }
-            ForEach(snapshot.pendingApprovals.prefix(2)) { approval in
-                ApprovalRow(approval: approval)
+            if !visibleApprovals.isEmpty {
+                HStack {
+                    SectionTitle(text: "Waiting on you")
+                    Spacer()
+                    ApprovalCountBadge(count: snapshot.pendingApprovals.count)
+                }
+                ForEach(visibleApprovals) { approval in
+                    ApprovalRow(approval: approval)
+                }
             }
             if let usage = snapshot.usage {
                 UsageBar(usage: usage)
@@ -59,15 +72,30 @@ struct DetailContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SnapshotContent(snapshot: snapshot, mood: mood)
+            SnapshotContent(snapshot: snapshot, mood: mood, approvalLimit: 0)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle(text: "Activity")
-                    if snapshot.recentActivity.isEmpty {
-                        Placeholder(text: "No activity yet")
+                    if !snapshot.pendingApprovals.isEmpty {
+                        HStack {
+                            SectionTitle(text: "Pending approvals")
+                            Spacer()
+                            ApprovalCountBadge(count: snapshot.pendingApprovals.count)
+                        }
+                        ForEach(snapshot.pendingApprovals) { approval in
+                            ApprovalRow(approval: approval)
+                        }
+                        Divider()
                     }
-                    ForEach(snapshot.recentActivity) { event in
+                    SectionTitle(text: "Recent activity")
+                    let history = ActivityPresentation.history(
+                        snapshot.recentActivity,
+                        currentActivity: snapshot.currentActivity
+                    )
+                    if history.isEmpty {
+                        Placeholder(text: "No additional activity yet")
+                    }
+                    ForEach(history) { event in
                         ActivityRow(event: event)
                     }
                     if !snapshot.recentMessages.isEmpty {
@@ -98,6 +126,7 @@ struct DetailContent: View {
 
 struct ActivityRow: View {
     let event: ActivityEvent
+    var emphasizesTitle = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -106,7 +135,7 @@ struct ActivityRow: View {
                 .frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 Text(event.title)
-                    .font(.callout)
+                    .font(emphasizesTitle ? .callout.weight(.semibold) : .callout)
                     .lineLimit(1)
                 if let detail = event.detail {
                     Text(detail)
@@ -145,13 +174,37 @@ struct ApprovalRow: View {
     let approval: ApprovalRequest
 
     var body: some View {
-        Label {
-            Text(approval.title).lineLimit(1)
-        } icon: {
-            Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "hand.raised.fill")
+                .foregroundStyle(.orange)
+                .frame(width: 14)
+                .accessibilityHidden(true)
+            Text(approval.title)
+                .font(.callout)
+                .lineLimit(1)
+                .accessibilityLabel(ApprovalPresentation.accessibilityContext(approval))
+            Spacer(minLength: 0)
+            if ApprovalPresentation.showsTimestamp(approval) {
+                Text(approval.requestedAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .font(.callout)
-        .accessibilityLabel("Waiting for approval: \(approval.title)")
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct ApprovalCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.caption2.weight(.bold).monospacedDigit())
+            .foregroundStyle(.black)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.orange))
+            .accessibilityLabel(ApprovalPresentation.countLabel(count))
     }
 }
 
@@ -176,8 +229,7 @@ struct UsageBar: View {
     }
 
     private var amount: String {
-        guard let limit = usage.limit else { return "\(usage.used) \(usage.unit)" }
-        return "\(usage.used) / \(limit) \(usage.unit)"
+        UsagePresentation.amount(usage)
     }
 }
 
@@ -213,5 +265,61 @@ struct Placeholder: View {
         Text(text)
             .font(.callout)
             .foregroundStyle(.tertiary)
+    }
+}
+
+enum ApprovalPresentation {
+    static func visible(
+        _ approvals: [ApprovalRequest],
+        limit: Int?
+    ) -> [ApprovalRequest] {
+        guard let limit else { return approvals }
+        return Array(approvals.prefix(max(limit, 0)))
+    }
+
+    static func countLabel(_ count: Int) -> String {
+        "\(count) pending \(count == 1 ? "approval" : "approvals")"
+    }
+
+    static func accessibilityContext(_ approval: ApprovalRequest) -> String {
+        "Waiting for approval: \(approval.title)"
+    }
+
+    static func showsTimestamp(_ approval: ApprovalRequest) -> Bool {
+        approval.requestedAt != .distantPast
+    }
+}
+
+enum ActivityPresentation {
+    static func history(
+        _ events: [ActivityEvent],
+        currentActivity: ActivityEvent?
+    ) -> [ActivityEvent] {
+        guard let currentActivity, let index = events.firstIndex(of: currentActivity) else {
+            return events
+        }
+        var history = events
+        history.remove(at: index)
+        return history
+    }
+}
+
+enum UsagePresentation {
+    static func amount(_ usage: UsageSnapshot) -> String {
+        if usage.unit.lowercased() == "cents" {
+            let used = currency(cents: usage.used)
+            guard let limit = usage.limit else { return used }
+            return "\(used) / \(currency(cents: limit))"
+        }
+        guard let limit = usage.limit else { return "\(usage.used) \(usage.unit)" }
+        return "\(usage.used) / \(limit) \(usage.unit)"
+    }
+
+    private static func currency(cents: Int) -> String {
+        let sign = cents < 0 ? "-" : ""
+        let absolute = cents.magnitude
+        let dollars = absolute / 100
+        let remainder = absolute % 100
+        return "\(sign)$\(dollars).\(String(format: "%02d", remainder))"
     }
 }
