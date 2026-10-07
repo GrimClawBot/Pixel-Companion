@@ -38,7 +38,7 @@ final class AppModel: ObservableObject {
             settings.connectorID = newValue
             rebuildConnector()
             scheduleStepTimer()
-            refreshConnector()
+            if isPaperclipConnector { refreshConnector() }
         }
     }
 
@@ -105,7 +105,7 @@ final class AppModel: ObservableObject {
     func start() {
         rebuildConnector()
         scheduleStepTimer()
-        refreshConnector()
+        if isPaperclipConnector { refreshConnector() }
     }
 
     /// Rewinds the mock script to its first step. Local only; nothing outside the app changes.
