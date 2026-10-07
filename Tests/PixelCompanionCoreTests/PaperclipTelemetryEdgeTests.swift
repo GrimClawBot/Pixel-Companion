@@ -125,6 +125,46 @@ final class PaperclipTelemetryEdgeTests: XCTestCase {
         XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
     }
 
+
+    func testLiveEndpointFailureRetainsRecentRunWithoutLiveClaim() {
+        let service = makeService()
+        EdgeStubURLProtocol.handler = { request in
+            switch request.url?.path {
+            case "/api/companies/company-1/heartbeat-runs":
+                return (200, self.json([[
+                    "id": "recent-running",
+                    "agentId": "agent-1",
+                    "status": "running",
+                    "startedAt": "2026-10-07T18:00:00.000Z",
+                    "createdAt": "2026-10-07T18:00:00.000Z",
+                    "updatedAt": "2026-10-07T18:30:00.000Z"
+                ]]))
+            case "/api/companies/company-1/live-runs":
+                return (503, Data("{}".utf8))
+            default:
+                return self.coreResponse(for: request.url?.path)
+            }
+        }
+
+        let sessionExpectation = expectation(description: "Unconfirmed recent session")
+        service.fetch(
+            configuration: selectedConfiguration(),
+            completion: { _ in },
+            sessionCompletion: { result in
+                guard case let .success(sessions) = result else {
+                    XCTFail("Expected recent telemetry to survive live endpoint failure")
+                    sessionExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(sessions.first?.runID, "recent-running")
+                XCTAssertEqual(sessions.first?.runState, .unknown)
+                XCTAssertFalse(sessions.first?.isActive ?? true)
+                sessionExpectation.fulfill()
+            }
+        )
+        wait(for: [sessionExpectation], timeout: 2)
+    }
+
     func testHistoricalRunningRunIsNotLiveWhenLiveEndpointIsEmpty() {
         let service = makeService()
         EdgeStubURLProtocol.handler = { request in
