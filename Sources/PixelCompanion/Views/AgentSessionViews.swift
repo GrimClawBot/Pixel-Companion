@@ -38,6 +38,12 @@ struct AgentSessionRow: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
+                if !compact, let identity = AgentSessionPresentation.identityLabel(session) {
+                    Text(identity)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
                 if !compact, let tokens = AgentSessionPresentation.tokenLabel(session) {
                     Text(tokens)
                         .font(.caption2.monospacedDigit())
@@ -88,6 +94,16 @@ enum AgentSessionPresentation {
             .nilIfEmpty
     }
 
+    static func identityLabel(_ session: AgentSessionSnapshot) -> String? {
+        if let sessionID = session.sessionID, !sessionID.isEmpty {
+            return "Session \(shortID(sessionID))"
+        }
+        if let runID = session.runID, !runID.isEmpty {
+            return "Run \(shortID(runID))"
+        }
+        return nil
+    }
+
     static func tokenLabel(_ session: AgentSessionSnapshot) -> String? {
         var parts: [String] = []
         if let value = session.inputTokens { parts.append("\(count(value)) in") }
@@ -116,6 +132,10 @@ enum AgentSessionPresentation {
         case .failed: return .red
         case .cancelled, .idle, .unknown: return .secondary
         }
+    }
+
+    private static func shortID(_ value: String) -> String {
+        value.count > 12 ? "\(value.prefix(8))…" : value
     }
 
     private static func count(_ value: Int) -> String {
