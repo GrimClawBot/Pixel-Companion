@@ -157,6 +157,7 @@ public final class PaperclipConnector:
     }
 
     private func applyCore(_ state: PaperclipRemoteState, to value: inout Cache) {
+        let companyChanged = value.companyID != state.companyID
         value.connectionState = .connected
         value.lastError = nil
         value.companyName = state.companyName
@@ -165,7 +166,9 @@ public final class PaperclipConnector:
         value.activity = state.activity
         value.approvals = state.approvals
         value.usage = state.usage
-        value.agentSessions = state.agentSessions
+        if companyChanged || value.agentSessions.isEmpty {
+            value.agentSessions = state.agentSessions
+        }
     }
 
     private static func initialCache(_ configuration: PaperclipConfiguration) -> Cache {
