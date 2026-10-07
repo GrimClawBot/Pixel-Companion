@@ -23,10 +23,13 @@ public final class SettingsStore {
         case presentation = "pixelCompanion.presentation"
         case mockConnectionState = "pixelCompanion.mockConnectionState"
         case mockStepInterval = "pixelCompanion.mockStepInterval"
+        case paperclipBaseURL = "pixelCompanion.paperclipBaseURL"
+        case paperclipCompanyID = "pixelCompanion.paperclipCompanyID"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
     public static let defaultStepInterval: TimeInterval = 4
+    public static let paperclipRefreshInterval: TimeInterval = 5
 
     private let defaults: UserDefaults
 
@@ -68,6 +71,18 @@ public final class SettingsStore {
             return Self.clampedInterval(stored)
         }
         set { defaults.set(Self.clampedInterval(newValue), forKey: Key.mockStepInterval.rawValue) }
+    }
+
+    /// Base URL for an optional Paperclip instance. This is connection metadata, not a secret.
+    public var paperclipBaseURL: String {
+        get { defaults.string(forKey: Key.paperclipBaseURL.rawValue) ?? "" }
+        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.paperclipBaseURL.rawValue) }
+    }
+
+    /// Selected Paperclip company identifier. Empty means "discover companies first".
+    public var paperclipCompanyID: String {
+        get { defaults.string(forKey: Key.paperclipCompanyID.rawValue) ?? "" }
+        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.paperclipCompanyID.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.
