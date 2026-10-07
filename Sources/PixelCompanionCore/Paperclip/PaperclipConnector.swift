@@ -1,7 +1,7 @@
 import Foundation
 
 /// Read-only Paperclip connector. Network requests update a synchronized cache off the UI path.
-public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, ApprovalProvider, UsageProvider {
+public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, ApprovalProvider, UsageProvider, AgentSessionSource {
     public let id: ConnectorID = .paperclip
     public let configuration: PaperclipConfiguration
 
@@ -14,6 +14,7 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
         var activity: [ActivityEvent] = []
         var approvals: [ApprovalRequest] = []
         var usage: UsageSnapshot?
+        var agentSessions: [AgentSessionSnapshot] = []
         var inFlight = false
     }
 
@@ -46,6 +47,7 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
     public var activity: (any ActivitySource)? { self }
     public var approvals: (any ApprovalProvider)? { self }
     public var usage: (any UsageProvider)? { self }
+    public var sessions: (any AgentSessionSource)? { self }
     public var authStatus: AuthStatus { .notRequired }
 
     public var currentActivity: ActivityEvent? {
@@ -70,6 +72,10 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
 
     public func currentUsage() -> UsageSnapshot? {
         locked { cache.usage }
+    }
+
+    public func agentSessions(limit: Int) -> [AgentSessionSnapshot] {
+        locked { Array(cache.agentSessions.prefix(max(limit, 0))) }
     }
 
     public func refresh() {
@@ -126,6 +132,7 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
         value.activity = state.activity
         value.approvals = state.approvals
         value.usage = state.usage
+        value.agentSessions = state.agentSessions
     }
 
     private static func initialCache(_ configuration: PaperclipConfiguration) -> Cache {
