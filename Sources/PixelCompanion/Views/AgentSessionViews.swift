@@ -61,9 +61,30 @@ struct AgentSessionRow: View {
     }
 }
 
+enum SnapshotPrimaryContent: Equatable {
+    case activity(ActivityEvent)
+    case session(AgentSessionSnapshot)
+}
+
 enum AgentSessionPresentation {
     static func primary(_ sessions: [AgentSessionSnapshot]) -> AgentSessionSnapshot? {
         sessions.first(where: \.isActive) ?? sessions.first
+    }
+
+    static func snapshotPrimary(
+        activity: ActivityEvent?,
+        sessions: [AgentSessionSnapshot]
+    ) -> SnapshotPrimaryContent? {
+        if let active = sessions.first(where: \.isActive) {
+            return .session(active)
+        }
+        if let activity {
+            return .activity(activity)
+        }
+        if let recent = sessions.first {
+            return .session(recent)
+        }
+        return nil
     }
 
     static func sectionTitle(_ sessions: [AgentSessionSnapshot]) -> String {
