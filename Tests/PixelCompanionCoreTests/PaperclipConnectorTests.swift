@@ -5,8 +5,8 @@ import XCTest
 private final class StubURLProtocol: URLProtocol {
     static var handler: ((URLRequest) throws -> (Int, Data))?
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
         guard let handler = Self.handler else {
@@ -116,72 +116,10 @@ final class PaperclipConnectorTests: XCTestCase {
 
     func testURLServiceMapsOnlyReadOnlyDashboardData() {
         let service = makeService()
-        StubURLProtocol.handler = { request in
-            XCTAssertEqual(request.httpMethod, "GET")
-            switch request.url?.path {
-            case "/api/health":
-                return (200, self.json(["status": "ok"]))
-            case "/api/companies":
-                return (200, self.json([
-                    ["id": "company-1", "name": "Example Co", "status": "active"]
-                ]))
-            case "/api/companies/company-1/dashboard":
-                return (200, self.json([
-                    "costs": ["monthSpendCents": 125, "monthBudgetCents": 1000]
-                ]))
-            case "/api/companies/company-1/agents":
-                return (200, self.json([
-                    [
-                        "id": "agent-1",
-                        "name": "Builder",
-                        "title": "Engineer",
-                        "status": "running",
-                        "updatedAt": "2026-10-07T18:00:00.000Z"
-                    ],
-                    [
-                        "id": "agent-2",
-                        "name": "QA",
-                        "title": "QA Engineer",
-                        "status": "idle",
-                        "updatedAt": "2026-10-07T17:00:00.000Z"
-                    ]
-                ]))
-            case "/api/companies/company-1/issues":
-                return (200, self.json([
-                    [
-                        "id": "issue-1",
-                        "identifier": "EX-1",
-                        "title": "Build native connector",
-                        "status": "in_progress",
-                        "assigneeAgentId": "agent-1",
-                        "lastActivityAt": "2026-10-07T18:10:00.000Z",
-                        "updatedAt": "2026-10-07T18:10:00.000Z",
-                        "createdAt": "2026-10-07T17:30:00.000Z",
-                        "description": "This field is intentionally ignored by the connector."
-                    ]
-                ]))
-            case "/api/companies/company-1/approvals":
-                return (200, self.json([
-                    [
-                        "id": "approval-1",
-                        "title": "Ship build",
-                        "status": "pending",
-                        "requestedAt": "2026-10-07T18:05:00.000Z"
-                    ]
-                ]))
-            default:
-                XCTFail("Unexpected URL: \(request.url?.absoluteString ?? "nil")")
-                return (404, Data())
-            }
-        }
+        installDashboardFixture()
 
         let expectation = expectation(description: "Paperclip fetch")
-        service.fetch(
-            configuration: PaperclipConfiguration(
-                baseURLString: "https://paperclip.example",
-                companyID: "company-1"
-            )
-        ) { result in
+        service.fetch(configuration: selectedConfiguration()) { result in
             guard case let .success(state) = result else {
                 XCTFail("Expected successful mapping: \(result)")
                 expectation.fulfill()
@@ -249,6 +187,86 @@ final class PaperclipConnectorTests: XCTestCase {
         wait(for: [expectation], timeout: 2)
     }
 
+    private func installDashboardFixture() {
+        StubURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            return self.dashboardResponse(for: request.url?.path)
+        }
+    }
+
+    private func dashboardResponse(for path: String?) -> (Int, Data) {
+        switch path {
+        case "/api/health":
+            return (200, json(["status": "ok"]))
+        case "/api/companies":
+            return (200, companiesJSON())
+        case "/api/companies/company-1/dashboard":
+            return (200, json(["costs": ["monthSpendCents": 125, "monthBudgetCents": 1000]]))
+        case "/api/companies/company-1/agents":
+            return (200, agentsJSON())
+        case "/api/companies/company-1/issues":
+            return (200, issuesJSON())
+        case "/api/companies/company-1/approvals":
+            return (200, approvalsJSON())
+        default:
+            XCTFail("Unexpected path: \(path ?? "nil")")
+            return (404, Data())
+        }
+    }
+
+    private func companiesJSON() -> Data {
+        json([["id": "company-1", "name": "Example Co", "status": "active"]])
+    }
+
+    private func agentsJSON() -> Data {
+        json([
+            [
+                "id": "agent-1",
+                "name": "Builder",
+                "title": "Engineer",
+                "status": "running",
+                "updatedAt": "2026-10-07T18:00:00.000Z"
+            ],
+            [
+                "id": "agent-2",
+                "name": "QA",
+                "title": "QA Engineer",
+                "status": "idle",
+                "updatedAt": "2026-10-07T17:00:00.000Z"
+            ]
+        ])
+    }
+
+    private func issuesJSON() -> Data {
+        json([[
+            "id": "issue-1",
+            "identifier": "EX-1",
+            "title": "Build native connector",
+            "status": "in_progress",
+            "assigneeAgentId": "agent-1",
+            "lastActivityAt": "2026-10-07T18:10:00.000Z",
+            "updatedAt": "2026-10-07T18:10:00.000Z",
+            "createdAt": "2026-10-07T17:30:00.000Z",
+            "description": "Ignored by the connector."
+        ]])
+    }
+
+    private func approvalsJSON() -> Data {
+        json([[
+            "id": "approval-1",
+            "title": "Ship build",
+            "status": "pending",
+            "requestedAt": "2026-10-07T18:05:00.000Z"
+        ]])
+    }
+
+    private func selectedConfiguration() -> PaperclipConfiguration {
+        PaperclipConfiguration(
+            baseURLString: "https://paperclip.example",
+            companyID: "company-1"
+        )
+    }
+
     private func makeService() -> URLSessionPaperclipService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubURLProtocol.self]
@@ -256,6 +274,6 @@ final class PaperclipConnectorTests: XCTestCase {
     }
 
     private func json(_ object: Any) -> Data {
-        try! JSONSerialization.data(withJSONObject: object)
+        (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
     }
 }
