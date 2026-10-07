@@ -277,7 +277,6 @@ final class PaperclipConnectorTests: XCTestCase {
         ]])
     }
 
-
     private func heartbeatRunsJSON() -> Data {
         json([[
             "id": "run-1",
