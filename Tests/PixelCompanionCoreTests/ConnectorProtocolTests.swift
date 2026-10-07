@@ -33,6 +33,7 @@ final class ConnectorProtocolTests: XCTestCase {
         XCTAssertNil(connector.activity)
         XCTAssertNil(connector.approvals)
         XCTAssertNil(connector.usage)
+        XCTAssertNil(connector.sessions)
         XCTAssertNil(connector.chat)
         connector.refresh()
     }
@@ -47,6 +48,7 @@ final class ConnectorProtocolTests: XCTestCase {
         XCTAssertTrue(snapshot.recentActivity.isEmpty)
         XCTAssertTrue(snapshot.pendingApprovals.isEmpty)
         XCTAssertNil(snapshot.usage)
+        XCTAssertTrue(snapshot.agentSessions.isEmpty)
         XCTAssertTrue(snapshot.recentMessages.isEmpty)
     }
 
