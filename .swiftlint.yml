@@ -1,0 +1,11 @@
+# SwiftLint runs with --strict in scripts/quality/check.sh: every warning fails the gate.
+included:
+  - Package.swift
+  - Sources
+  - Tests
+excluded:
+  - .build
+
+identifier_name:
+  excluded:
+    - id
