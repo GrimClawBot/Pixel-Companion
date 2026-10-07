@@ -145,7 +145,6 @@ final class PaperclipConnectorTests: XCTestCase {
         wait(for: [expectation], timeout: 2)
     }
 
-
     func testRunTelemetryFailureDoesNotBreakBaseConnectorData() {
         let service = makeService()
         StubURLProtocol.handler = { request in
@@ -221,6 +220,9 @@ final class PaperclipConnectorTests: XCTestCase {
         wait(for: [expectation], timeout: 2)
     }
 
+}
+
+private extension PaperclipConnectorTests {
     private func installDashboardFixture() {
         StubURLProtocol.handler = { request in
             XCTAssertEqual(request.httpMethod, "GET")
