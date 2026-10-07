@@ -22,14 +22,20 @@ struct PaperclipFetchPayload {
 }
 
 final class PaperclipTelemetryFetcher {
+    private struct Key: Equatable {
+        let baseURL: String
+        let companyID: String
+    }
+
     private struct Pending {
+        let key: Key
         let payload: PaperclipFetchPayload
         let completion: (Result<[AgentSessionSnapshot], Error>) -> Void
     }
 
     private let client: PaperclipHTTPClient
     private let lock = NSLock()
-    private var inFlight = false
+    private var activeKey: Key?
     private var pending: [Pending] = []
 
     init(client: PaperclipHTTPClient) {
@@ -40,17 +46,21 @@ final class PaperclipTelemetryFetcher {
         payload: PaperclipFetchPayload,
         completion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
+        let key = Self.key(for: payload.context)
         let shouldStart = lock.withLock {
-            pending.append(Pending(payload: payload, completion: completion))
-            guard !inFlight else { return false }
-            inFlight = true
+            pending.append(Pending(key: key, payload: payload, completion: completion))
+            guard activeKey == nil else { return false }
+            activeKey = key
             return true
         }
         guard shouldStart else { return }
-        fetchRecentRuns(context: payload.context)
+        fetchRecentRuns(context: payload.context, key: key)
     }
 
-    private func fetchRecentRuns(context: PaperclipFetchContext) {
+    private func fetchRecentRuns(
+        context: PaperclipFetchContext,
+        key: Key
+    ) {
         client.getLossyArray(
             baseURL: context.baseURL,
             path: companyPath(context.company.id, resource: "heartbeat-runs"),
@@ -61,12 +71,13 @@ final class PaperclipTelemetryFetcher {
             as: PaperclipHeartbeatRunResponse.self
         ) { [weak self] recentResult in
             guard let self else { return }
-            self.fetchLiveRuns(context: context, recentResult: recentResult)
+            self.fetchLiveRuns(context: context, key: key, recentResult: recentResult)
         }
     }
 
     private func fetchLiveRuns(
         context: PaperclipFetchContext,
+        key: Key,
         recentResult: Result<[PaperclipHeartbeatRunResponse], Error>
     ) {
         client.getLossyArray(
@@ -78,18 +89,19 @@ final class PaperclipTelemetryFetcher {
             ],
             as: PaperclipHeartbeatRunResponse.self
         ) { [weak self] liveResult in
-            self?.finish(recentResult: recentResult, liveResult: liveResult)
+            self?.finish(key: key, recentResult: recentResult, liveResult: liveResult)
         }
     }
 
     private func finish(
+        key: Key,
         recentResult: Result<[PaperclipHeartbeatRunResponse], Error>,
         liveResult: Result<[PaperclipHeartbeatRunResponse], Error>
     ) {
         let waiters = lock.withLock {
-            let current = pending
-            pending = []
-            inFlight = false
+            let current = pending.filter { $0.key == key }
+            pending.removeAll { $0.key == key }
+            if activeKey == key { activeKey = nil }
             return current
         }
 
@@ -113,14 +125,18 @@ final class PaperclipTelemetryFetcher {
     }
 
     private func restartIfNeeded() {
-        let context = lock.withLock { () -> PaperclipFetchContext? in
-            guard !inFlight, let first = pending.first else { return nil }
-            inFlight = true
-            return first.payload.context
+        let next = lock.withLock { () -> Pending? in
+            guard activeKey == nil, let first = pending.first else { return nil }
+            activeKey = first.key
+            return first
         }
-        if let context {
-            fetchRecentRuns(context: context)
+        if let next {
+            fetchRecentRuns(context: next.payload.context, key: next.key)
         }
+    }
+
+    private static func key(for context: PaperclipFetchContext) -> Key {
+        Key(baseURL: context.baseURL.absoluteString, companyID: context.company.id)
     }
 
     private static func merge(
