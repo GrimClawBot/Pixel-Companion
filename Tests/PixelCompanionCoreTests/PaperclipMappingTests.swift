@@ -15,16 +15,24 @@ final class PaperclipMappingTests: XCTestCase {
                 PaperclipAgentResponse(
                     id: "agent-1",
                     name: "Old Name",
+                    role: nil,
                     title: nil,
                     status: "idle",
+                    adapterType: nil,
+                    adapterConfig: nil,
+                    runtimeConfig: nil,
                     lastHeartbeatAt: nil,
                     updatedAt: "2026-10-07T17:00:00.000Z"
                 ),
                 PaperclipAgentResponse(
                     id: "agent-1",
                     name: "Current Name",
+                    role: nil,
                     title: nil,
                     status: "idle",
+                    adapterType: nil,
+                    adapterConfig: nil,
+                    runtimeConfig: nil,
                     lastHeartbeatAt: nil,
                     updatedAt: "2026-10-07T18:00:00.000Z"
                 )
@@ -41,12 +49,136 @@ final class PaperclipMappingTests: XCTestCase {
                     createdAt: nil
                 )
             ],
-            approvals: []
+            approvals: [],
+            runs: []
         )
 
         let state = PaperclipMapper.map(input)
 
         XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Current Name")
+    }
+
+
+    func testAgentSessionsPreferActiveRunAndMapSafeTelemetry() {
+        let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+        let input = PaperclipMappingInput(
+            companies: [company],
+            company: company,
+            dashboard: PaperclipDashboardResponse(
+                costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+            ),
+            agents: [
+                PaperclipAgentResponse(
+                    id: "agent-1",
+                    name: "Builder",
+                    role: "engineer",
+                    title: "Senior Engineer",
+                    status: "idle",
+                    adapterType: "codex_local",
+                    adapterConfig: .init(model: "fallback-model"),
+                    runtimeConfig: .init(aiConnection: .init(provider: "fallback-provider")),
+                    lastHeartbeatAt: "2026-10-07T18:00:00.000Z",
+                    updatedAt: "2026-10-07T18:00:00.000Z"
+                )
+            ],
+            issues: [
+                PaperclipIssueResponse(
+                    id: "issue-1",
+                    identifier: "EX-1",
+                    title: "Build session UI",
+                    status: "in_progress",
+                    assigneeAgentId: "agent-1",
+                    lastActivityAt: nil,
+                    updatedAt: nil,
+                    createdAt: nil
+                )
+            ],
+            approvals: [],
+            runs: [
+                PaperclipHeartbeatRunResponse(
+                    id: "recent-failed",
+                    agentId: "agent-1",
+                    status: "failed",
+                    startedAt: "2026-10-07T18:20:00.000Z",
+                    finishedAt: "2026-10-07T18:21:00.000Z",
+                    createdAt: "2026-10-07T18:20:00.000Z",
+                    updatedAt: "2026-10-07T18:21:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: .init(issueId: "issue-1", taskId: "issue-1")
+                ),
+                PaperclipHeartbeatRunResponse(
+                    id: "active-run",
+                    agentId: "agent-1",
+                    status: "running",
+                    startedAt: "2026-10-07T18:10:00.000Z",
+                    finishedAt: nil,
+                    createdAt: "2026-10-07T18:10:00.000Z",
+                    updatedAt: "2026-10-07T18:19:00.000Z",
+                    usageJson: .init(
+                        model: "gpt-5.6-sol",
+                        provider: "openai",
+                        inputTokens: 1200,
+                        cachedInputTokens: 800,
+                        outputTokens: 250,
+                        persistedSessionId: "session-1"
+                    ),
+                    sessionIdBefore: nil,
+                    sessionIdAfter: "session-1",
+                    contextSnapshot: .init(issueId: "issue-1", taskId: "issue-1")
+                )
+            ]
+        )
+
+        let state = PaperclipMapper.map(input)
+        let session = try? XCTUnwrap(state.agentSessions.first)
+
+        XCTAssertEqual(session??.runID, "active-run")
+        XCTAssertEqual(session??.runState, .running)
+        XCTAssertEqual(session??.taskTitle, "EX-1 · Build session UI")
+        XCTAssertEqual(session??.model, "gpt-5.6-sol")
+        XCTAssertEqual(session??.provider, "openai")
+        XCTAssertEqual(session??.sessionID, "session-1")
+        XCTAssertEqual(session??.inputTokens, 1200)
+        XCTAssertEqual(session??.cachedInputTokens, 800)
+        XCTAssertEqual(session??.outputTokens, 250)
+        XCTAssertTrue(session??.isActive == true)
+    }
+
+    func testAgentWithoutRunIsNeverInventedAsLive() {
+        let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+        let input = PaperclipMappingInput(
+            companies: [company],
+            company: company,
+            dashboard: PaperclipDashboardResponse(
+                costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+            ),
+            agents: [
+                PaperclipAgentResponse(
+                    id: "agent-1",
+                    name: "Builder",
+                    role: "engineer",
+                    title: "Engineer",
+                    status: "running",
+                    adapterType: "codex_local",
+                    adapterConfig: .init(model: "gpt-5.6-sol"),
+                    runtimeConfig: .init(aiConnection: .init(provider: "openai")),
+                    lastHeartbeatAt: nil,
+                    updatedAt: "2026-10-07T18:00:00.000Z"
+                )
+            ],
+            issues: [],
+            approvals: [],
+            runs: []
+        )
+
+        let session = PaperclipMapper.map(input).agentSessions.first
+
+        XCTAssertEqual(session?.runState, .unknown)
+        XCTAssertFalse(session?.isActive ?? true)
+        XCTAssertEqual(session?.model, "gpt-5.6-sol")
+        XCTAssertEqual(session?.provider, "openai")
     }
 
     func testCurrentActivityUsesNewestEventEvenWhenOlderEventIsRunning() {
@@ -75,7 +207,8 @@ final class PaperclipMappingTests: XCTestCase {
             companyName: "Example Co",
             activity: [newestFailure, olderRunning],
             approvals: [],
-            usage: nil
+            usage: nil,
+            agentSessions: []
         )))
 
         XCTAssertEqual(connector.currentActivity, newestFailure)
