@@ -86,6 +86,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
         }
         guard let company = companies.first(where: { $0.id == selectedID }) else {
             completion(.failure(PaperclipServiceError.companyNotFound))
+            sessionCompletion(.success([]))
             return
         }
 
@@ -219,7 +220,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     }
 
     private static func coreState(_ payload: PaperclipFetchPayload) -> PaperclipRemoteState {
-        PaperclipMapper.map(PaperclipMappingInput(
+        let mapped = PaperclipMapper.map(PaperclipMappingInput(
             companies: payload.context.companies,
             company: payload.context.company,
             dashboard: payload.dashboard,
@@ -228,6 +229,15 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             approvals: payload.approvals,
             runs: []
         ))
+        return PaperclipRemoteState(
+            companies: mapped.companies,
+            companyID: mapped.companyID,
+            companyName: mapped.companyName,
+            activity: mapped.activity,
+            approvals: mapped.approvals,
+            usage: mapped.usage,
+            agentSessions: []
+        )
     }
 
     private func companyPath(_ companyID: String, resource: String) -> String {
