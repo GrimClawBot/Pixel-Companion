@@ -110,9 +110,12 @@ enum AgentSessionPresentation {
         case .cancelled: return "Cancelled"
         case .idle: return "Idle"
         case .unknown:
-            let status = session.agentStatus
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(of: "_", with: " ")
+            let rawStatus = session.agentStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = rawStatus.lowercased()
+            if ["queued", "running", "working", "busy", "active", "executing"].contains(normalized) {
+                return "Unknown"
+            }
+            let status = rawStatus.replacingOccurrences(of: "_", with: " ")
             return status.isEmpty ? "Unknown" : status.capitalized
         }
     }
