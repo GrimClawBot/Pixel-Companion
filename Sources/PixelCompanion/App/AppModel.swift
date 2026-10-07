@@ -89,7 +89,10 @@ final class AppModel: ObservableObject {
             guard newValue != notificationManager.enabled else { return }
             objectWillChange.send()
             notificationManager.setEnabled(newValue)
-            notificationManager.observe(snapshot, isPaperclip: isPaperclipConnector)
+            notificationManager.observe(
+                ConnectorSnapshot(capturing: connector, sessionLimit: 128),
+                isPaperclip: isPaperclipConnector
+            )
         }
     }
 
@@ -99,6 +102,10 @@ final class AppModel: ObservableObject {
 
     func requestNotificationPermission() {
         notificationManager.requestPermission()
+    }
+
+    func refreshNotificationPermission() {
+        notificationManager.refreshPermission()
     }
 
     var paperclipBaseURL: String { settings.paperclipBaseURL }
@@ -204,7 +211,9 @@ final class AppModel: ObservableObject {
         let next = ConnectorSnapshot(capturing: connector)
         if next != snapshot { snapshot = next }
         if stateMachine.update(with: next) != nil { mood = stateMachine.mood }
-        notificationManager.observe(next, isPaperclip: isPaperclipConnector)
+        let notificationSnapshot = notificationsEnabled && isPaperclipConnector
+            ? ConnectorSnapshot(capturing: connector, sessionLimit: 128) : next
+        notificationManager.observe(notificationSnapshot, isPaperclip: isPaperclipConnector)
     }
 
     private func scheduleStepTimer() {

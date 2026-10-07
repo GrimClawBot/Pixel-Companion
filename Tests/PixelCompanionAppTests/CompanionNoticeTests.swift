@@ -58,6 +58,34 @@ final class CompanionNoticeTests: XCTestCase {
         )
     }
 
+    func testBriefUnknownOrMissingRunStillNotifiesOnceWhenConfirmedEnded() {
+        var detector = CompanionNoticeDetector()
+        let running = session("a", run: "run1", state: .running)
+        XCTAssertEqual(detector.observe(snapshot(sessions: [running])), [])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [
+            session("a", run: "run1", state: .unknown)
+        ])), [])
+        XCTAssertEqual(detector.observe(snapshot()), [])
+        let completed = session("a", run: "run1", state: .completed)
+        XCTAssertEqual(detector.observe(snapshot(sessions: [completed])), [.completedRuns(1)])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [completed])), [])
+    }
+
+    func testRunFinishingOutsideEightVisibleAgentRowsStillNotifies() {
+        var detector = CompanionNoticeDetector()
+        let running = session("a", run: "run1", state: .running)
+        let nineActive = (1...9).map {
+            session("other-\($0)", run: "r\($0)", state: .running)
+        }
+        XCTAssertEqual(detector.observe(snapshot(sessions: nineActive + [running])), [])
+        XCTAssertEqual(detector.observe(snapshot(sessions: nineActive)), [])
+        let finished = session("a", run: "run1", state: .failed)
+        XCTAssertEqual(
+            detector.observe(snapshot(sessions: nineActive + [finished])),
+            [.failedRuns(1)]
+        )
+    }
+
     func testUnknownAndUnconfirmedRunsNeverProduceCompletionNotice() {
         var detector = CompanionNoticeDetector()
         XCTAssertEqual(detector.observe(snapshot(sessions: [

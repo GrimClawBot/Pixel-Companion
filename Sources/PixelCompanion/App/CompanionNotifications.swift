@@ -2,7 +2,7 @@ import Foundation
 import PixelCompanionCore
 import UserNotifications
 
-/// Privacy-safe notices: text never contains task, identity, session, or connector data.
+/// Static content excludes agent, task, and connector data.
 enum CompanionNotice: Equatable {
     case approvals(Int)
     case completedRuns(Int)
@@ -28,14 +28,24 @@ enum CompanionNotice: Equatable {
     }
 }
 
-/// Pure, testable transition policy. No notice on the first connected snapshot.
+/// Remember observed active runs across temporary unknown/missing telemetry; never infer live runs.
 struct CompanionNoticeDetector {
-    private var previous: ConnectorSnapshot?
+    private struct TrackedRun {
+        var observedActive: Bool
+        var notified: Bool
+        var lastPoll: Int
+    }
+
+    private var connectorName: String?
     private var seenApprovalIDs: Set<String> = []
+    private var tracked: [String: TrackedRun] = [:]
+    private var poll = 0
 
     mutating func reset() {
-        previous = nil
+        connectorName = nil
         seenApprovalIDs.removeAll()
+        tracked.removeAll()
+        poll = 0
     }
 
     mutating func observe(_ snapshot: ConnectorSnapshot) -> [CompanionNotice] {
@@ -43,41 +53,101 @@ struct CompanionNoticeDetector {
             reset()
             return []
         }
-        guard let old = previous, old.connectorName == snapshot.connectorName else {
+        if connectorName != snapshot.connectorName {
             reset()
-            previous = snapshot
+            connectorName = snapshot.connectorName
             seenApprovalIDs.formUnion(snapshot.pendingApprovals.map(\.id))
+            _ = scanRuns(snapshot.agentSessions, notify: false)
             return []
         }
-        previous = snapshot
 
         let newApprovals = snapshot.pendingApprovals.filter {
             !seenApprovalIDs.contains($0.id)
         }.count
         seenApprovalIDs.formUnion(snapshot.pendingApprovals.map(\.id))
-
-        let oldRuns = Dictionary(
-            old.agentSessions.map { ($0.agentID, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        var completed = 0
-        var failed = 0
-        for session in snapshot.agentSessions {
-            guard let previousRun = oldRuns[session.agentID],
-                  let runID = session.runID,
-                  runID == previousRun.runID,
-                  previousRun.isActive else { continue }
-            switch session.runState {
-            case .completed: completed += 1
-            case .failed: failed += 1
-            default: break
-            }
-        }
+        let endings = scanRuns(snapshot.agentSessions, notify: true)
         var notices: [CompanionNotice] = []
         if newApprovals > 0 { notices.append(.approvals(newApprovals)) }
-        if completed > 0 { notices.append(.completedRuns(completed)) }
-        if failed > 0 { notices.append(.failedRuns(failed)) }
+        if endings.completed > 0 { notices.append(.completedRuns(endings.completed)) }
+        if endings.failed > 0 { notices.append(.failedRuns(endings.failed)) }
         return notices
+    }
+
+    private mutating func scanRuns(
+        _ sessions: [AgentSessionSnapshot],
+        notify: Bool
+    ) -> (completed: Int, failed: Int) {
+        poll += 1
+        var completed = 0
+        var failed = 0
+        for session in sessions {
+            guard let runID = session.runID else { continue }
+            let key = session.agentID + ":" + runID
+            var state = tracked[key] ?? TrackedRun(observedActive: false, notified: false, lastPoll: poll)
+            if session.isActive { state.observedActive = true }
+            if notify && state.observedActive && !state.notified {
+                switch session.runState {
+                case .completed:
+                    completed += 1
+                    state.notified = true
+                case .failed:
+                    failed += 1
+                    state.notified = true
+                default: break
+                }
+            }
+            state.lastPoll = poll
+            tracked[key] = state
+        }
+        // A run can briefly vanish from telemetry; bound retained evidence by polls and count.
+        tracked = tracked.filter { poll - $0.value.lastPoll <= 12 }
+        if tracked.count > 512 {
+            let overflow = tracked.count - 512
+            let oldest = tracked.sorted { $0.value.lastPoll < $1.value.lastPoll }.prefix(overflow)
+            for item in oldest { tracked.removeValue(forKey: item.key) }
+        }
+        return (completed, failed)
+    }
+}
+
+enum CompanionAuthorization {
+    case authorized
+    case denied
+    case notDetermined
+}
+
+@MainActor
+protocol CompanionNoticeCenter: AnyObject {
+    func authorization() async -> CompanionAuthorization
+    func requestPermission() async -> Bool
+    func deliver(_ notice: CompanionNotice)
+}
+
+@MainActor
+final class SystemCompanionNoticeCenter: CompanionNoticeCenter {
+    func authorization() async -> CompanionAuthorization {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return .authorized
+        case .notDetermined: return .notDetermined
+        case .denied: return .denied
+        @unknown default: return .denied
+        }
+    }
+
+    func requestPermission() async -> Bool {
+        (try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound])) ?? false
+    }
+
+    func deliver(_ notice: CompanionNotice) {
+        let content = UNMutableNotificationContent()
+        content.title = notice.title
+        content.body = notice.body
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        )
     }
 }
 
@@ -93,15 +163,24 @@ final class CompanionNotificationManager {
     }
 
     private static let preferenceKey = "pixelCompanion.notificationsEnabled"
-
     private let defaults: UserDefaults
+    private let center: any CompanionNoticeCenter
+    private let isBundled: Bool
     private var detector = CompanionNoticeDetector()
+    private var pending: [CompanionNotice] = []
+    private var authorizationGeneration = 0
     private(set) var enabled: Bool
     private(set) var permission: PermissionState = .off
     var onChange: (() -> Void)?
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        center: (any CompanionNoticeCenter)? = nil,
+        isBundled: Bool = Bundle.main.bundleURL.pathExtension.lowercased() == "app"
+    ) {
         self.defaults = defaults
+        self.center = center ?? SystemCompanionNoticeCenter()
+        self.isBundled = isBundled
         enabled = defaults.bool(forKey: Self.preferenceKey)
     }
 
@@ -117,29 +196,18 @@ final class CompanionNotificationManager {
     }
 
     func start() {
-        guard enabled else { return }
-        guard isBundled else { setPermission(.unavailable); return }
-        setPermission(.checking)
-        Task { [weak self] in
-            let current = await UNUserNotificationCenter.current().notificationSettings()
-            guard let self, self.enabled else { return }
-            switch current.authorizationStatus {
-            case .authorized, .provisional, .ephemeral: self.setPermission(.ready)
-            case .denied: self.setPermission(.denied)
-            case .notDetermined: self.setPermission(.needsPermission)
-            @unknown default: self.setPermission(.denied)
-            }
-        }
+        refreshPermission()
     }
 
     func setEnabled(_ value: Bool) {
         guard value != enabled else { return }
         enabled = value
         defaults.set(value, forKey: Self.preferenceKey)
-        detector.reset()
+        resetBaseline()
         if value {
             requestPermission()
         } else {
+            authorizationGeneration += 1
             setPermission(.off)
         }
     }
@@ -147,46 +215,67 @@ final class CompanionNotificationManager {
     func requestPermission() {
         guard enabled else { return }
         guard isBundled else { setPermission(.unavailable); return }
+        authorizationGeneration += 1
+        let generation = authorizationGeneration
         setPermission(.checking)
         Task { [weak self] in
-            let approved = (try? await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .sound])) ?? false
-            guard let self, self.enabled else { return }
-            self.setPermission(approved ? .ready : .denied)
+            guard let self else { return }
+            let allowed = await self.center.requestPermission()
+            guard self.enabled && generation == self.authorizationGeneration else { return }
+            self.setPermission(allowed ? .ready : .denied)
+        }
+    }
+
+    /// Refresh on app activation, including return from the macOS System Settings pane.
+    func refreshPermission() {
+        guard enabled else { setPermission(.off); return }
+        guard isBundled else { setPermission(.unavailable); return }
+        authorizationGeneration += 1
+        let generation = authorizationGeneration
+        if permission == .off { setPermission(.checking) }
+        Task { [weak self] in
+            guard let self else { return }
+            let status = await self.center.authorization()
+            guard self.enabled && generation == self.authorizationGeneration else { return }
+            switch status {
+            case .authorized: self.setPermission(.ready)
+            case .denied: self.setPermission(.denied)
+            case .notDetermined: self.setPermission(.needsPermission)
+            }
         }
     }
 
     func observe(_ snapshot: ConnectorSnapshot, isPaperclip: Bool) {
         guard enabled && isPaperclip else {
-            detector.reset()
+            resetBaseline()
             return
         }
         let notices = detector.observe(snapshot)
-        guard permission == .ready else { return }
-        for notice in notices {
-            let content = UNMutableNotificationContent()
-            content.title = notice.title
-            content.body = notice.body
-            content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: UUID().uuidString,
-                content: content,
-                trigger: nil
-            )
-            UNUserNotificationCenter.current().add(request)
+        switch permission {
+        case .ready:
+            notices.forEach { center.deliver($0) }
+        case .checking:
+            pending.append(contentsOf: notices)
+            if pending.count > 24 { pending.removeFirst(pending.count - 24) }
+        case .off, .denied, .unavailable, .needsPermission:
+            break
         }
     }
 
     func resetBaseline() {
         detector.reset()
-    }
-
-    private var isBundled: Bool {
-        Bundle.main.bundleURL.pathExtension.lowercased() == "app"
+        pending.removeAll()
     }
 
     private func setPermission(_ value: PermissionState) {
+        let wasReady = permission == .ready
         permission = value
+        if value == .ready && !wasReady {
+            pending.forEach { center.deliver($0) }
+            pending.removeAll()
+        } else if value != .checking && value != .ready {
+            pending.removeAll()
+        }
         onChange?()
     }
 }
