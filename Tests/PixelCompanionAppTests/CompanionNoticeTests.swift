@@ -26,6 +26,15 @@ final class CompanionNoticeTests: XCTestCase {
         XCTAssertEqual(detector.observe(snapshot(approvals: ["new2"])), [])
     }
 
+    func testDuplicatePendingApprovalIDsCountOnce() {
+        var detector = CompanionNoticeDetector()
+        XCTAssertEqual(detector.observe(snapshot(approvals: ["existing"])), [])
+        XCTAssertEqual(
+            detector.observe(snapshot(approvals: ["existing", "new", "new", "new"])),
+            [.approvals(1)]
+        )
+    }
+
     func testOnlyObservedRunTransitionNotifies() {
         var detector = CompanionNoticeDetector()
         let running = session("a", run: "run1", state: .running)

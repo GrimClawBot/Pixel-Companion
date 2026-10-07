@@ -61,10 +61,9 @@ struct CompanionNoticeDetector {
             return []
         }
 
-        let newApprovals = snapshot.pendingApprovals.filter {
-            !seenApprovalIDs.contains($0.id)
-        }.count
-        seenApprovalIDs.formUnion(snapshot.pendingApprovals.map(\.id))
+        let currentIDs = Set(snapshot.pendingApprovals.map(\.id))
+        let newApprovals = currentIDs.subtracting(seenApprovalIDs).count
+        seenApprovalIDs.formUnion(currentIDs)
         let endings = scanRuns(snapshot.agentSessions, notify: true)
         var notices: [CompanionNotice] = []
         if newApprovals > 0 { notices.append(.approvals(newApprovals)) }
