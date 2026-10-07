@@ -72,10 +72,17 @@ struct DetailContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SnapshotContent(snapshot: snapshot, mood: mood, approvalLimit: nil)
+            SnapshotContent(snapshot: snapshot, mood: mood, approvalLimit: 0)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
+                    if !snapshot.pendingApprovals.isEmpty {
+                        SectionTitle(text: "Pending approvals")
+                        ForEach(snapshot.pendingApprovals) { approval in
+                            ApprovalRow(approval: approval)
+                        }
+                        Divider()
+                    }
                     SectionTitle(text: "Recent activity")
                     let history = ActivityPresentation.history(
                         snapshot.recentActivity,
@@ -167,17 +174,18 @@ struct ApprovalRow: View {
             Image(systemName: "hand.raised.fill")
                 .foregroundStyle(.orange)
                 .frame(width: 14)
+                .accessibilityHidden(true)
             Text(approval.title)
                 .font(.callout)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            if approval.requestedAt != .distantPast {
+            if ApprovalPresentation.showsTimestamp(approval) {
                 Text(approval.requestedAt, style: .relative)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }
-        .accessibilityLabel(ApprovalPresentation.accessibilityLabel(approval))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -268,21 +276,8 @@ enum ApprovalPresentation {
         "\(count) pending \(count == 1 ? "approval" : "approvals")"
     }
 
-    static func accessibilityLabel(
-        _ approval: ApprovalRequest,
-        now: Date = Date()
-    ) -> String {
-        let prefix = "Waiting for approval: \(approval.title)"
-        guard approval.requestedAt != .distantPast else { return prefix }
-
-        let elapsed = max(now.timeIntervalSince(approval.requestedAt), 0)
-        let minutes = Int(elapsed / 60)
-        if minutes < 1 { return "\(prefix). Requested less than a minute ago." }
-        if minutes < 60 {
-            return "\(prefix). Requested \(minutes) \(minutes == 1 ? "minute" : "minutes") ago."
-        }
-        let hours = minutes / 60
-        return "\(prefix). Requested \(hours) \(hours == 1 ? "hour" : "hours") ago."
+    static func showsTimestamp(_ approval: ApprovalRequest) -> Bool {
+        approval.requestedAt != .distantPast
     }
 }
 
