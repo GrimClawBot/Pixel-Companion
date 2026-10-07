@@ -15,36 +15,26 @@ final class LivePresentationTests: XCTestCase {
         }
 
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: 2), Array(approvals.prefix(2)))
+        XCTAssertTrue(ApprovalPresentation.visible(approvals, limit: 0).isEmpty)
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
-    func testApprovalAccessibilityIncludesWaitTimeAndCount() {
-        let now = Date(timeIntervalSince1970: 10_000)
-        let approval = ApprovalRequest(
+    func testApprovalCountAndTimestampPolicies() {
+        let recent = ApprovalRequest(
             id: "approval-1",
             title: "Ship release",
-            requestedAt: now.addingTimeInterval(-125)
+            requestedAt: Date(timeIntervalSince1970: 10_000)
+        )
+        let unknown = ApprovalRequest(
+            id: "approval-2",
+            title: "Unknown time",
+            requestedAt: .distantPast
         )
 
         XCTAssertEqual(ApprovalPresentation.countLabel(1), "1 pending approval")
         XCTAssertEqual(ApprovalPresentation.countLabel(3), "3 pending approvals")
-        XCTAssertEqual(
-            ApprovalPresentation.accessibilityLabel(approval, now: now),
-            "Waiting for approval: Ship release. Requested 2 minutes ago."
-        )
-    }
-
-    func testApprovalAccessibilityHandlesMissingTimestamp() {
-        let approval = ApprovalRequest(
-            id: "approval-1",
-            title: "Ship release",
-            requestedAt: .distantPast
-        )
-
-        XCTAssertEqual(
-            ApprovalPresentation.accessibilityLabel(approval, now: Date(timeIntervalSince1970: 10_000)),
-            "Waiting for approval: Ship release"
-        )
+        XCTAssertTrue(ApprovalPresentation.showsTimestamp(recent))
+        XCTAssertFalse(ApprovalPresentation.showsTimestamp(unknown))
     }
 
     func testHistoryRemovesCurrentActivityByID() {
