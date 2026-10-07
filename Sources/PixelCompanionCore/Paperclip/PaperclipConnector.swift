@@ -141,6 +141,7 @@ public final class PaperclipConnector:
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 value.agentSessions = []
+                publishedCoreGeneration = 0
             }
         }
     }
