@@ -13,7 +13,9 @@ enum PaperclipMapper {
     }
 
     private static func activity(_ input: PaperclipMappingInput) -> [ActivityEvent] {
-        let agentNames = Dictionary(uniqueKeysWithValues: input.agents.map { ($0.id, $0.name) })
+        let agentNames = input.agents.reduce(into: [String: String]()) { names, agent in
+            names[agent.id] = agent.name
+        }
         var events = input.issues.map { issueEvent($0, agentNames: agentNames) }
         events.append(contentsOf: input.agents.compactMap(agentEvent))
         events.sort { $0.timestamp > $1.timestamp }
