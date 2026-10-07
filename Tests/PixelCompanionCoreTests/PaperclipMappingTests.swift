@@ -143,7 +143,6 @@ final class PaperclipMappingTests: XCTestCase {
     }
 }
 
-
 private func makeSessionMappingInput() -> PaperclipMappingInput {
     let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
     return PaperclipMappingInput(
