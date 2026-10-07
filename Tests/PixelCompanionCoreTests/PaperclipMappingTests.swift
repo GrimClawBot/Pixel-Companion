@@ -96,7 +96,6 @@ final class PaperclipMappingTests: XCTestCase {
     }
 }
 
-
 private func makeDuplicateAgentInput() -> PaperclipMappingInput {
     let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
     return PaperclipMappingInput(
