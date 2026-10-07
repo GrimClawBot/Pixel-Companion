@@ -24,8 +24,8 @@ Run on macOS with Xcode and SwiftLint installed. CI runs the same script on
 | Stage      | What it proves                                                                  |
 |------------|---------------------------------------------------------------------------------|
 | tooling    | the gate's own scripts pass their unit tests (`make quality-tests`)            |
-| secrets    | no secret patterns or forbidden files (`.env`, `*.p12`, provisioning profiles, private keys) in tracked files; `secrets+` repeats it on the branch's added lines; gitleaks also runs when installed |
-| config     | every tracked JSON / plist / entitlements file parses; remote SwiftPM dependencies have a committed `Package.resolved` |
+| secrets    | no secret patterns or forbidden files (`.env`, `*.p12`, provisioning profiles, private keys) in tracked files; `secrets+` scans every commit introduced by the branch so add-then-delete secrets still fail; gitleaks also runs when installed |
+| config     | every tracked JSON / plist / entitlements file parses; root SwiftPM and Xcode-managed remote package dependencies have a committed `Package.resolved` |
 | lint       | `swiftlint lint --strict`                                                       |
 | resolve    | `swift package resolve --force-resolved-versions` (lockfile is authoritative)  |
 | build/test | `swift build` / `swift test` with `-warnings-as-errors`                         |

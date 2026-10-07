@@ -1,4 +1,7 @@
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.quality import secret_scan as ss
 
@@ -65,6 +68,55 @@ class DiffParsingTests(unittest.TestCase):
             ]
         )
         self.assertEqual([("x.swift", 5, "first"), ("x.swift", 6, "second")], ss.parse_added_lines(diff))
+
+
+class HistoryRangeTests(unittest.TestCase):
+    def git(self, root, *args):
+        return subprocess.run(
+            ["git", *args], cwd=root, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    def commit(self, root, message):
+        self.git(root, "add", "-A")
+        self.git(root, "commit", "-m", message)
+
+    def test_detects_secret_added_then_removed_from_branch_history(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.git(root, "init", "-q")
+            self.git(root, "config", "user.email", "quality@example.invalid")
+            self.git(root, "config", "user.name", "Quality Test")
+            (root / "fixture.txt").write_text("safe\n")
+            self.commit(root, "base")
+            base = self.git(root, "rev-parse", "HEAD")
+
+            (root / "fixture.txt").write_text(f"{GITHUB}\n")
+            self.commit(root, "introduce credential")
+            (root / "fixture.txt").write_text("safe again\n")
+            self.commit(root, "remove credential")
+
+            findings = ss.scan_range(root, f"{base}...HEAD")
+            self.assertTrue(
+                any(f.rule == "github-token" and f.path == "fixture.txt" for f in findings)
+            )
+
+    def test_detects_forbidden_file_added_then_removed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.git(root, "init", "-q")
+            self.git(root, "config", "user.email", "quality@example.invalid")
+            self.git(root, "config", "user.name", "Quality Test")
+            (root / "README.md").write_text("base\n")
+            self.commit(root, "base")
+            base = self.git(root, "rev-parse", "HEAD")
+
+            (root / ".env").write_text("placeholder=true\n")
+            self.commit(root, "add forbidden file")
+            (root / ".env").unlink()
+            self.commit(root, "remove forbidden file")
+
+            findings = ss.scan_range(root, f"{base}...HEAD")
+            self.assertTrue(any(f.rule == "forbidden-file" and f.path == ".env" for f in findings))
 
 
 if __name__ == "__main__":

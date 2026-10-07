@@ -65,8 +65,8 @@ SENSITIVE_PATHS: list[tuple[str, str]] = [
     ("*token*", "auth"),
     ("*/security/*", "security"),
 ]
+PUBLIC_API_PATTERN = re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s")
 SENSITIVE_CONTENT: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s"), "public-api"),
     (re.compile(r"\b(?:SecItem\w*|kSecClass\w*|Keychain)\b"), "secrets"),
     (re.compile(r"\b(?:authorization|bearer|api[_-]?key|access[_-]?token|password|passwd|signin|sign_in|login|logout|session|oauth|credential)\b", re.IGNORECASE), "auth"),
     (re.compile(r"quality:allow-secret", re.IGNORECASE), "secrets"),
@@ -106,12 +106,44 @@ def classify_sensitive(paths: list[str], diff: str) -> list[str]:
         for pattern, reason in SENSITIVE_PATHS:
             if fnmatch.fnmatch(path.lower(), pattern.lower()):
                 reasons.add(f"{reason}: {path}")
+    current_path = ""
+    old_path = ""
+    hunk_has_change = False
+    hunk_has_public_api = False
+
+    def flush_hunk() -> None:
+        nonlocal hunk_has_change, hunk_has_public_api
+        if current_path.lower().endswith(".swift") and hunk_has_change and hunk_has_public_api:
+            reasons.add("public-api")
+        hunk_has_change = False
+        hunk_has_public_api = False
+
     for line in diff.splitlines():
-        if line.startswith(("+++", "---")) or not line.startswith(("+", "-")):
+        if line.startswith("--- "):
+            candidate = line[4:]
+            old_path = candidate[2:] if candidate.startswith("a/") else ""
             continue
-        for pattern, reason in SENSITIVE_CONTENT:
-            if pattern.search(line[1:]):
-                reasons.add(reason)
+        if line.startswith("+++ "):
+            flush_hunk()
+            candidate = line[4:]
+            current_path = candidate[2:] if candidate.startswith("b/") else old_path
+            continue
+        if line.startswith("@@"):
+            flush_hunk()
+            continue
+        if not line or line[0] not in " +-":
+            continue
+
+        content = line[1:]
+        if line[0] in "+-":
+            hunk_has_change = True
+            for pattern, reason in SENSITIVE_CONTENT:
+                if pattern.search(content):
+                    reasons.add(reason)
+        if PUBLIC_API_PATTERN.search(content):
+            hunk_has_public_api = True
+
+    flush_hunk()
     return sorted(reasons)
 
 

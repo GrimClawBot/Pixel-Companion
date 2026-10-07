@@ -20,4 +20,5 @@ jobs:
       - name: Native quality checks
         env:
           QUALITY_XCODE_SCHEME: ${{ vars.QUALITY_XCODE_SCHEME }}
-        run: scripts/quality/check.sh --base "origin/${{ github.base_ref || 'main' }}"
+          QUALITY_BASE_REF: ${{ github.base_ref || 'main' }}
+        run: scripts/quality/check.sh --base "origin/$QUALITY_BASE_REF"

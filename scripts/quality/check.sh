@@ -40,9 +40,15 @@ skipped() { record "$1" N/A "$2"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 SWIFT_SOURCES="$(git ls-files '*.swift' | head -n 1)"
-XCODE_CONTAINER="$(git ls-files -- '*.xcworkspace/contents.xcworkspacedata' '*.xcodeproj/project.pbxproj' \
+XCODE_WORKSPACE="$(git ls-files -- '*.xcworkspace/contents.xcworkspacedata' \
   | grep -v '\.xcodeproj/project\.xcworkspace/' | head -n 1)"
-XCODE_CONTAINER="${XCODE_CONTAINER%/*}"
+XCODE_PROJECT="$(git ls-files -- '*.xcodeproj/project.pbxproj' | head -n 1)"
+XCODE_CONTAINER=""
+if [[ -n "$XCODE_WORKSPACE" ]]; then
+  XCODE_CONTAINER="${XCODE_WORKSPACE%/*}"
+elif [[ -n "$XCODE_PROJECT" ]]; then
+  XCODE_CONTAINER="${XCODE_PROJECT%/*}"
+fi
 
 # 1. Tooling self-tests: the gate must be trustworthy before it judges anything.
 run_stage tooling python3 -m unittest discover -s scripts/quality/tests -t . -q

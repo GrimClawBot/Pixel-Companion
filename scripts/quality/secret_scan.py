@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Dependency-free secret scanner for the Pixel-Companion quality gate.
 
-Scans every tracked file (default) or only the lines added in a git range
-(--range BASE..HEAD). Exits 1 when a finding is reported, 0 when clean.
+Scans every tracked file (default) or every line introduced by each commit
+in a git range (--range BASE...HEAD). The history-aware range scan catches
+credentials that were committed and later deleted. Exits 1 on findings.
 
 A line can be allowlisted with an inline `quality:allow-secret` marker; every
 use of the marker is itself a review item for Greptile and the human reviewer.
@@ -132,20 +133,59 @@ def parse_added_lines(diff: str) -> list[tuple[str, int, str]]:
     return added
 
 
+def history_range(root: Path, rev_range: str) -> str:
+    if "..." in rev_range:
+        left, right = rev_range.split("...", 1)
+        if not left or not right:
+            raise ValueError("range must be BASE...HEAD")
+        base = git(root, "merge-base", left, right).strip()
+        return f"{base}..{right}"
+    if ".." in rev_range:
+        left, right = rev_range.split("..", 1)
+        if not left or not right:
+            raise ValueError("range must be BASE..HEAD")
+        return rev_range
+    raise ValueError("range must contain .. or ...")
+
+
+def commit_delta(root: Path, commit: str) -> tuple[list[str], str]:
+    lineage = git(root, "rev-list", "--parents", "-n", "1", commit).strip().split()
+    parent = lineage[1] if len(lineage) > 1 else None
+    if parent is None:
+        names = git(
+            root,
+            "diff-tree",
+            "--root",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            "-z",
+            "--diff-filter=AMR",
+            commit,
+        ).split("\0")
+        diff = git(root, "show", "--format=", "--unified=0", "--no-color", "--no-ext-diff", commit)
+    else:
+        names = git(root, "diff", "--name-only", "-z", "--diff-filter=AMR", parent, commit).split("\0")
+        diff = git(root, "diff", "--unified=0", "--no-color", "--no-ext-diff", parent, commit)
+    return [path for path in names if path], diff
+
+
 def scan_range(root: Path, rev_range: str) -> list[Finding]:
     findings: list[Finding] = []
-    for path in git(root, "diff", "--name-only", "--diff-filter=AMR", rev_range).splitlines():
-        if forbidden_path(path):
-            findings.append(Finding("forbidden-file", path, 0))
-    diff = git(root, "diff", "--unified=0", "--no-color", "--no-ext-diff", rev_range)
-    for path, lineno, text in parse_added_lines(diff):
-        findings.extend(scan_line(path, lineno, text))
+    commits = git(root, "rev-list", "--reverse", "--topo-order", history_range(root, rev_range)).splitlines()
+    for commit in commits:
+        paths, diff = commit_delta(root, commit)
+        for path in paths:
+            if forbidden_path(path):
+                findings.append(Finding("forbidden-file", path, 0))
+        for path, lineno, text in parse_added_lines(diff):
+            findings.extend(scan_line(path, lineno, text))
     return findings
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--range", dest="rev_range", help="scan only lines added in BASE..HEAD")
+    parser.add_argument("--range", dest="rev_range", help="scan every commit introduced by BASE...HEAD")
     args = parser.parse_args(argv)
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
     findings = scan_range(root, args.rev_range) if args.rev_range else scan_tracked(root)

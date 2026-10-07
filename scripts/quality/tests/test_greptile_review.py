@@ -54,6 +54,19 @@ class ClassifySensitiveTests(unittest.TestCase):
         diff = "+++ b/Sources/Lib/View.swift\n+    public func render() {}\n-@MainActor open class Foo {}\n+SecItemAdd(q, nil)\n"
         self.assertEqual(["public-api", "secrets"], gr.classify_sensitive(["Sources/Lib/View.swift"], diff))
 
+    def test_multiline_public_api_change_uses_unchanged_hunk_context(self):
+        diff = (
+            "--- a/Sources/Lib/API.swift\n"
+            "+++ b/Sources/Lib/API.swift\n"
+            "@@ -1,4 +1,4 @@\n"
+            " public func render(\n"
+            "-    width: Int,\n"
+            "+    width: Double,\n"
+            "     height: Int\n"
+            " ) -> View\n"
+        )
+        self.assertEqual(["public-api"], gr.classify_sensitive(["Sources/Lib/API.swift"], diff))
+
     def test_login_and_session_changes_require_human_review(self):
         diff = "+++ b/Sources/App/LoginCoordinator.swift\n+    func signIn() { session = newSession }\n"
         reasons = gr.classify_sensitive(["Sources/App/LoginCoordinator.swift"], diff)
