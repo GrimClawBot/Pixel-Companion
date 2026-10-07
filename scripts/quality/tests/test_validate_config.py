@@ -19,6 +19,18 @@ class ValidateFileTests(unittest.TestCase):
             self.assertIsNone(vc.validate_file(config))
             self.assertIsNone(vc.validate_file(plist))
 
+    def test_workspace_xml_parses_and_rejects_malformed_xml(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            workspace = root / "contents.xcworkspacedata"
+            workspace.write_text(
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<Workspace version="1.0"><FileRef location="group:R&amp;D.xcodeproj"/></Workspace>\n'
+            )
+            self.assertIsNone(vc.validate_file(workspace))
+            workspace.write_text("<Workspace>")
+            self.assertIsNotNone(vc.validate_file(workspace))
+
     def test_rejects_invalid_json_and_plist(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -111,6 +123,31 @@ class LockfileTests(unittest.TestCase):
             )
             tracked = {project_rel, workspace_rel, lock_rel}
             self.assertEqual([], vc.lockfile_errors(root, tracked))
+
+    def test_workspace_xml_escaping_matches_project_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_rel = "R&D.xcodeproj/project.pbxproj"
+            project = root / project_rel
+            project.parent.mkdir(parents=True)
+            project.write_text(
+                "/* Begin XCRemoteSwiftPackageReference section */\n"
+                "repositoryURL = https://example.invalid/repo.git;\n"
+            )
+            workspace_rel = "Product.xcworkspace/contents.xcworkspacedata"
+            workspace = root / workspace_rel
+            workspace.parent.mkdir(parents=True)
+            workspace.write_text(
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<Workspace version="1.0">\n'
+                '  <FileRef location="group:R&amp;D.xcodeproj"></FileRef>\n'
+                '</Workspace>\n'
+            )
+            lock_rel = "Product.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+            self.assertEqual(
+                [],
+                vc.lockfile_errors(root, {project_rel, workspace_rel, lock_rel}),
+            )
 
     def test_xcode_project_without_remote_packages_needs_no_lockfile(self):
         with tempfile.TemporaryDirectory() as td:

@@ -14,6 +14,7 @@ import re
 import posixpath
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PLIST_SUFFIXES = {".plist", ".entitlements"}
@@ -29,7 +30,9 @@ def validate_file(path: Path) -> str | None:
         elif suffix in PLIST_SUFFIXES:
             with path.open("rb") as fh:
                 plistlib.load(fh)
-    except (ValueError, plistlib.InvalidFileException, UnicodeDecodeError) as exc:
+        elif path.name == "contents.xcworkspacedata":
+            ET.parse(path)
+    except (ValueError, plistlib.InvalidFileException, UnicodeDecodeError, ET.ParseError) as exc:
         return f"{path}: {exc}"
     return None
 
@@ -59,8 +62,14 @@ def xcode_project_lockfiles(root: Path, tracked: set[str], project_rel: str) -> 
             continue
         workspace_dir = rel.removesuffix("/contents.xcworkspacedata")
         workspace_parent = posixpath.dirname(workspace_dir)
-        text = workspace_file.read_text(encoding="utf-8", errors="replace")
-        for location in re.findall(r'\blocation\s*=\s*"([^"]+)"', text):
+        try:
+            workspace_xml = ET.parse(workspace_file).getroot()
+        except (ET.ParseError, OSError):
+            continue
+        for element in workspace_xml.iter():
+            location = element.attrib.get("location")
+            if not location:
+                continue
             kind, sep, value = location.partition(":")
             if not sep or kind not in {"group", "container"}:
                 continue
@@ -117,7 +126,10 @@ def main() -> int:
     checked = 0
     for rel in tracked_paths:
         path = root / rel
-        if path.suffix.lower() in JSON_SUFFIXES | PLIST_SUFFIXES and path.is_file():
+        if (
+            path.suffix.lower() in JSON_SUFFIXES | PLIST_SUFFIXES
+            or path.name == "contents.xcworkspacedata"
+        ) and path.is_file():
             checked += 1
             if (err := validate_file(path)) is not None:
                 errors.append(err)
