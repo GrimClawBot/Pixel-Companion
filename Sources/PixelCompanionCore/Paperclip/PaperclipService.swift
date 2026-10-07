@@ -211,7 +211,6 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
         }
     }
 
-
     private func companyPath(_ companyID: String, resource: String) -> String {
         "api/companies/\(companyID)/\(resource)"
     }
