@@ -23,6 +23,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.presentation, .automatic)
         XCTAssertEqual(store.mockConnectionState, .connected)
         XCTAssertEqual(store.mockStepInterval, SettingsStore.defaultStepInterval)
+        XCTAssertEqual(store.paperclipBaseURL, "")
+        XCTAssertEqual(store.paperclipCompanyID, "")
     }
 
     func testValuesPersistAcrossInstances() {
@@ -31,12 +33,16 @@ final class SettingsStoreTests: XCTestCase {
         store.presentation = .menuBar
         store.mockConnectionState = .error
         store.mockStepInterval = 10
+        store.paperclipBaseURL = "  http://127.0.0.1:3100  "
+        store.paperclipCompanyID = " company-1 "
 
         let reloaded = SettingsStore(defaults: defaults)
         XCTAssertEqual(reloaded.connectorID, .disabled)
         XCTAssertEqual(reloaded.presentation, .menuBar)
         XCTAssertEqual(reloaded.mockConnectionState, .error)
         XCTAssertEqual(reloaded.mockStepInterval, 10)
+        XCTAssertEqual(reloaded.paperclipBaseURL, "http://127.0.0.1:3100")
+        XCTAssertEqual(reloaded.paperclipCompanyID, "company-1")
     }
 
     func testCorruptValuesFallBackToDefaults() {
@@ -77,9 +83,13 @@ final class SettingsStoreTests: XCTestCase {
         let store = SettingsStore(defaults: defaults)
         store.presentation = .notch
         store.connectorID = .mockQuiet
+        store.paperclipBaseURL = "https://paperclip.example"
+        store.paperclipCompanyID = "company-1"
         store.reset()
 
         XCTAssertEqual(store.presentation, .automatic)
         XCTAssertEqual(store.connectorID, ConnectorRegistry.defaultID)
+        XCTAssertEqual(store.paperclipBaseURL, "")
+        XCTAssertEqual(store.paperclipCompanyID, "")
     }
 }

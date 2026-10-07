@@ -32,10 +32,17 @@ final class SettingsWindowController {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @State private var paperclipBaseURLDraft: String
+
+    init(model: AppModel) {
+        self.model = model
+        _paperclipBaseURLDraft = State(initialValue: model.paperclipBaseURL)
+    }
 
     var body: some View {
         Form {
             connectorSection
+            paperclipSection
             mockSection
             presentationSection
         }
@@ -54,6 +61,43 @@ struct SettingsView: View {
             Text(selectedSummary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var paperclipSection: some View {
+        if model.isPaperclipConnector {
+            Section {
+                TextField("Base URL", text: $paperclipBaseURLDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
+                if model.paperclipCompanies.isEmpty {
+                    TextField("Company ID", text: $model.paperclipCompanyID)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    Picker("Company", selection: $model.paperclipCompanyID) {
+                        Text("Choose a company").tag("")
+                        ForEach(model.paperclipCompanies) { company in
+                            Text(company.name).tag(company.id)
+                        }
+                    }
+                }
+                HStack {
+                    LabeledContent("Status", value: model.snapshot.connectionState.displayName)
+                    Spacer()
+                    Button("Refresh") { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
+                }
+                if let error = model.snapshot.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Paperclip")
+            } footer: {
+                Text("Read-only. Pixel Companion sends GET requests only and stores no Paperclip credentials.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

@@ -18,14 +18,16 @@ public extension ConnectorID {
     static let disabled = ConnectorID(rawValue: "disabled")
     static let mockDemo = ConnectorID(rawValue: "mock.demo")
     static let mockQuiet = ConnectorID(rawValue: "mock.quiet")
+    static let paperclip = ConnectorID(rawValue: "paperclip")
 }
 
-/// Every connector the app can create. Only `MockConnector` exists in this release; real
-/// connectors register here behind the same protocols.
+/// Every connector the app can create. Real connectors remain optional and use the same
+/// read-only capability protocols as the mock implementations.
 public enum ConnectorRegistry {
     public static let options: [ConnectorOption] = [
         ConnectorOption(id: .mockDemo, displayName: "Mock: demo loop", summary: "Cycles through every character state"),
         ConnectorOption(id: .mockQuiet, displayName: "Mock: quiet", summary: "Connected, nothing running"),
+        ConnectorOption(id: .paperclip, displayName: "Paperclip", summary: "Read-only live agent runtime"),
         ConnectorOption(id: .disabled, displayName: "None", summary: "Run without a connector")
     ]
 
@@ -37,7 +39,11 @@ public enum ConnectorRegistry {
     }
 
     /// Builds the connector for `id`; `nil` for `.disabled` or an unknown identifier.
-    public static func makeConnector(id: ConnectorID, connectionState: ConnectionState) -> (any Connector)? {
+    public static func makeConnector(
+        id: ConnectorID,
+        connectionState: ConnectionState,
+        paperclipConfiguration: PaperclipConfiguration = PaperclipConfiguration()
+    ) -> (any Connector)? {
         switch id {
         case .mockDemo:
             return MockConnector(
@@ -45,6 +51,8 @@ public enum ConnectorRegistry {
             )
         case .mockQuiet:
             return MockConnector(id: id, displayName: "Mock: quiet", script: .quiet, connectionState: connectionState)
+        case .paperclip:
+            return PaperclipConnector(configuration: paperclipConfiguration)
         default:
             return nil
         }

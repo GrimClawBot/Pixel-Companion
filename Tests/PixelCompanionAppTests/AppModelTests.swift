@@ -63,6 +63,35 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.notchAvailable)
     }
 
+    func testPaperclipSettingsRebuildAndRefreshImmediately() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.connectorID = .paperclip
+        let model = AppModel(settings: settings)
+        model.start()
+
+        XCTAssertTrue(model.isPaperclipConnector)
+        XCTAssertEqual(model.snapshot.connectionState, .disconnected)
+
+        model.applyPaperclipBaseURL("not-a-valid-url")
+        XCTAssertEqual(model.paperclipBaseURL, "not-a-valid-url")
+        XCTAssertEqual(model.snapshot.connectionState, .error)
+        XCTAssertNotNil(model.snapshot.lastError)
+
+        model.paperclipCompanyID = "company-2"
+        XCTAssertEqual(model.paperclipCompanyID, "company-2")
+        XCTAssertEqual(model.snapshot.connectionState, .error)
+
+        model.applyPaperclipBaseURL("  not-a-valid-url  ")
+        XCTAssertEqual(model.paperclipCompanyID, "company-2", "Equivalent normalized URL preserves company selection")
+        XCTAssertEqual(model.paperclipBaseURL, "not-a-valid-url")
+
+        model.applyPaperclipBaseURL("")
+        XCTAssertEqual(model.paperclipCompanyID, "")
+        XCTAssertTrue(model.paperclipCompanies.isEmpty)
+        XCTAssertEqual(model.snapshot.connectionState, .disconnected)
+        XCTAssertNil(model.snapshot.lastError)
+    }
+
     func testTimerAdvancesMockAndRestartReturnsToFirstStep() async throws {
         let settings = SettingsStore(defaults: defaults)
         settings.mockStepInterval = 1

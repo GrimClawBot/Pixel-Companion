@@ -30,9 +30,16 @@ Xcode creates the schemes from `Package.swift`; there is no `.xcodeproj` to keep
   click it for the detail view; press Esc or click elsewhere to collapse it.
 - Without a notch (older Macs, lid closed on an external display) a symbol appears in the menu
   bar. Click it for the detail view; hover it for a tooltip.
-- **Settings…** in the detail view switches the connector, simulates connection states
-  (connected / connecting / disconnected / error), changes the mock step interval, and picks the
-  notch, the menu bar, or automatic placement.
+- **Settings…** in the detail view switches the connector, simulates mock connection states,
+  configures an optional read-only Paperclip base URL/company, changes the mock step interval, and
+  picks the notch, the menu bar, or automatic placement.
+
+### Paperclip
+
+Choose **Paperclip** in Settings, enter a reachable `http://` or `https://` base URL, then use
+**Refresh** to discover companies. Select a company when more than one is available. Pixel Companion
+stores only the base URL and company ID in `UserDefaults`; it does not store Paperclip credentials.
+The connector sends GET requests only.
 
 Settings are stored in the app's `UserDefaults` domain. To start fresh:
 
