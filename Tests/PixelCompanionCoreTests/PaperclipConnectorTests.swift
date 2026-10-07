@@ -35,19 +35,28 @@ private final class StubURLProtocol: URLProtocol {
 private final class DeferredPaperclipService: PaperclipServiceProtocol {
     private(set) var fetchCount = 0
     private var completion: ((Result<PaperclipRemoteState, Error>) -> Void)?
+    private var sessionCompletion: ((Result<[AgentSessionSnapshot], Error>) -> Void)?
 
     func fetch(
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
         fetchCount += 1
         self.completion = completion
+        self.sessionCompletion = sessionCompletion
     }
 
-    func finish(_ result: Result<PaperclipRemoteState, Error>) {
+    func finishCore(_ result: Result<PaperclipRemoteState, Error>) {
         let completion = completion
         self.completion = nil
         completion?(result)
+    }
+
+    func finishSessions(_ result: Result<[AgentSessionSnapshot], Error>) {
+        let sessionCompletion = sessionCompletion
+        self.sessionCompletion = nil
+        sessionCompletion?(result)
     }
 }
 
@@ -95,7 +104,7 @@ final class PaperclipConnectorTests: XCTestCase {
             title: "Review release",
             requestedAt: Date(timeIntervalSince1970: 90)
         )
-        service.finish(.success(PaperclipRemoteState(
+        service.finishCore(.success(PaperclipRemoteState(
             companies: [PaperclipCompany(id: "company-1", name: "Example Co", status: "active")],
             companyID: "company-1",
             companyName: "Example Co",
