@@ -56,6 +56,8 @@ final class PaperclipMappingTests: XCTestCase {
         let state = PaperclipMapper.map(input)
 
         XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Current Name")
+        XCTAssertEqual(state.agentSessions.count, 1)
+        XCTAssertEqual(state.agentSessions.first?.agentName, "Current Name")
     }
 
     func testAgentSessionsPreferActiveRunAndMapSafeTelemetry() throws {
