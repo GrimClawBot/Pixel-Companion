@@ -15,6 +15,7 @@ let package = Package(
         .target(name: "PixelCompanionCore"),
         // The macOS app: AppKit + SwiftUI shell over PixelCompanionCore. No Info.plist or entitlements.
         .executableTarget(name: "PixelCompanion", dependencies: ["PixelCompanionCore"]),
-        .testTarget(name: "PixelCompanionCoreTests", dependencies: ["PixelCompanionCore"])
+        .testTarget(name: "PixelCompanionCoreTests", dependencies: ["PixelCompanionCore"]),
+        .testTarget(name: "PixelCompanionAppTests", dependencies: ["PixelCompanion", "PixelCompanionCore"])
     ]
 )

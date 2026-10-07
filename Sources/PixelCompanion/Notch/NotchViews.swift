@@ -1,21 +1,27 @@
 import PixelCompanionCore
 import SwiftUI
 
-/// Panel sizes per surface. The compact bar is the notch plus a wing on each side.
+/// Panel sizes per surface. The compact surface is exactly the physical notch width so the
+/// companion never overlays or intercepts adjacent menu-bar items. Expanded surfaces may grow
+/// below and beyond the notch while the user is actively interacting with the companion.
 enum NotchLayout {
-    static let wingWidth: CGFloat = 64
     static let snapshotSize = CGSize(width: 400, height: 200)
     static let detailSize = CGSize(width: 440, height: 440)
 
     static func size(for surface: NotchSurface, notchSize: CGSize) -> CGSize {
-        let compactWidth = notchSize.width + wingWidth * 2
         switch surface {
         case .compact:
-            return CGSize(width: compactWidth, height: notchSize.height)
+            return notchSize
         case .snapshot:
-            return CGSize(width: max(snapshotSize.width, compactWidth), height: snapshotSize.height + notchSize.height)
+            return CGSize(
+                width: max(snapshotSize.width, notchSize.width),
+                height: snapshotSize.height + notchSize.height
+            )
         case .detail:
-            return CGSize(width: max(detailSize.width, compactWidth), height: detailSize.height + notchSize.height)
+            return CGSize(
+                width: max(detailSize.width, notchSize.width),
+                height: detailSize.height + notchSize.height
+            )
         }
     }
 }
