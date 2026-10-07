@@ -74,7 +74,6 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
         XCTAssertEqual(connector.agentSessions(limit: 8), [current])
     }
 
-
     func testOlderTelemetryCannotReturnAfterNewerCoreFailure() {
         let service = GenerationDeferredService()
         let connector = PaperclipConnector(
