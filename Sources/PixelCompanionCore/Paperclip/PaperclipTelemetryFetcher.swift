@@ -162,8 +162,11 @@ final class PaperclipTelemetryFetcher {
         let liveIDs = Set(live.map(\.id))
         let safeRecent: [PaperclipHeartbeatRunResponse]
         if liveEndpointSucceeded {
-            safeRecent = recent.filter { run in
-                !isActiveStatus(run.status) || liveIDs.contains(run.id)
+            safeRecent = recent.map { run in
+                if isActiveStatus(run.status), !liveIDs.contains(run.id) {
+                    return downgradeUnconfirmedActiveRun(run)
+                }
+                return run
             }
         } else {
             safeRecent = recent.map(downgradeUnconfirmedActiveRun)
