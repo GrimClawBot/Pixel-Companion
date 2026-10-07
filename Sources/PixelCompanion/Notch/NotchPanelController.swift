@@ -106,6 +106,13 @@ final class NotchPanelController {
         panel.orderOut(nil)
     }
 
+    func resetToCompact() {
+        _ = interaction.handle(.dismissed)
+        viewState.surface = .compact
+        stopOutsideClickMonitor()
+        applyFrame()
+    }
+
     private func handle(_ event: NotchEvent) {
         guard interaction.handle(event) else { return }
         viewState.surface = interaction.surface
