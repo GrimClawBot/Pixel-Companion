@@ -44,7 +44,13 @@ TMP="$(mktemp -d /tmp/pixel-companion-package.XXXXXXXX)"
 STAGE=""
 cleanup() {
   rm -rf "$TMP"
-  if [[ -n "$STAGE" ]]; then rm -rf "$STAGE"; fi
+  if [[ -n "$STAGE" ]]; then
+    if [[ -e "$STAGE/Previous.app" && ! -e "$OUTPUT" ]]; then
+      echo "RECOVERY REQUIRED: previous app preserved at $STAGE/Previous.app" >&2
+    else
+      rm -rf "$STAGE"
+    fi
+  fi
 }
 trap cleanup EXIT
 APP="$TMP/Pixel Companion.app"
