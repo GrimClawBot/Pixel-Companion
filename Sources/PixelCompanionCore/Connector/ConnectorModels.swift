@@ -114,3 +114,77 @@ public struct ChatMessage: Identifiable, Hashable, Sendable {
         self.timestamp = timestamp
     }
 }
+
+
+/// Read-only summary of one agent and its active or most recent execution session.
+public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
+    public enum RunState: String, CaseIterable, Sendable {
+        case queued
+        case running
+        case completed
+        case failed
+        case cancelled
+        case idle
+        case unknown
+    }
+
+    public let id: String
+    public let agentID: String
+    public let agentName: String
+    public let agentTitle: String?
+    public let agentStatus: String
+    public let runID: String?
+    public let runState: RunState
+    public let taskTitle: String?
+    public let model: String?
+    public let provider: String?
+    public let sessionID: String?
+    public let inputTokens: Int?
+    public let cachedInputTokens: Int?
+    public let outputTokens: Int?
+    public let startedAt: Date?
+    public let finishedAt: Date?
+    public let updatedAt: Date?
+
+    public init(
+        id: String,
+        agentID: String,
+        agentName: String,
+        agentTitle: String? = nil,
+        agentStatus: String,
+        runID: String? = nil,
+        runState: RunState,
+        taskTitle: String? = nil,
+        model: String? = nil,
+        provider: String? = nil,
+        sessionID: String? = nil,
+        inputTokens: Int? = nil,
+        cachedInputTokens: Int? = nil,
+        outputTokens: Int? = nil,
+        startedAt: Date? = nil,
+        finishedAt: Date? = nil,
+        updatedAt: Date? = nil
+    ) {
+        self.id = id
+        self.agentID = agentID
+        self.agentName = agentName
+        self.agentTitle = agentTitle
+        self.agentStatus = agentStatus
+        self.runID = runID
+        self.runState = runState
+        self.taskTitle = taskTitle
+        self.model = model
+        self.provider = provider
+        self.sessionID = sessionID
+        self.inputTokens = inputTokens
+        self.cachedInputTokens = cachedInputTokens
+        self.outputTokens = outputTokens
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+        self.updatedAt = updatedAt
+    }
+
+    public var isActive: Bool {
+        runState == .queued || runState == .running
+    }
+}
