@@ -26,8 +26,15 @@ final class PresentationCoordinatorTests: XCTestCase {
             reason: .preference
         )
 
+        let followUp = PresentationTransitionPlan.resolve(
+            preference: .automatic,
+            notchAvailable: true,
+            reason: .environmentFollowUp
+        )
+
         XCTAssertFalse(startup.resetNotchInteraction)
         XCTAssertFalse(preference.resetNotchInteraction)
+        XCTAssertFalse(followUp.resetNotchInteraction)
     }
 
     func testEnvironmentChangeFallsBackToMenuBarWithoutNotch() {
