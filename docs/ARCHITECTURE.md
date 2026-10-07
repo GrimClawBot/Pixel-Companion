@@ -10,9 +10,13 @@ Package.swift
 │   ├── Character/               CharacterMood, CharacterStateMachine, CharacterSprite
 │   ├── Settings/                SettingsStore (UserDefaults)
 │   └── Presentation/            NotchGeometry, PresentationMode, NotchInteraction
-├── Sources/PixelCompanion       macOS app: AppKit + SwiftUI shell
+├── Sources/PixelCompanion       planned next slice (PC-001a app shell): AppKit + SwiftUI app
 └── Tests/PixelCompanionCoreTests
 ```
+
+This change ships only `PixelCompanionCore` and its tests. The macOS app target
+`Sources/PixelCompanion` is the planned next slice, stacked on this one; until it lands, the
+"app" in the sections below refers to that planned shell.
 
 All decisions live in `PixelCompanionCore` as plain values and pure functions, so they can be
 unit-tested without a display. The app target only adapts AppKit inputs (screens, mouse,

@@ -34,10 +34,17 @@ public final class SettingsStore {
         self.defaults = defaults
     }
 
+    /// The chosen connector. A stored identifier that is not in `ConnectorRegistry.options` (for
+    /// example one written by a newer build, or a removed connector) reads as the default.
     public var connectorID: ConnectorID {
         get {
-            let stored = defaults.string(forKey: Key.connectorID.rawValue)
-            return stored.map(ConnectorID.init(rawValue:)) ?? ConnectorRegistry.defaultID
+            guard
+                let stored = defaults.string(forKey: Key.connectorID.rawValue).map(ConnectorID.init(rawValue:)),
+                ConnectorRegistry.isRegistered(stored)
+            else {
+                return ConnectorRegistry.defaultID
+            }
+            return stored
         }
         set { defaults.set(newValue.rawValue, forKey: Key.connectorID.rawValue) }
     }

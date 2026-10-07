@@ -50,6 +50,20 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.mockStepInterval, SettingsStore.defaultStepInterval)
     }
 
+    func testUnknownConnectorFallsBackToDefault() {
+        defaults.set("removed.connector", forKey: SettingsStore.Key.connectorID.rawValue)
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertEqual(store.connectorID, ConnectorRegistry.defaultID)
+
+        store.connectorID = ConnectorID(rawValue: "")
+        XCTAssertEqual(store.connectorID, ConnectorRegistry.defaultID)
+
+        for option in ConnectorRegistry.options {
+            store.connectorID = option.id
+            XCTAssertEqual(store.connectorID, option.id, "registered connectors must round-trip")
+        }
+    }
+
     func testStepIntervalIsClamped() {
         let store = SettingsStore(defaults: defaults)
         store.mockStepInterval = 0.01

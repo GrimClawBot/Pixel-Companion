@@ -118,6 +118,19 @@ final class MockConnectorTests: XCTestCase {
         XCTAssertEqual(makeConnector(script).currentActivity?.kind, .note)
     }
 
+    func testScriptEmptiedAfterInitPlaysIdleStep() {
+        var script = MockScript.demo
+        script.steps.removeAll()
+
+        XCTAssertEqual(script.step(at: 0), MockScript.idleStep)
+        XCTAssertEqual(script.step(at: -3), MockScript.idleStep)
+        let connector = makeConnector(script)
+        connector.advance(by: 5)
+        XCTAssertEqual(connector.currentActivity?.title, MockScript.idleStep.title)
+        XCTAssertTrue(connector.pendingApprovals().isEmpty)
+        XCTAssertTrue(connector.recentMessages(limit: 10).isEmpty)
+    }
+
     func testMockReportsNoAuthRequirement() {
         XCTAssertEqual(makeConnector().authStatus, .notRequired)
     }

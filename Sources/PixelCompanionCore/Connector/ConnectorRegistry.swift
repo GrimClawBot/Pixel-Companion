@@ -31,6 +31,11 @@ public enum ConnectorRegistry {
 
     public static let defaultID = ConnectorID.mockDemo
 
+    /// Whether `id` is one of `options`.
+    static func isRegistered(_ id: ConnectorID) -> Bool {
+        options.contains { $0.id == id }
+    }
+
     /// Builds the connector for `id`; `nil` for `.disabled` or an unknown identifier.
     public static func makeConnector(id: ConnectorID, connectionState: ConnectionState) -> (any Connector)? {
         switch id {

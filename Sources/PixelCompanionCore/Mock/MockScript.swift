@@ -43,7 +43,7 @@ public struct MockScript: Equatable, Sendable {
         stepInterval: TimeInterval = 60,
         usageLimit: Int? = 1_000
     ) {
-        self.steps = steps.isEmpty ? [MockStep(kind: .note, title: "Idle")] : steps
+        self.steps = steps.isEmpty ? [Self.idleStep] : steps
         self.startDate = startDate
         self.stepInterval = stepInterval
         self.usageLimit = usageLimit
@@ -52,8 +52,14 @@ public struct MockScript: Equatable, Sendable {
     /// 2026-01-01T00:00:00Z.
     public static let referenceDate = Date(timeIntervalSince1970: 1_767_225_600)
 
+    /// Stands in for an empty script.
+    public static let idleStep = MockStep(kind: .note, title: "Idle")
+
+    /// The step for `tick`, looping. `steps` is mutable, so it can be emptied after `init`; an
+    /// empty script then plays `idleStep` instead of dividing by zero.
     public func step(at tick: Int) -> MockStep {
         let count = steps.count
+        guard count > 0 else { return Self.idleStep }
         return steps[((tick % count) + count) % count]
     }
 
