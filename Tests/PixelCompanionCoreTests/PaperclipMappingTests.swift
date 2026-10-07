@@ -58,8 +58,7 @@ final class PaperclipMappingTests: XCTestCase {
         XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Current Name")
     }
 
-
-    func testAgentSessionsPreferActiveRunAndMapSafeTelemetry() {
+    func testAgentSessionsPreferActiveRunAndMapSafeTelemetry() throws {
         let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
         let input = PaperclipMappingInput(
             companies: [company],
@@ -132,18 +131,18 @@ final class PaperclipMappingTests: XCTestCase {
         )
 
         let state = PaperclipMapper.map(input)
-        let session = try? XCTUnwrap(state.agentSessions.first)
+        let session = try XCTUnwrap(state.agentSessions.first)
 
-        XCTAssertEqual(session??.runID, "active-run")
-        XCTAssertEqual(session??.runState, .running)
-        XCTAssertEqual(session??.taskTitle, "EX-1 · Build session UI")
-        XCTAssertEqual(session??.model, "gpt-5.6-sol")
-        XCTAssertEqual(session??.provider, "openai")
-        XCTAssertEqual(session??.sessionID, "session-1")
-        XCTAssertEqual(session??.inputTokens, 1200)
-        XCTAssertEqual(session??.cachedInputTokens, 800)
-        XCTAssertEqual(session??.outputTokens, 250)
-        XCTAssertTrue(session??.isActive == true)
+        XCTAssertEqual(session.runID, "active-run")
+        XCTAssertEqual(session.runState, .running)
+        XCTAssertEqual(session.taskTitle, "EX-1 · Build session UI")
+        XCTAssertEqual(session.model, "gpt-5.6-sol")
+        XCTAssertEqual(session.provider, "openai")
+        XCTAssertEqual(session.sessionID, "session-1")
+        XCTAssertEqual(session.inputTokens, 1200)
+        XCTAssertEqual(session.cachedInputTokens, 800)
+        XCTAssertEqual(session.outputTokens, 250)
+        XCTAssertTrue(session.isActive)
     }
 
     func testAgentWithoutRunIsNeverInventedAsLive() {
