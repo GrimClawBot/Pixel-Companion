@@ -49,7 +49,7 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
     public var authStatus: AuthStatus { .notRequired }
 
     public var currentActivity: ActivityEvent? {
-        locked { cache.activity.first(where: { $0.kind == .running }) ?? cache.activity.first }
+        locked { cache.activity.first }
     }
 
     public var availableCompanies: [PaperclipCompany] {
