@@ -111,9 +111,14 @@ final class PaperclipTelemetryTests: XCTestCase {
 
         connector.refresh()
         service.finishCore(.success(core), fetch: 1)
-        connector.refresh()
-        service.finishCore(.success(core), fetch: 2)
 
+        let first = AgentSessionSnapshot(
+            id: "first",
+            agentID: "first",
+            agentName: "First",
+            agentStatus: "running",
+            runState: .running
+        )
         let stale = AgentSessionSnapshot(
             id: "stale",
             agentID: "stale",
@@ -129,8 +134,17 @@ final class PaperclipTelemetryTests: XCTestCase {
             runState: .running
         )
 
+        connector.refresh()
+        service.finishSessions(.success([first]), fetch: 1)
+        XCTAssertEqual(
+            connector.agentSessions(limit: 8),
+            [first],
+            "Telemetry stays valid until a newer core result actually publishes"
+        )
+
+        service.finishCore(.success(core), fetch: 2)
         service.finishSessions(.success([stale]), fetch: 1)
-        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
+        XCTAssertEqual(connector.agentSessions(limit: 8), [first])
 
         service.finishSessions(.success([current]), fetch: 2)
         XCTAssertEqual(connector.agentSessions(limit: 8), [current])
