@@ -27,6 +27,7 @@ public final class PaperclipConnector:
     private let lock = NSLock()
     private let service: any PaperclipServiceProtocol
     private var cache: Cache
+    private var refreshGeneration = 0
 
     /// Called on the main queue after cached state changes.
     public var onChange: (() -> Void)?
@@ -85,43 +86,55 @@ public final class PaperclipConnector:
     }
 
     public func refresh() {
-        guard beginRefresh() else { return }
-        service.fetch(configuration: configuration) { [weak self] result in
-            self?.finishRefresh(result)
-        }
+        guard let generation = beginRefresh() else { return }
+        service.fetch(
+            configuration: configuration,
+            completion: { [weak self] result in
+                self?.finishRefresh(result, generation: generation)
+            },
+            sessionCompletion: { [weak self] result in
+                self?.finishSessionRefresh(result, generation: generation)
+            }
+        )
     }
 
-    private func beginRefresh() -> Bool {
+    private func beginRefresh() -> Int? {
         if configuration.baseURLString.isEmpty {
             update { value in
                 value.connectionState = .disconnected
                 value.lastError = nil
             }
-            return false
+            return nil
         }
         if let validationError = configuration.validationError {
             update { value in
                 value.connectionState = .error
                 value.lastError = validationError
             }
-            return false
+            return nil
         }
         return locked {
-            guard !cache.inFlight else { return false }
+            guard !cache.inFlight else { return nil }
             cache.inFlight = true
+            refreshGeneration += 1
+            let generation = refreshGeneration
             if cache.activity.isEmpty, cache.companies.isEmpty {
                 cache.connectionState = .connecting
             }
-            return true
+            return generation
         }
     }
 
-    private func finishRefresh(_ result: Result<PaperclipRemoteState, Error>) {
+    private func finishRefresh(
+        _ result: Result<PaperclipRemoteState, Error>,
+        generation: Int
+    ) {
         update { value in
+            guard generation == refreshGeneration else { return }
             value.inFlight = false
             switch result {
             case let .success(state):
-                apply(state, to: &value)
+                applyCore(state, to: &value)
             case let .failure(error):
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -129,7 +142,19 @@ public final class PaperclipConnector:
         }
     }
 
-    private func apply(_ state: PaperclipRemoteState, to value: inout Cache) {
+    private func finishSessionRefresh(
+        _ result: Result<[AgentSessionSnapshot], Error>,
+        generation: Int
+    ) {
+        update { value in
+            guard generation == refreshGeneration else { return }
+            if case let .success(sessions) = result {
+                value.agentSessions = sessions
+            }
+        }
+    }
+
+    private func applyCore(_ state: PaperclipRemoteState, to value: inout Cache) {
         value.connectionState = .connected
         value.lastError = nil
         value.companyName = state.companyName
@@ -138,7 +163,6 @@ public final class PaperclipConnector:
         value.activity = state.activity
         value.approvals = state.approvals
         value.usage = state.usage
-        value.agentSessions = state.agentSessions
     }
 
     private static func initialCache(_ configuration: PaperclipConfiguration) -> Cache {
