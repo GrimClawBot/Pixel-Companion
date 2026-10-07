@@ -71,7 +71,6 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertFalse(session.isActive)
     }
 
-
     func testAgentSessionPresentationClampsNegativeTokenCounts() {
         let session = AgentSessionSnapshot(
             id: "negative",
