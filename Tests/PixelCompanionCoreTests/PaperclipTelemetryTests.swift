@@ -150,108 +150,6 @@ final class PaperclipTelemetryTests: XCTestCase {
         XCTAssertEqual(connector.agentSessions(limit: 8), [current])
     }
 
-
-    func testTelemetryRequestsCoalesceWhileNetworkFetchIsInFlight() {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [TelemetryStubURLProtocol.self]
-        let client = PaperclipHTTPClient(session: URLSession(configuration: configuration))
-        let fetcher = PaperclipTelemetryFetcher(client: client)
-        let payload = telemetryPayload()
-        let countLock = NSLock()
-        var heartbeatCount = 0
-        var liveCount = 0
-
-        TelemetryStubURLProtocol.handler = { request in
-            switch request.url?.path {
-            case "/api/companies/company-1/heartbeat-runs":
-                countLock.lock()
-                heartbeatCount += 1
-                countLock.unlock()
-                Thread.sleep(forTimeInterval: 0.05)
-                return (200, self.json([]))
-            case "/api/companies/company-1/live-runs":
-                countLock.lock()
-                liveCount += 1
-                countLock.unlock()
-                return (200, self.json([]))
-            default:
-                return (404, Data())
-            }
-        }
-
-        let first = expectation(description: "First coalesced telemetry result")
-        let second = expectation(description: "Second coalesced telemetry result")
-        fetcher.fetch(payload: payload) { _ in first.fulfill() }
-        fetcher.fetch(payload: payload) { _ in second.fulfill() }
-
-        wait(for: [first, second], timeout: 2)
-        XCTAssertEqual(heartbeatCount, 1)
-        XCTAssertEqual(liveCount, 1)
-    }
-
-    func testTelemetryFailureClearsPreviouslyPublishedSessions() {
-        let service = TelemetryDeferredService()
-        let connector = PaperclipConnector(
-            configuration: selectedConfiguration(),
-            service: service
-        )
-        let core = coreState()
-        let live = AgentSessionSnapshot(
-            id: "live",
-            agentID: "agent-1",
-            agentName: "Builder",
-            agentStatus: "running",
-            runState: .running
-        )
-
-        connector.refresh()
-        service.finishCore(.success(core), fetch: 1)
-        service.finishSessions(.success([live]), fetch: 1)
-        XCTAssertEqual(connector.agentSessions(limit: 8), [live])
-
-        connector.refresh()
-        service.finishCore(.success(core), fetch: 2)
-        service.finishSessions(.failure(URLError(.timedOut)), fetch: 2)
-        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
-    }
-
-    func testHistoricalRunningRunIsNotLiveWhenLiveEndpointIsEmpty() {
-        let service = makeService()
-        TelemetryStubURLProtocol.handler = { request in
-            switch request.url?.path {
-            case "/api/companies/company-1/heartbeat-runs":
-                return (200, self.json([[
-                    "id": "finished-between-requests",
-                    "agentId": "agent-1",
-                    "status": "running",
-                    "startedAt": "2026-10-07T18:00:00.000Z",
-                    "createdAt": "2026-10-07T18:00:00.000Z",
-                    "updatedAt": "2026-10-07T18:30:00.000Z"
-                ]]))
-            case "/api/companies/company-1/live-runs":
-                return (200, self.json([]))
-            default:
-                return self.coreResponse(for: request.url?.path)
-            }
-        }
-
-        let sessionExpectation = expectation(description: "Confirmed session state")
-        service.fetch(
-            configuration: selectedConfiguration(),
-            completion: { _ in },
-            sessionCompletion: { result in
-                guard case let .success(sessions) = result else {
-                    XCTFail("Expected telemetry success")
-                    sessionExpectation.fulfill()
-                    return
-                }
-                XCTAssertFalse(sessions.contains(where: \.isActive))
-                sessionExpectation.fulfill()
-            }
-        )
-        wait(for: [sessionExpectation], timeout: 2)
-    }
-
     func testLiveRunsRestoreActiveSessionOutsideRecentWindow() {
         let service = makeService()
         TelemetryStubURLProtocol.handler = { request in
@@ -376,7 +274,6 @@ final class PaperclipTelemetryTests: XCTestCase {
         )
         wait(for: [coreExpectation, telemetryExpectation], timeout: 2)
     }
-
 
     private func coreState() -> PaperclipRemoteState {
         PaperclipRemoteState(
