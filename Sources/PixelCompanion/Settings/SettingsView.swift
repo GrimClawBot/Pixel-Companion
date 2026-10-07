@@ -32,6 +32,12 @@ final class SettingsWindowController {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @State private var paperclipBaseURLDraft: String
+
+    init(model: AppModel) {
+        self.model = model
+        _paperclipBaseURLDraft = State(initialValue: model.paperclipBaseURL)
+    }
 
     var body: some View {
         Form {
@@ -61,9 +67,9 @@ struct SettingsView: View {
     @ViewBuilder private var paperclipSection: some View {
         if model.isPaperclipConnector {
             Section {
-                TextField("Base URL", text: $model.paperclipBaseURL)
+                TextField("Base URL", text: $paperclipBaseURLDraft)
                     .textFieldStyle(.roundedBorder)
-                    .onSubmit { model.applyPaperclipBaseURL() }
+                    .onSubmit { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
                 if model.paperclipCompanies.isEmpty {
                     TextField("Company ID", text: $model.paperclipCompanyID)
                         .textFieldStyle(.roundedBorder)
@@ -78,7 +84,7 @@ struct SettingsView: View {
                 HStack {
                     LabeledContent("Status", value: model.snapshot.connectionState.displayName)
                     Spacer()
-                    Button("Refresh") { model.refreshConnector() }
+                    Button("Refresh") { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
                 }
                 if let error = model.snapshot.lastError {
                     Text(error)
