@@ -19,6 +19,151 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
+    func testSnapshotPrimaryPrefersActiveSessionWithoutStackingActivity() {
+        let activity = ActivityEvent(
+            id: "activity",
+            kind: .running,
+            title: "Current activity",
+            timestamp: Date(timeIntervalSince1970: 10)
+        )
+        let active = makeAgentSession(
+            id: "active",
+            name: "Builder",
+            state: .running,
+            agentStatus: "running"
+        )
+        let recent = makeAgentSession(
+            id: "recent",
+            name: "Recent",
+            state: .completed,
+            agentStatus: "idle"
+        )
+
+        XCTAssertEqual(
+            AgentSessionPresentation.snapshotPrimary(activity: activity, sessions: [recent, active]),
+            .session(active)
+        )
+        XCTAssertEqual(
+            AgentSessionPresentation.snapshotPrimary(activity: activity, sessions: [recent]),
+            .activity(activity)
+        )
+        XCTAssertEqual(
+            AgentSessionPresentation.snapshotPrimary(activity: nil, sessions: [recent]),
+            .session(recent)
+        )
+    }
+
+    func testDetailHistoryKeepsCurrentActivityWhenActiveSessionIsHighlighted() {
+        let activity = ActivityEvent(
+            id: "activity",
+            kind: .running,
+            title: "Current activity",
+            timestamp: Date(timeIntervalSince1970: 10)
+        )
+        let active = makeAgentSession(
+            id: "active",
+            name: "Builder",
+            state: .running,
+            agentStatus: "running"
+        )
+
+        XCTAssertNil(
+            AgentSessionPresentation.highlightedActivity(
+                activity: activity,
+                sessions: [active]
+            )
+        )
+        XCTAssertEqual(
+            ActivityPresentation.history(
+                [activity],
+                currentActivity: AgentSessionPresentation.highlightedActivity(
+                    activity: activity,
+                    sessions: [active]
+                )
+            ),
+            [activity]
+        )
+    }
+
+    func testAgentSessionPresentationPrefersActiveSession() {
+        let recent = makeAgentSession(
+            id: "recent",
+            name: "Recent",
+            state: .completed,
+            agentStatus: "idle"
+        )
+        let active = makeAgentSession(
+            id: "active",
+            name: "Builder",
+            state: .running,
+            agentStatus: "running"
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.primary([recent, active]), active)
+        XCTAssertEqual(AgentSessionPresentation.sectionTitle([recent, active]), "Agent sessions")
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(active), "Live")
+    }
+
+    func testAgentSessionPresentationFormatsRuntimeAndTokens() {
+        let session = AgentSessionSnapshot(
+            id: "agent-1",
+            agentID: "agent-1",
+            agentName: "Builder",
+            agentStatus: "idle",
+            runState: .completed,
+            model: "gpt-5.6-sol",
+            provider: "openai",
+            sessionID: "01a1159b-b36a-7fa1-a102-aa1988d6dfc7",
+            inputTokens: 1_250,
+            cachedInputTokens: 2_500_000,
+            outputTokens: 250
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.runtimeLabel(session), "openai · gpt-5.6-sol")
+        XCTAssertEqual(AgentSessionPresentation.identityLabel(session), "Session 01a1159b…")
+        XCTAssertEqual(AgentSessionPresentation.tokenLabel(session), "1.2K in · 2.5M cached · 250 out")
+        XCTAssertEqual(AgentSessionPresentation.sectionTitle([session]), "Recent agent sessions")
+    }
+
+    func testAgentSessionUnknownStateUsesAgentStatusWithoutInventingLiveState() {
+        let session = makeAgentSession(
+            id: "unknown",
+            name: "Builder",
+            state: .unknown,
+            agentStatus: "waiting_for_task"
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(session), "Waiting For Task")
+        XCTAssertFalse(session.isActive)
+    }
+
+    func testUnknownSessionNeverEchoesActiveAgentStatus() {
+        let session = makeAgentSession(
+            id: "unknown-running",
+            name: "Builder",
+            state: .unknown,
+            agentStatus: "running"
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(session), "Unknown")
+        XCTAssertFalse(session.isActive)
+    }
+
+    func testAgentSessionPresentationClampsNegativeTokenCounts() {
+        let session = AgentSessionSnapshot(
+            id: "negative",
+            agentID: "negative",
+            agentName: "Agent",
+            agentStatus: "idle",
+            runState: .completed,
+            inputTokens: -1,
+            cachedInputTokens: -2,
+            outputTokens: -3
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.tokenLabel(session), "0 in · 0 cached · 0 out")
+    }
+
     func testApprovalCountAndTimestampPolicies() {
         let recent = ApprovalRequest(
             id: "approval-1",
@@ -113,4 +258,19 @@ final class LivePresentationTests: XCTestCase {
             "42 / 100 tokens"
         )
     }
+}
+
+private func makeAgentSession(
+    id: String,
+    name: String,
+    state: AgentSessionSnapshot.RunState,
+    agentStatus: String
+) -> AgentSessionSnapshot {
+    AgentSessionSnapshot(
+        id: id,
+        agentID: id,
+        agentName: name,
+        agentStatus: agentStatus,
+        runState: state
+    )
 }

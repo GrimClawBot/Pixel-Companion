@@ -4,6 +4,126 @@ import XCTest
 
 final class PaperclipMappingTests: XCTestCase {
     func testDuplicateAgentIDsDoNotCrashMapper() {
+        let state = PaperclipMapper.map(makeDuplicateAgentInput())
+
+        XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Current Name")
+        XCTAssertEqual(state.agentSessions.count, 1)
+        XCTAssertEqual(state.agentSessions.first?.agentName, "Current Name")
+    }
+
+    func testAgentSessionsPreferActiveRunAndMapSafeTelemetry() throws {
+        let state = PaperclipMapper.map(makeSessionMappingInput())
+        let session = try XCTUnwrap(state.agentSessions.first)
+
+        XCTAssertEqual(session.runID, "active-run")
+        XCTAssertEqual(session.runState, .running)
+        XCTAssertEqual(session.taskTitle, "EX-1 · Build session UI")
+        XCTAssertEqual(session.model, "gpt-5.6-sol")
+        XCTAssertEqual(session.provider, "openai")
+        XCTAssertEqual(session.sessionID, "session-1")
+        XCTAssertEqual(session.inputTokens, 1200)
+        XCTAssertEqual(session.cachedInputTokens, 800)
+        XCTAssertEqual(session.outputTokens, 250)
+        XCTAssertTrue(session.isActive)
+    }
+
+    func testRecentSessionSelectionDoesNotDependOnResponseOrder() throws {
+        let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+        let input = PaperclipMappingInput(
+            companies: [company],
+            company: company,
+            dashboard: PaperclipDashboardResponse(
+                costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+            ),
+            agents: [makeSessionAgent()],
+            issues: [makeSessionIssue()],
+            approvals: [],
+            runs: [
+                PaperclipHeartbeatRunResponse(
+                    id: "older",
+                    agentId: "agent-1",
+                    status: "completed",
+                    startedAt: "2026-10-07T17:00:00.000Z",
+                    finishedAt: "2026-10-07T17:01:00.000Z",
+                    createdAt: "2026-10-07T17:00:00.000Z",
+                    updatedAt: "2026-10-07T17:01:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: nil
+                ),
+                PaperclipHeartbeatRunResponse(
+                    id: "newer",
+                    agentId: "agent-1",
+                    status: "failed",
+                    startedAt: "2026-10-07T18:00:00.000Z",
+                    finishedAt: "2026-10-07T18:01:00.000Z",
+                    createdAt: "2026-10-07T18:00:00.000Z",
+                    updatedAt: "2026-10-07T18:01:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: nil
+                )
+            ]
+        )
+
+        let session = try XCTUnwrap(PaperclipMapper.map(input).agentSessions.first)
+
+        XCTAssertEqual(session.runID, "newer")
+        XCTAssertEqual(session.runState, .failed)
+        XCTAssertFalse(session.isActive)
+    }
+
+    func testConfirmedCompletedRunBeatsNewerUnconfirmedRun() throws {
+        let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+        let input = PaperclipMappingInput(
+            companies: [company],
+            company: company,
+            dashboard: PaperclipDashboardResponse(
+                costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+            ),
+            agents: [makeSessionAgent()],
+            issues: [],
+            approvals: [],
+            runs: [
+                PaperclipHeartbeatRunResponse(
+                    id: "newer-unconfirmed",
+                    agentId: "agent-1",
+                    status: "unknown",
+                    startedAt: "2026-10-07T19:00:00.000Z",
+                    finishedAt: nil,
+                    createdAt: "2026-10-07T19:00:00.000Z",
+                    updatedAt: "2026-10-07T19:01:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: nil
+                ),
+                PaperclipHeartbeatRunResponse(
+                    id: "older-completed",
+                    agentId: "agent-1",
+                    status: "completed",
+                    startedAt: "2026-10-07T18:00:00.000Z",
+                    finishedAt: "2026-10-07T18:10:00.000Z",
+                    createdAt: "2026-10-07T18:00:00.000Z",
+                    updatedAt: "2026-10-07T18:10:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: nil
+                )
+            ]
+        )
+
+        let session = try XCTUnwrap(PaperclipMapper.map(input).agentSessions.first)
+
+        XCTAssertEqual(session.runID, "older-completed")
+        XCTAssertEqual(session.runState, .completed)
+        XCTAssertFalse(session.isActive)
+    }
+
+    func testAgentWithoutRunIsNeverInventedAsLive() {
         let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
         let input = PaperclipMappingInput(
             companies: [company],
@@ -14,39 +134,28 @@ final class PaperclipMappingTests: XCTestCase {
             agents: [
                 PaperclipAgentResponse(
                     id: "agent-1",
-                    name: "Old Name",
-                    title: nil,
-                    status: "idle",
-                    lastHeartbeatAt: nil,
-                    updatedAt: "2026-10-07T17:00:00.000Z"
-                ),
-                PaperclipAgentResponse(
-                    id: "agent-1",
-                    name: "Current Name",
-                    title: nil,
-                    status: "idle",
+                    name: "Builder",
+                    role: "engineer",
+                    title: "Engineer",
+                    status: "running",
+                    adapterType: "codex_local",
+                    adapterConfig: .init(model: "gpt-5.6-sol"),
+                    runtimeConfig: .init(aiConnection: .init(provider: "openai")),
                     lastHeartbeatAt: nil,
                     updatedAt: "2026-10-07T18:00:00.000Z"
                 )
             ],
-            issues: [
-                PaperclipIssueResponse(
-                    id: "issue-1",
-                    identifier: "EX-1",
-                    title: "Duplicate-safe mapping",
-                    status: "in_progress",
-                    assigneeAgentId: "agent-1",
-                    lastActivityAt: "2026-10-07T19:00:00.000Z",
-                    updatedAt: nil,
-                    createdAt: nil
-                )
-            ],
-            approvals: []
+            issues: [],
+            approvals: [],
+            runs: []
         )
 
-        let state = PaperclipMapper.map(input)
+        let session = PaperclipMapper.map(input).agentSessions.first
 
-        XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Current Name")
+        XCTAssertEqual(session?.runState, .unknown)
+        XCTAssertFalse(session?.isActive ?? true)
+        XCTAssertEqual(session?.model, "gpt-5.6-sol")
+        XCTAssertEqual(session?.provider, "openai")
     }
 
     func testCurrentActivityUsesNewestEventEvenWhenOlderEventIsRunning() {
@@ -75,11 +184,144 @@ final class PaperclipMappingTests: XCTestCase {
             companyName: "Example Co",
             activity: [newestFailure, olderRunning],
             approvals: [],
-            usage: nil
+            usage: nil,
+            agentSessions: []
         )))
 
         XCTAssertEqual(connector.currentActivity, newestFailure)
     }
+}
+
+private func makeDuplicateAgentInput() -> PaperclipMappingInput {
+    let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+    return PaperclipMappingInput(
+        companies: [company],
+        company: company,
+        dashboard: PaperclipDashboardResponse(
+            costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+        ),
+        agents: [
+            PaperclipAgentResponse(
+                id: "agent-1",
+                name: "Old Name",
+                role: nil,
+                title: nil,
+                status: "idle",
+                adapterType: nil,
+                adapterConfig: nil,
+                runtimeConfig: nil,
+                lastHeartbeatAt: nil,
+                updatedAt: "2026-10-07T17:00:00.000Z"
+            ),
+            PaperclipAgentResponse(
+                id: "agent-1",
+                name: "Current Name",
+                role: nil,
+                title: nil,
+                status: "idle",
+                adapterType: nil,
+                adapterConfig: nil,
+                runtimeConfig: nil,
+                lastHeartbeatAt: nil,
+                updatedAt: "2026-10-07T18:00:00.000Z"
+            )
+        ],
+        issues: [
+            PaperclipIssueResponse(
+                id: "issue-1",
+                identifier: "EX-1",
+                title: "Duplicate-safe mapping",
+                status: "in_progress",
+                assigneeAgentId: "agent-1",
+                lastActivityAt: "2026-10-07T19:00:00.000Z",
+                updatedAt: nil,
+                createdAt: nil
+            )
+        ],
+        approvals: [],
+        runs: []
+    )
+}
+
+private func makeSessionMappingInput() -> PaperclipMappingInput {
+    let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+    return PaperclipMappingInput(
+        companies: [company],
+        company: company,
+        dashboard: PaperclipDashboardResponse(
+            costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+        ),
+        agents: [makeSessionAgent()],
+        issues: [makeSessionIssue()],
+        approvals: [],
+        runs: makeSessionRuns()
+    )
+}
+
+private func makeSessionAgent() -> PaperclipAgentResponse {
+    PaperclipAgentResponse(
+        id: "agent-1",
+        name: "Builder",
+        role: "engineer",
+        title: "Senior Engineer",
+        status: "idle",
+        adapterType: "codex_local",
+        adapterConfig: .init(model: "fallback-model"),
+        runtimeConfig: .init(aiConnection: .init(provider: "fallback-provider")),
+        lastHeartbeatAt: "2026-10-07T18:00:00.000Z",
+        updatedAt: "2026-10-07T18:00:00.000Z"
+    )
+}
+
+private func makeSessionIssue() -> PaperclipIssueResponse {
+    PaperclipIssueResponse(
+        id: "issue-1",
+        identifier: "EX-1",
+        title: "Build session UI",
+        status: "in_progress",
+        assigneeAgentId: "agent-1",
+        lastActivityAt: nil,
+        updatedAt: nil,
+        createdAt: nil
+    )
+}
+
+private func makeSessionRuns() -> [PaperclipHeartbeatRunResponse] {
+    [
+        PaperclipHeartbeatRunResponse(
+            id: "recent-failed",
+            agentId: "agent-1",
+            status: "failed",
+            startedAt: "2026-10-07T18:20:00.000Z",
+            finishedAt: "2026-10-07T18:21:00.000Z",
+            createdAt: "2026-10-07T18:20:00.000Z",
+            updatedAt: "2026-10-07T18:21:00.000Z",
+            usageJson: nil,
+            sessionIdBefore: nil,
+            sessionIdAfter: nil,
+            contextSnapshot: .init(issueId: "issue-1", taskId: "issue-1")
+        ),
+        PaperclipHeartbeatRunResponse(
+            id: "active-run",
+            agentId: "agent-1",
+            status: "running",
+            startedAt: "2026-10-07T18:10:00.000Z",
+            finishedAt: nil,
+            createdAt: "2026-10-07T18:10:00.000Z",
+            updatedAt: "2026-10-07T18:19:00.000Z",
+            usageJson: .init(
+                model: "gpt-5.6-sol",
+                provider: "openai",
+                inputTokens: 1200,
+                cachedInputTokens: 800,
+                outputTokens: 250,
+                persistedSessionId: "session-1"
+            ),
+            sessionIdBefore: nil,
+            sessionIdAfter: "session-1",
+            contextSnapshot: .init(issueId: "issue-1", taskId: "issue-1")
+        )
+    ]
 }
 
 private final class DeferredPaperclipMappingService: PaperclipServiceProtocol {
@@ -87,7 +329,8 @@ private final class DeferredPaperclipMappingService: PaperclipServiceProtocol {
 
     func fetch(
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
         self.completion = completion
     }

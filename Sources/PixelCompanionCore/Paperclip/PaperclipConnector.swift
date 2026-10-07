@@ -1,7 +1,13 @@
 import Foundation
 
 /// Read-only Paperclip connector. Network requests update a synchronized cache off the UI path.
-public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, ApprovalProvider, UsageProvider {
+public final class PaperclipConnector:
+    Connector,
+    AuthProvider,
+    ActivitySource,
+    ApprovalProvider,
+    UsageProvider,
+    AgentSessionSource {
     public let id: ConnectorID = .paperclip
     public let configuration: PaperclipConfiguration
 
@@ -14,12 +20,15 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
         var activity: [ActivityEvent] = []
         var approvals: [ApprovalRequest] = []
         var usage: UsageSnapshot?
+        var agentSessions: [AgentSessionSnapshot] = []
         var inFlight = false
     }
 
     private let lock = NSLock()
     private let service: any PaperclipServiceProtocol
     private var cache: Cache
+    private var refreshGeneration = 0
+    private var publishedCoreGeneration = 0
 
     /// Called on the main queue after cached state changes.
     public var onChange: (() -> Void)?
@@ -46,6 +55,7 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
     public var activity: (any ActivitySource)? { self }
     public var approvals: (any ApprovalProvider)? { self }
     public var usage: (any UsageProvider)? { self }
+    public var sessions: (any AgentSessionSource)? { self }
     public var authStatus: AuthStatus { .notRequired }
 
     public var currentActivity: ActivityEvent? {
@@ -72,52 +82,87 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
         locked { cache.usage }
     }
 
-    public func refresh() {
-        guard beginRefresh() else { return }
-        service.fetch(configuration: configuration) { [weak self] result in
-            self?.finishRefresh(result)
-        }
+    public func agentSessions(limit: Int) -> [AgentSessionSnapshot] {
+        locked { Array(cache.agentSessions.prefix(max(limit, 0))) }
     }
 
-    private func beginRefresh() -> Bool {
+    public func refresh() {
+        guard let generation = beginRefresh() else { return }
+        service.fetch(
+            configuration: configuration,
+            completion: { [weak self] result in
+                self?.finishRefresh(result, generation: generation)
+            },
+            sessionCompletion: { [weak self] result in
+                self?.finishSessionRefresh(result, generation: generation)
+            }
+        )
+    }
+
+    private func beginRefresh() -> Int? {
         if configuration.baseURLString.isEmpty {
             update { value in
                 value.connectionState = .disconnected
                 value.lastError = nil
             }
-            return false
+            return nil
         }
         if let validationError = configuration.validationError {
             update { value in
                 value.connectionState = .error
                 value.lastError = validationError
             }
-            return false
+            return nil
         }
         return locked {
-            guard !cache.inFlight else { return false }
+            guard !cache.inFlight else { return nil }
             cache.inFlight = true
+            refreshGeneration += 1
+            let generation = refreshGeneration
             if cache.activity.isEmpty, cache.companies.isEmpty {
                 cache.connectionState = .connecting
             }
-            return true
+            return generation
         }
     }
 
-    private func finishRefresh(_ result: Result<PaperclipRemoteState, Error>) {
+    private func finishRefresh(
+        _ result: Result<PaperclipRemoteState, Error>,
+        generation: Int
+    ) {
         update { value in
+            guard generation == refreshGeneration else { return }
             value.inFlight = false
             switch result {
             case let .success(state):
-                apply(state, to: &value)
+                applyCore(state, to: &value)
+                publishedCoreGeneration = generation
             case let .failure(error):
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                value.agentSessions = []
+                publishedCoreGeneration = 0
             }
         }
     }
 
-    private func apply(_ state: PaperclipRemoteState, to value: inout Cache) {
+    private func finishSessionRefresh(
+        _ result: Result<[AgentSessionSnapshot], Error>,
+        generation: Int
+    ) {
+        update { value in
+            guard generation == publishedCoreGeneration else { return }
+            switch result {
+            case let .success(sessions):
+                value.agentSessions = sessions
+            case .failure:
+                value.agentSessions = []
+            }
+        }
+    }
+
+    private func applyCore(_ state: PaperclipRemoteState, to value: inout Cache) {
+        let companyChanged = value.companyID != state.companyID
         value.connectionState = .connected
         value.lastError = nil
         value.companyName = state.companyName
@@ -126,6 +171,9 @@ public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, 
         value.activity = state.activity
         value.approvals = state.approvals
         value.usage = state.usage
+        if companyChanged || value.agentSessions.isEmpty {
+            value.agentSessions = state.agentSessions
+        }
     }
 
     private static func initialCache(_ configuration: PaperclipConfiguration) -> Cache {

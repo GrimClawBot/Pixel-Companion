@@ -28,6 +28,12 @@ public protocol UsageProvider: AnyObject {
     func currentUsage() -> UsageSnapshot?
 }
 
+/// Exposes sanitized read-only agent and session summaries.
+public protocol AgentSessionSource: AnyObject {
+    /// Up to `limit` agent/session summaries, active first and otherwise most recent first.
+    func agentSessions(limit: Int) -> [AgentSessionSnapshot]
+}
+
 /// Exposes recent conversation lines. Sending messages is out of scope.
 public protocol ChatBackend: AnyObject {
     /// Up to `limit` messages, oldest first.
@@ -47,6 +53,7 @@ public protocol Connector: AnyObject {
     var activity: (any ActivitySource)? { get }
     var approvals: (any ApprovalProvider)? { get }
     var usage: (any UsageProvider)? { get }
+    var sessions: (any AgentSessionSource)? { get }
     var chat: (any ChatBackend)? { get }
 
     /// Pulls the latest state from the source. Must not mutate the source.
@@ -59,6 +66,7 @@ public extension Connector {
     var activity: (any ActivitySource)? { nil }
     var approvals: (any ApprovalProvider)? { nil }
     var usage: (any UsageProvider)? { nil }
+    var sessions: (any AgentSessionSource)? { nil }
     var chat: (any ChatBackend)? { nil }
     func refresh() {}
 }

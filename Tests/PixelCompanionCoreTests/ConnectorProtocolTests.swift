@@ -9,17 +9,24 @@ private final class BareConnector: Connector {
 }
 
 /// A connector that reports a failure reason even when it is not in `.error`.
-private final class FlakyConnector: Connector, ActivitySource {
+private final class FlakyConnector: Connector, ActivitySource, AgentSessionSource {
     let id = ConnectorID(rawValue: "test.flaky")
     let displayName = "Flaky"
     var connectionState: ConnectionState = .connected
     var lastError: String? { "stale failure" }
     var activity: (any ActivitySource)? { self }
+    var sessions: (any AgentSessionSource)? { self }
     var currentActivity: ActivityEvent? { nil }
     private(set) var requestedLimit: Int?
+    private(set) var requestedSessionLimit: Int?
 
     func recentActivity(limit: Int) -> [ActivityEvent] {
         requestedLimit = limit
+        return []
+    }
+
+    func agentSessions(limit: Int) -> [AgentSessionSnapshot] {
+        requestedSessionLimit = limit
         return []
     }
 }
@@ -33,6 +40,7 @@ final class ConnectorProtocolTests: XCTestCase {
         XCTAssertNil(connector.activity)
         XCTAssertNil(connector.approvals)
         XCTAssertNil(connector.usage)
+        XCTAssertNil(connector.sessions)
         XCTAssertNil(connector.chat)
         connector.refresh()
     }
@@ -47,6 +55,7 @@ final class ConnectorProtocolTests: XCTestCase {
         XCTAssertTrue(snapshot.recentActivity.isEmpty)
         XCTAssertTrue(snapshot.pendingApprovals.isEmpty)
         XCTAssertNil(snapshot.usage)
+        XCTAssertTrue(snapshot.agentSessions.isEmpty)
         XCTAssertTrue(snapshot.recentMessages.isEmpty)
     }
 
@@ -67,9 +76,10 @@ final class ConnectorProtocolTests: XCTestCase {
 
     func testNegativeLimitsAreClampedToZero() {
         let connector = FlakyConnector()
-        _ = ConnectorSnapshot(capturing: connector, activityLimit: -3)
+        _ = ConnectorSnapshot(capturing: connector, activityLimit: -3, sessionLimit: -4)
 
         XCTAssertEqual(connector.requestedLimit, 0)
+        XCTAssertEqual(connector.requestedSessionLimit, 0)
     }
 
     func testUsageFraction() {

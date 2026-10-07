@@ -43,9 +43,18 @@ struct SnapshotContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SummaryHeader(snapshot: snapshot, mood: mood)
-            if let activity = snapshot.currentActivity {
+            switch AgentSessionPresentation.snapshotPrimary(
+                activity: snapshot.currentActivity,
+                sessions: snapshot.agentSessions
+            ) {
+            case let .activity(activity):
                 SectionTitle(text: "Now")
                 ActivityRow(event: activity, emphasizesTitle: true)
+            case let .session(session):
+                SectionTitle(text: session.isActive ? "Live agent" : "Recent agent")
+                AgentSessionRow(session: session, compact: true)
+            case nil:
+                EmptyView()
             }
             if !visibleApprovals.isEmpty {
                 HStack {
@@ -76,6 +85,13 @@ struct DetailContent: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
+                    if !snapshot.agentSessions.isEmpty {
+                        SectionTitle(text: AgentSessionPresentation.sectionTitle(snapshot.agentSessions))
+                        ForEach(snapshot.agentSessions) { session in
+                            AgentSessionRow(session: session)
+                        }
+                        Divider()
+                    }
                     if !snapshot.pendingApprovals.isEmpty {
                         HStack {
                             SectionTitle(text: "Pending approvals")
@@ -90,7 +106,10 @@ struct DetailContent: View {
                     SectionTitle(text: "Recent activity")
                     let history = ActivityPresentation.history(
                         snapshot.recentActivity,
-                        currentActivity: snapshot.currentActivity
+                        currentActivity: AgentSessionPresentation.highlightedActivity(
+                            activity: snapshot.currentActivity,
+                            sessions: snapshot.agentSessions
+                        )
                     )
                     if history.isEmpty {
                         Placeholder(text: "No additional activity yet")

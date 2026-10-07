@@ -54,6 +54,7 @@ struct PaperclipRemoteState {
     let activity: [ActivityEvent]
     let approvals: [ApprovalRequest]
     let usage: UsageSnapshot?
+    let agentSessions: [AgentSessionSnapshot]
 }
 
 enum PaperclipServiceError: LocalizedError {
@@ -79,6 +80,7 @@ enum PaperclipServiceError: LocalizedError {
 protocol PaperclipServiceProtocol: AnyObject {
     func fetch(
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     )
 }

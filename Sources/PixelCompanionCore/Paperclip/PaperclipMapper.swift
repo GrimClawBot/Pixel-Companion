@@ -8,7 +8,8 @@ enum PaperclipMapper {
             companyName: input.company.name,
             activity: activity(input),
             approvals: approvals(input.approvals),
-            usage: usage(input.dashboard)
+            usage: usage(input.dashboard),
+            agentSessions: agentSessions(input)
         )
     }
 
@@ -55,6 +56,106 @@ enum PaperclipMapper {
             detail: agent.title,
             timestamp: date(agent.updatedAt) ?? date(agent.lastHeartbeatAt) ?? .distantPast
         )
+    }
+
+    private static func agentSessions(_ input: PaperclipMappingInput) -> [AgentSessionSnapshot] {
+        let issuesByID = input.issues.reduce(into: [String: PaperclipIssueResponse]()) { values, issue in
+            values[issue.id] = issue
+        }
+        let runsByAgent = Dictionary(grouping: input.runs, by: \.agentId)
+        let agentsByID = input.agents.reduce(into: [String: PaperclipAgentResponse]()) { values, agent in
+            values[agent.id] = agent
+        }
+
+        return agentsByID.values.map { agent in
+            let runs = (runsByAgent[agent.id] ?? []).sorted { runTimestamp($0) > runTimestamp($1) }
+            let selectedRun = preferredRun(from: runs)
+            let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
+            let usage = selectedRun?.usageJson
+            let taskTitle = issue.map { issue in
+                if let identifier = issue.identifier, !identifier.isEmpty {
+                    return "\(identifier) · \(issue.title)"
+                }
+                return issue.title
+            }
+            return AgentSessionSnapshot(
+                id: "paperclip-agent-session-\(agent.id)",
+                agentID: agent.id,
+                agentName: agent.name,
+                agentTitle: agent.title,
+                agentStatus: agent.status,
+                runID: selectedRun?.id,
+                runState: runState(selectedRun?.status, agentStatus: agent.status),
+                taskTitle: taskTitle,
+                model: usage?.model ?? agent.adapterConfig?.model,
+                provider: usage?.provider ?? agent.runtimeConfig?.aiConnection?.provider,
+                sessionID: usage?.persistedSessionId
+                    ?? selectedRun?.sessionIdAfter
+                    ?? selectedRun?.sessionIdBefore,
+                inputTokens: nonnegative(usage?.inputTokens),
+                cachedInputTokens: nonnegative(usage?.cachedInputTokens),
+                outputTokens: nonnegative(usage?.outputTokens),
+                startedAt: date(selectedRun?.startedAt),
+                finishedAt: date(selectedRun?.finishedAt),
+                updatedAt: date(selectedRun?.updatedAt)
+                    ?? date(selectedRun?.createdAt)
+                    ?? date(agent.updatedAt)
+                    ?? date(agent.lastHeartbeatAt)
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.isActive != rhs.isActive { return lhs.isActive }
+            let leftDate = lhs.updatedAt ?? .distantPast
+            let rightDate = rhs.updatedAt ?? .distantPast
+            if leftDate != rightDate { return leftDate > rightDate }
+            return lhs.agentName.localizedCaseInsensitiveCompare(rhs.agentName) == .orderedAscending
+        }
+    }
+
+    private static func preferredRun(
+        from runs: [PaperclipHeartbeatRunResponse]
+    ) -> PaperclipHeartbeatRunResponse? {
+        runs.first(where: { isActiveRun($0.status) })
+            ?? runs.first(where: { isConfirmedRecentRun($0.status) })
+            ?? runs.first
+    }
+
+    private static func runTimestamp(_ run: PaperclipHeartbeatRunResponse) -> Date {
+        date(run.updatedAt) ?? date(run.createdAt) ?? date(run.startedAt) ?? .distantPast
+    }
+
+    private static func nonnegative(_ value: Int?) -> Int? {
+        value.map { max($0, 0) }
+    }
+
+    private static func isActiveRun(_ status: String) -> Bool {
+        ["queued", "running"].contains(status.lowercased())
+    }
+
+    private static func isConfirmedRecentRun(_ status: String) -> Bool {
+        let value = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return ["completed", "succeeded", "success", "failed", "error", "cancelled", "canceled"].contains(value)
+    }
+
+    private static func runState(
+        _ runStatus: String?,
+        agentStatus: String
+    ) -> AgentSessionSnapshot.RunState {
+        guard let runStatus else {
+            switch agentStatus.lowercased() {
+            case "idle", "paused": return .idle
+            case "error", "failed": return .failed
+            default: return .unknown
+            }
+        }
+        switch runStatus.lowercased() {
+        case "queued": return .queued
+        case "running": return .running
+        case "completed", "succeeded", "success": return .completed
+        case "failed", "error": return .failed
+        case "cancelled", "canceled": return .cancelled
+        default: return .unknown
+        }
     }
 
     private static func issueKind(_ rawStatus: String) -> ActivityEvent.Kind {

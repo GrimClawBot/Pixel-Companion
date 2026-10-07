@@ -26,10 +26,11 @@ any other backend is an optional plug-in, never a requirement.
 | `ActivitySource`   | What is the agent doing?                        | `currentActivity`, `recentActivity(limit:)` (newest first) |
 | `ApprovalProvider` | What is waiting on a human?                     | `pendingApprovals()`                     |
 | `UsageProvider`    | How much of the quota is used?                  | `currentUsage()`                         |
+| `AgentSessionSource` | Which agents/sessions are active or recent?   | `agentSessions(limit:)`                  |
 | `ChatBackend`      | What was said recently?                         | `recentMessages(limit:)` (oldest first)  |
 
 `Connector` exposes each capability as an optional property (`auth`, `activity`, `approvals`,
-`usage`, `chat`). A protocol extension defaults all of them to `nil`, along with `lastError` and a
+`usage`, `sessions`, `chat`). A protocol extension defaults all of them to `nil`, along with `lastError` and a
 no-op `refresh()`, so the smallest valid connector is:
 
 ```swift
@@ -46,7 +47,7 @@ views work from that snapshot.
 
 ## MockConnector
 
-`MockConnector` is the only implementation in this release. It replays a `MockScript`, a looping
+`MockConnector` is the deterministic reference/demo implementation. It replays a `MockScript`, a looping
 list of `MockStep`s (activity kind and title, pending approvals, usage, an optional chat line):
 
 - Each `refresh()` advances one step, but only while `simulatedConnectionState == .connected`.
@@ -72,15 +73,22 @@ let connector = MockConnector(id: ConnectorID(rawValue: "mock.custom"), displayN
 ## PaperclipConnector
 
 `PaperclipConnector` is the first real runtime connector. It is intentionally read-only and only
-uses GET requests for health, company discovery, dashboard summary, agents, issues, and approvals.
+uses GET requests for health, company discovery, dashboard summary, agents, issues, approvals, and
+bounded recent heartbeat-run telemetry.
 
 - The Paperclip base URL and company selection are local `UserDefaults` settings.
 - No endpoint, company ID, credential, Pixel HQ org detail, adapter command, environment value, or
   secret is compiled into the public repository.
 - Network work happens asynchronously. `Connector.refresh()` only starts/coalesces a refresh and
   the UI reads the most recent synchronized cache.
-- Agent payloads are decoded into narrow DTOs: only identity/status/timestamps needed for generic
-  companion activity are read. Adapter configuration and other runtime internals are ignored.
+- Agent and heartbeat-run payloads are decoded into narrow DTOs. The connector keeps only
+  identity/status, task linkage, model/provider names, session/run IDs, timestamps, and token
+  counters needed for generic companion presentation.
+- Raw logs, adapter commands, environment values, filesystem paths, secrets, provider traces, and
+  unrelated runtime internals are not exposed to the UI.
+- A run is considered active only when Paperclip reports `queued` or `running`; stale agent status
+  alone cannot manufacture a live session. If run telemetry is unavailable, core Paperclip state
+  remains usable and agent cards fall back to non-live metadata.
 - Multiple companies can be discovered before a company is selected. A single active company may
   be selected automatically in memory.
 - Approval data is display-only. There are no approve/reject/send/deploy mutation APIs in the
@@ -94,7 +102,7 @@ example a user-managed tunnel or private network address) and select the desired
 1. Implement `Connector` and whichever capability protocols the service supports, in a new file or
    module. Keep service details (endpoints, payloads) inside it.
 2. Add a `ConnectorID` and a `ConnectorOption` to `ConnectorRegistry` so it appears in Settings, and
-   build it in `ConnectorRegistry.makeConnector(id:connectionState:)`.
+   build it through `ConnectorRegistry.makeConnector`.
 3. Add tests that the connector maps service states to `ConnectionState` and never mutates anything.
 4. Anything involving sign-in or stored secrets is a sensitive change under
    [QUALITY_GATE.md](QUALITY_GATE.md) and needs a named security reviewer.

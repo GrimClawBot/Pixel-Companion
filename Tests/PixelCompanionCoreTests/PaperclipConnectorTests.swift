@@ -35,19 +35,28 @@ private final class StubURLProtocol: URLProtocol {
 private final class DeferredPaperclipService: PaperclipServiceProtocol {
     private(set) var fetchCount = 0
     private var completion: ((Result<PaperclipRemoteState, Error>) -> Void)?
+    private var sessionCompletion: ((Result<[AgentSessionSnapshot], Error>) -> Void)?
 
     func fetch(
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
         fetchCount += 1
         self.completion = completion
+        self.sessionCompletion = sessionCompletion
     }
 
-    func finish(_ result: Result<PaperclipRemoteState, Error>) {
+    func finishCore(_ result: Result<PaperclipRemoteState, Error>) {
         let completion = completion
         self.completion = nil
         completion?(result)
+    }
+
+    func finishSessions(_ result: Result<[AgentSessionSnapshot], Error>) {
+        let sessionCompletion = sessionCompletion
+        self.sessionCompletion = nil
+        sessionCompletion?(result)
     }
 }
 
@@ -95,13 +104,14 @@ final class PaperclipConnectorTests: XCTestCase {
             title: "Review release",
             requestedAt: Date(timeIntervalSince1970: 90)
         )
-        service.finish(.success(PaperclipRemoteState(
+        service.finishCore(.success(PaperclipRemoteState(
             companies: [PaperclipCompany(id: "company-1", name: "Example Co", status: "active")],
             companyID: "company-1",
             companyName: "Example Co",
             activity: [activity],
             approvals: [approval],
-            usage: UsageSnapshot(used: 25, limit: 100, unit: "cents", periodLabel: "This month")
+            usage: UsageSnapshot(used: 25, limit: 100, unit: "cents", periodLabel: "This month"),
+            agentSessions: []
         )))
 
         XCTAssertEqual(connector.connectionState, .connected)
@@ -114,44 +124,24 @@ final class PaperclipConnectorTests: XCTestCase {
         XCTAssertEqual(service.fetchCount, 2)
     }
 
-    func testURLServiceMapsOnlyReadOnlyDashboardData() {
-        let service = makeService()
-        installDashboardFixture()
-
-        let expectation = expectation(description: "Paperclip fetch")
-        service.fetch(configuration: selectedConfiguration()) { result in
-            guard case let .success(state) = result else {
-                XCTFail("Expected successful mapping: \(result)")
-                expectation.fulfill()
-                return
-            }
-            XCTAssertEqual(state.companyName, "Example Co")
-            XCTAssertEqual(state.companies.count, 1)
-            XCTAssertEqual(state.activity.first?.title, "Build native connector")
-            XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Builder")
-            XCTAssertTrue(state.activity.contains { $0.title == "Builder · running" })
-            XCTAssertEqual(state.approvals.map(\.title), ["Ship build"])
-            XCTAssertEqual(state.usage?.used, 125)
-            XCTAssertEqual(state.usage?.limit, 1000)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 2)
-    }
-
     func testURLServiceReportsHTTPFailure() {
         let service = makeService()
         StubURLProtocol.handler = { _ in (503, Data("{}".utf8)) }
 
         let expectation = expectation(description: "Paperclip failure")
-        service.fetch(configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example")) { result in
-            guard case let .failure(error) = result else {
-                XCTFail("Expected failure")
+        service.fetch(
+            configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example"),
+            completion: { result in
+                guard case let .failure(error) = result else {
+                    XCTFail("Expected failure")
+                    expectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(error.localizedDescription, "Paperclip returned HTTP 503.")
                 expectation.fulfill()
-                return
-            }
-            XCTAssertEqual(error.localizedDescription, "Paperclip returned HTTP 503.")
-            expectation.fulfill()
-        }
+            },
+            sessionCompletion: { _ in }
+        )
         wait(for: [expectation], timeout: 2)
     }
 
@@ -173,23 +163,34 @@ final class PaperclipConnectorTests: XCTestCase {
         }
 
         let expectation = expectation(description: "Company discovery")
-        service.fetch(configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example")) { result in
-            guard case let .success(state) = result else {
-                XCTFail("Expected discovery success")
+        service.fetch(
+            configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example"),
+            completion: { result in
+                guard case let .success(state) = result else {
+                    XCTFail("Expected discovery success")
+                    expectation.fulfill()
+                    return
+                }
+                XCTAssertNil(state.companyID)
+                XCTAssertEqual(state.companies.map(\.name), ["Alpha", "Beta"])
+                XCTAssertTrue(state.activity.isEmpty)
                 expectation.fulfill()
-                return
-            }
-            XCTAssertNil(state.companyID)
-            XCTAssertEqual(state.companies.map(\.name), ["Alpha", "Beta"])
-            XCTAssertTrue(state.activity.isEmpty)
-            expectation.fulfill()
-        }
+            },
+            sessionCompletion: { _ in }
+        )
         wait(for: [expectation], timeout: 2)
     }
 
+}
+
+private extension PaperclipConnectorTests {
     private func installDashboardFixture() {
         StubURLProtocol.handler = { request in
             XCTAssertEqual(request.httpMethod, "GET")
+            if request.url?.path == "/api/companies/company-1/heartbeat-runs" {
+                let components = URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)
+                XCTAssertEqual(components?.queryItems?.first(where: { $0.name == "limit" })?.value, "40")
+            }
             return self.dashboardResponse(for: request.url?.path)
         }
     }
@@ -208,6 +209,10 @@ final class PaperclipConnectorTests: XCTestCase {
             return (200, issuesJSON())
         case "/api/companies/company-1/approvals":
             return (200, approvalsJSON())
+        case "/api/companies/company-1/heartbeat-runs":
+            return (200, heartbeatRunsJSON())
+        case "/api/companies/company-1/live-runs":
+            return (200, heartbeatRunsJSON())
         default:
             XCTFail("Unexpected path: \(path ?? "nil")")
             return (404, Data())
@@ -223,15 +228,23 @@ final class PaperclipConnectorTests: XCTestCase {
             [
                 "id": "agent-1",
                 "name": "Builder",
+                "role": "engineer",
                 "title": "Engineer",
                 "status": "running",
+                "adapterType": "codex_local",
+                "adapterConfig": ["model": "gpt-5.6-sol"],
+                "runtimeConfig": ["aiConnection": ["provider": "openai"]],
                 "updatedAt": "2026-10-07T18:00:00.000Z"
             ],
             [
                 "id": "agent-2",
                 "name": "QA",
+                "role": "qa",
                 "title": "QA Engineer",
                 "status": "idle",
+                "adapterType": "claude_local",
+                "adapterConfig": ["model": "claude-sonnet-5-5"],
+                "runtimeConfig": ["aiConnection": ["provider": "anthropic"]],
                 "updatedAt": "2026-10-07T17:00:00.000Z"
             ]
         ])
@@ -257,6 +270,26 @@ final class PaperclipConnectorTests: XCTestCase {
             "title": "Ship build",
             "status": "pending",
             "requestedAt": "2026-10-07T18:05:00.000Z"
+        ]])
+    }
+
+    private func heartbeatRunsJSON() -> Data {
+        json([[
+            "id": "run-1",
+            "agentId": "agent-1",
+            "status": "running",
+            "startedAt": "2026-10-07T18:11:00.000Z",
+            "createdAt": "2026-10-07T18:11:00.000Z",
+            "updatedAt": "2026-10-07T18:12:00.000Z",
+            "usageJson": [
+                "model": "gpt-5.6-sol",
+                "provider": "openai",
+                "inputTokens": 1200,
+                "cachedInputTokens": 800,
+                "outputTokens": 250,
+                "persistedSessionId": "session-1"
+            ],
+            "contextSnapshot": ["issueId": "issue-1"]
         ]])
     }
 

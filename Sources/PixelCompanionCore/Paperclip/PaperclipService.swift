@@ -1,28 +1,27 @@
 import Foundation
 
 final class URLSessionPaperclipService: PaperclipServiceProtocol {
-    private struct Context {
-        let baseURL: URL
-        let companies: [PaperclipCompany]
-        let company: PaperclipCompany
-    }
-
-    private let session: URLSession
+    private let client: PaperclipHTTPClient
+    private let telemetry: PaperclipTelemetryFetcher
 
     init(session: URLSession = .shared) {
-        self.session = session
+        let client = PaperclipHTTPClient(session: session)
+        self.client = client
+        telemetry = PaperclipTelemetryFetcher(client: client)
     }
 
     func fetch(
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
         guard let baseURL = configuration.baseURL else {
             completion(.failure(PaperclipServiceError.invalidConfiguration))
+            sessionCompletion(.success([]))
             return
         }
 
-        get(baseURL: baseURL, path: "api/health", as: PaperclipHealthResponse.self) { [weak self] result in
+        client.get(baseURL: baseURL, path: "api/health", as: PaperclipHealthResponse.self) { [weak self] result in
             guard let self else { return }
             switch result {
             case let .failure(error):
@@ -35,7 +34,8 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
                 self.fetchCompanies(
                     baseURL: baseURL,
                     configuration: configuration,
-                    completion: completion
+                    completion: completion,
+                    sessionCompletion: sessionCompletion
                 )
             }
         }
@@ -44,9 +44,10 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     private func fetchCompanies(
         baseURL: URL,
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
-        get(baseURL: baseURL, path: "api/companies", as: [PaperclipCompanyResponse].self) { [weak self] result in
+        client.get(baseURL: baseURL, path: "api/companies", as: [PaperclipCompanyResponse].self) { [weak self] result in
             guard let self else { return }
             switch result {
             case let .failure(error):
@@ -56,7 +57,8 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
                     baseURL: baseURL,
                     responses: responses,
                     configuration: configuration,
-                    completion: completion
+                    completion: completion,
+                    sessionCompletion: sessionCompletion
                 )
             }
         }
@@ -66,7 +68,8 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
         baseURL: URL,
         responses: [PaperclipCompanyResponse],
         configuration: PaperclipConfiguration,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
         let companies = responses.map {
             PaperclipCompany(id: $0.id, name: $0.name, status: $0.status)
@@ -78,16 +81,19 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
 
         guard let selectedID else {
             completion(.success(discoveryState(companies)))
+            sessionCompletion(.success([]))
             return
         }
         guard let company = companies.first(where: { $0.id == selectedID }) else {
             completion(.failure(PaperclipServiceError.companyNotFound))
+            sessionCompletion(.success([]))
             return
         }
 
         fetchDashboard(
-            context: Context(baseURL: baseURL, companies: companies, company: company),
-            completion: completion
+            context: PaperclipFetchContext(baseURL: baseURL, companies: companies, company: company),
+            completion: completion,
+            sessionCompletion: sessionCompletion
         )
     }
 
@@ -98,15 +104,17 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             companyName: nil,
             activity: [],
             approvals: [],
-            usage: nil
+            usage: nil,
+            agentSessions: []
         )
     }
 
     private func fetchDashboard(
-        context: Context,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        context: PaperclipFetchContext,
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
-        get(
+        client.get(
             baseURL: context.baseURL,
             path: companyPath(context.company.id, resource: "dashboard"),
             as: PaperclipDashboardResponse.self
@@ -116,17 +124,23 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             case let .failure(error):
                 completion(.failure(error))
             case let .success(dashboard):
-                self.fetchAgents(context: context, dashboard: dashboard, completion: completion)
+                self.fetchAgents(
+                    context: context,
+                    dashboard: dashboard,
+                    completion: completion,
+                    sessionCompletion: sessionCompletion
+                )
             }
         }
     }
 
     private func fetchAgents(
-        context: Context,
+        context: PaperclipFetchContext,
         dashboard: PaperclipDashboardResponse,
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
-        get(
+        client.get(
             baseURL: context.baseURL,
             path: companyPath(context.company.id, resource: "agents"),
             as: [PaperclipAgentResponse].self
@@ -140,19 +154,21 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
                     context: context,
                     dashboard: dashboard,
                     agents: agents,
-                    completion: completion
+                    completion: completion,
+                    sessionCompletion: sessionCompletion
                 )
             }
         }
     }
 
     private func fetchIssues(
-        context: Context,
+        context: PaperclipFetchContext,
         dashboard: PaperclipDashboardResponse,
         agents: [PaperclipAgentResponse],
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
-        get(
+        client.get(
             baseURL: context.baseURL,
             path: companyPath(context.company.id, resource: "issues"),
             as: [PaperclipIssueResponse].self
@@ -163,87 +179,68 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
                 completion(.failure(error))
             case let .success(issues):
                 self.fetchApprovals(
-                    context: context,
-                    dashboard: dashboard,
-                    agents: agents,
-                    issues: issues,
-                    completion: completion
+                    payload: PaperclipIssuePayload(
+                        context: context,
+                        dashboard: dashboard,
+                        agents: agents,
+                        issues: issues
+                    ),
+                    completion: completion,
+                    sessionCompletion: sessionCompletion
                 )
             }
         }
     }
 
     private func fetchApprovals(
-        context: Context,
-        dashboard: PaperclipDashboardResponse,
-        agents: [PaperclipAgentResponse],
-        issues: [PaperclipIssueResponse],
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+        payload: PaperclipIssuePayload,
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void,
+        sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
-        get(
-            baseURL: context.baseURL,
-            path: companyPath(context.company.id, resource: "approvals"),
+        client.get(
+            baseURL: payload.context.baseURL,
+            path: companyPath(payload.context.company.id, resource: "approvals"),
             as: [PaperclipApprovalResponse].self
         ) { result in
             switch result {
             case let .failure(error):
                 completion(.failure(error))
             case let .success(approvals):
-                completion(.success(PaperclipMapper.map(PaperclipMappingInput(
-                    companies: context.companies,
-                    company: context.company,
-                    dashboard: dashboard,
-                    agents: agents,
-                    issues: issues,
+                let fullPayload = PaperclipFetchPayload(
+                    context: payload.context,
+                    dashboard: payload.dashboard,
+                    agents: payload.agents,
+                    issues: payload.issues,
                     approvals: approvals
-                ))))
+                )
+                completion(.success(Self.coreState(fullPayload)))
+                self.telemetry.fetch(payload: fullPayload, completion: sessionCompletion)
             }
         }
     }
 
+    private static func coreState(_ payload: PaperclipFetchPayload) -> PaperclipRemoteState {
+        let mapped = PaperclipMapper.map(PaperclipMappingInput(
+            companies: payload.context.companies,
+            company: payload.context.company,
+            dashboard: payload.dashboard,
+            agents: payload.agents,
+            issues: payload.issues,
+            approvals: payload.approvals,
+            runs: []
+        ))
+        return PaperclipRemoteState(
+            companies: mapped.companies,
+            companyID: mapped.companyID,
+            companyName: mapped.companyName,
+            activity: mapped.activity,
+            approvals: mapped.approvals,
+            usage: mapped.usage,
+            agentSessions: []
+        )
+    }
+
     private func companyPath(_ companyID: String, resource: String) -> String {
         "api/companies/\(companyID)/\(resource)"
-    }
-
-    private func get<Value: Decodable & Sendable>(
-        baseURL: URL,
-        path: String,
-        as type: Value.Type,
-        completion: @escaping (Result<Value, Error>) -> Void
-    ) {
-        let url = path.split(separator: "/").reduce(baseURL) { partial, component in
-            partial.appendingPathComponent(String(component))
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 8
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        session.dataTask(with: request) { data, response, error in
-            completion(Self.decodeResponse(data: data, response: response, error: error, as: type))
-        }.resume()
-    }
-
-    private static func decodeResponse<Value: Decodable>(
-        data: Data?,
-        response: URLResponse?,
-        error: Error?,
-        as type: Value.Type
-    ) -> Result<Value, Error> {
-        if let error { return .failure(error) }
-        guard let http = response as? HTTPURLResponse else {
-            return .failure(PaperclipServiceError.invalidResponse)
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            return .failure(PaperclipServiceError.http(http.statusCode))
-        }
-        guard let data else {
-            return .failure(PaperclipServiceError.invalidResponse)
-        }
-        do {
-            return .success(try JSONDecoder().decode(type, from: data))
-        } catch {
-            return .failure(error)
-        }
     }
 }
