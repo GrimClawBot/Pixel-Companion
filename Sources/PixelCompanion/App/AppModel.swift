@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var mood: CharacterMood = .offline
     @Published private(set) var activeMode: PresentationMode = .menuBar
     @Published private(set) var notchAvailable = false
+    @Published private(set) var paperclipCompanies: [PaperclipCompany] = []
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
@@ -36,6 +37,8 @@ final class AppModel: ObservableObject {
             objectWillChange.send()
             settings.connectorID = newValue
             rebuildConnector()
+            scheduleStepTimer()
+            refreshConnector()
         }
     }
 
@@ -65,17 +68,44 @@ final class AppModel: ObservableObject {
         set {
             objectWillChange.send()
             settings.mockStepInterval = newValue
-            scheduleStepTimer()
+            if isMockConnector { scheduleStepTimer() }
+        }
+    }
+
+    var paperclipBaseURL: String {
+        get { settings.paperclipBaseURL }
+        set {
+            guard newValue != settings.paperclipBaseURL else { return }
+            objectWillChange.send()
+            settings.paperclipBaseURL = newValue
+            if isPaperclipConnector { rebuildConnector() }
+        }
+    }
+
+    var paperclipCompanyID: String {
+        get { settings.paperclipCompanyID }
+        set {
+            guard newValue != settings.paperclipCompanyID else { return }
+            objectWillChange.send()
+            settings.paperclipCompanyID = newValue
+            if isPaperclipConnector { rebuildConnector() }
         }
     }
 
     var isMockConnector: Bool { mockConnector != nil }
+    var isPaperclipConnector: Bool { connectorID == .paperclip }
+
+    func refreshConnector() {
+        connector?.refresh()
+        capture()
+    }
 
     // MARK: Lifecycle
 
     func start() {
         rebuildConnector()
         scheduleStepTimer()
+        refreshConnector()
     }
 
     /// Rewinds the mock script to its first step. Local only; nothing outside the app changes.
@@ -92,10 +122,33 @@ final class AppModel: ObservableObject {
     // MARK: Private
 
     private var mockConnector: MockConnector? { connector as? MockConnector }
+    private var paperclipConnector: PaperclipConnector? { connector as? PaperclipConnector }
 
     private func rebuildConnector() {
         let state = settings.mockConnectionState
-        connector = ConnectorRegistry.makeConnector(id: settings.connectorID, connectionState: state)
+        let configuration = PaperclipConfiguration(
+            baseURLString: settings.paperclipBaseURL,
+            companyID: settings.paperclipCompanyID
+        )
+        connector = ConnectorRegistry.makeConnector(
+            id: settings.connectorID,
+            connectionState: state,
+            paperclipConfiguration: configuration
+        )
+        paperclipCompanies = []
+        if let paperclipConnector {
+            paperclipConnector.onChange = { [weak self, weak paperclipConnector] in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.paperclipCompanies = paperclipConnector?.availableCompanies ?? []
+                    if self.settings.paperclipCompanyID.isEmpty,
+                       let resolvedID = paperclipConnector?.resolvedCompanyID {
+                        self.settings.paperclipCompanyID = resolvedID
+                    }
+                    self.capture()
+                }
+            }
+        }
         capture()
     }
 
@@ -112,7 +165,8 @@ final class AppModel: ObservableObject {
 
     private func scheduleStepTimer() {
         stepTimer?.invalidate()
-        let timer = Timer(timeInterval: settings.mockStepInterval, repeats: true) { [weak self] _ in
+        let interval = isMockConnector ? settings.mockStepInterval : SettingsStore.paperclipRefreshInterval
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             // Scheduled on the main run loop below, so this always runs on the main thread.
             MainActor.assumeIsolated { self?.step() }
         }
