@@ -43,13 +43,18 @@ struct SnapshotContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SummaryHeader(snapshot: snapshot, mood: mood)
-            if let activity = snapshot.currentActivity {
+            switch AgentSessionPresentation.snapshotPrimary(
+                activity: snapshot.currentActivity,
+                sessions: snapshot.agentSessions
+            ) {
+            case let .activity(activity):
                 SectionTitle(text: "Now")
                 ActivityRow(event: activity, emphasizesTitle: true)
-            }
-            if let session = AgentSessionPresentation.primary(snapshot.agentSessions) {
+            case let .session(session):
                 SectionTitle(text: session.isActive ? "Live agent" : "Recent agent")
                 AgentSessionRow(session: session, compact: true)
+            case nil:
+                EmptyView()
             }
             if !visibleApprovals.isEmpty {
                 HStack {
