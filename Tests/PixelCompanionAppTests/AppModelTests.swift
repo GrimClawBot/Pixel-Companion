@@ -74,6 +74,9 @@ final class AppModelTests: XCTestCase {
 
         model.paperclipBaseURL = "not-a-valid-url"
         XCTAssertEqual(model.paperclipBaseURL, "not-a-valid-url")
+        XCTAssertEqual(model.snapshot.connectionState, .disconnected, "Typing alone must not rebuild or request")
+
+        model.applyPaperclipBaseURL()
         XCTAssertEqual(model.snapshot.connectionState, .error)
         XCTAssertNotNil(model.snapshot.lastError)
 
@@ -82,6 +85,10 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.snapshot.connectionState, .error)
 
         model.paperclipBaseURL = ""
+        XCTAssertEqual(model.paperclipCompanyID, "company-2", "Uncommitted URL edits preserve the selection")
+        model.applyPaperclipBaseURL()
+        XCTAssertEqual(model.paperclipCompanyID, "")
+        XCTAssertTrue(model.paperclipCompanies.isEmpty)
         XCTAssertEqual(model.snapshot.connectionState, .disconnected)
         XCTAssertNil(model.snapshot.lastError)
     }
