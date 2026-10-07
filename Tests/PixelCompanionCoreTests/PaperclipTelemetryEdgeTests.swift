@@ -125,7 +125,6 @@ final class PaperclipTelemetryEdgeTests: XCTestCase {
         XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
     }
 
-
     func testLiveEndpointFailureRetainsRecentRunWithoutLiveClaim() {
         let service = makeService()
         EdgeStubURLProtocol.handler = { request in
