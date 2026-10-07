@@ -150,8 +150,11 @@ public final class PaperclipConnector:
     ) {
         update { value in
             guard generation == publishedCoreGeneration else { return }
-            if case let .success(sessions) = result {
+            switch result {
+            case let .success(sessions):
                 value.agentSessions = sessions
+            case .failure:
+                value.agentSessions = []
             }
         }
     }
