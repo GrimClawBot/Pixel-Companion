@@ -127,7 +127,6 @@ final class PaperclipTelemetryTests: XCTestCase {
         wait(for: [sessionExpectation], timeout: 2)
     }
 
-
     func testMalformedOptionalAgentTelemetryDoesNotBlockCoreRefresh() {
         let service = makeService()
         TelemetryStubURLProtocol.handler = { request in
