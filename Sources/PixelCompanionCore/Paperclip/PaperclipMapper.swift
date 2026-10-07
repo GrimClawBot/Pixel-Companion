@@ -68,7 +68,7 @@ enum PaperclipMapper {
         }
 
         return agentsByID.values.map { agent in
-            let runs = runsByAgent[agent.id] ?? []
+            let runs = (runsByAgent[agent.id] ?? []).sorted { runTimestamp($0) > runTimestamp($1) }
             let selectedRun = runs.first(where: { isActiveRun($0.status) }) ?? runs.first
             let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
             let usage = selectedRun?.usageJson
@@ -92,9 +92,9 @@ enum PaperclipMapper {
                 sessionID: usage?.persistedSessionId
                     ?? selectedRun?.sessionIdAfter
                     ?? selectedRun?.sessionIdBefore,
-                inputTokens: usage?.inputTokens,
-                cachedInputTokens: usage?.cachedInputTokens,
-                outputTokens: usage?.outputTokens,
+                inputTokens: nonnegative(usage?.inputTokens),
+                cachedInputTokens: nonnegative(usage?.cachedInputTokens),
+                outputTokens: nonnegative(usage?.outputTokens),
                 startedAt: date(selectedRun?.startedAt),
                 finishedAt: date(selectedRun?.finishedAt),
                 updatedAt: date(selectedRun?.updatedAt)
@@ -110,6 +110,14 @@ enum PaperclipMapper {
             if leftDate != rightDate { return leftDate > rightDate }
             return lhs.agentName.localizedCaseInsensitiveCompare(rhs.agentName) == .orderedAscending
         }
+    }
+
+    private static func runTimestamp(_ run: PaperclipHeartbeatRunResponse) -> Date {
+        date(run.updatedAt) ?? date(run.createdAt) ?? date(run.startedAt) ?? .distantPast
+    }
+
+    private static func nonnegative(_ value: Int?) -> Int? {
+        value.map { max($0, 0) }
     }
 
     private static func isActiveRun(_ status: String) -> Bool {
