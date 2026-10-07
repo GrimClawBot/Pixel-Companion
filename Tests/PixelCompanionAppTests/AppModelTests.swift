@@ -81,8 +81,9 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.paperclipCompanyID, "company-2")
         XCTAssertEqual(model.snapshot.connectionState, .error)
 
-        model.applyPaperclipBaseURL("not-a-valid-url")
-        XCTAssertEqual(model.paperclipCompanyID, "company-2", "Reapplying the same URL preserves company selection")
+        model.applyPaperclipBaseURL("  not-a-valid-url  ")
+        XCTAssertEqual(model.paperclipCompanyID, "company-2", "Equivalent normalized URL preserves company selection")
+        XCTAssertEqual(model.paperclipBaseURL, "not-a-valid-url")
 
         model.applyPaperclipBaseURL("")
         XCTAssertEqual(model.paperclipCompanyID, "")
