@@ -78,11 +78,15 @@ final class AppModel: ObservableObject {
             guard newValue != settings.paperclipBaseURL else { return }
             objectWillChange.send()
             settings.paperclipBaseURL = newValue
-            if isPaperclipConnector {
-                rebuildConnector()
-                refreshConnector()
-            }
         }
+    }
+
+    func applyPaperclipBaseURL() {
+        guard isPaperclipConnector else { return }
+        settings.paperclipCompanyID = ""
+        paperclipCompanies = []
+        rebuildConnector(preservePaperclipCompanies: false)
+        refreshConnector()
     }
 
     var paperclipCompanyID: String {
@@ -92,7 +96,7 @@ final class AppModel: ObservableObject {
             objectWillChange.send()
             settings.paperclipCompanyID = newValue
             if isPaperclipConnector {
-                rebuildConnector()
+                rebuildConnector(preservePaperclipCompanies: true)
                 refreshConnector()
             }
         }
@@ -130,8 +134,8 @@ final class AppModel: ObservableObject {
     private var mockConnector: MockConnector? { connector as? MockConnector }
     private var paperclipConnector: PaperclipConnector? { connector as? PaperclipConnector }
 
-    private func rebuildConnector() {
-        let previousPaperclipCompanies = paperclipCompanies
+    private func rebuildConnector(preservePaperclipCompanies: Bool = false) {
+        let previousPaperclipCompanies = preservePaperclipCompanies ? paperclipCompanies : []
         let state = settings.mockConnectionState
         let configuration = PaperclipConfiguration(
             baseURLString: settings.paperclipBaseURL,
