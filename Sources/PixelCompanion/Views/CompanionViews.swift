@@ -182,7 +182,7 @@ struct ApprovalRow: View {
             Text(approval.title)
                 .font(.callout)
                 .lineLimit(1)
-                .accessibilityLabel("Waiting for approval: \(approval.title)")
+                .accessibilityLabel(ApprovalPresentation.accessibilityContext(approval))
             Spacer(minLength: 0)
             if ApprovalPresentation.showsTimestamp(approval) {
                 Text(approval.requestedAt, style: .relative)
@@ -279,6 +279,10 @@ enum ApprovalPresentation {
 
     static func countLabel(_ count: Int) -> String {
         "\(count) pending \(count == 1 ? "approval" : "approvals")"
+    }
+
+    static func accessibilityContext(_ approval: ApprovalRequest) -> String {
+        "Waiting for approval: \(approval.title)"
     }
 
     static func showsTimestamp(_ approval: ApprovalRequest) -> Bool {
