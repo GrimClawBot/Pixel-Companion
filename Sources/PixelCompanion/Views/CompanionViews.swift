@@ -34,6 +34,12 @@ struct SummaryHeader: View {
 struct SnapshotContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
+    var approvalLimit: Int? = 2
+
+    private var visibleApprovals: [ApprovalRequest] {
+        guard let approvalLimit else { return snapshot.pendingApprovals }
+        return Array(snapshot.pendingApprovals.prefix(approvalLimit))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -48,7 +54,7 @@ struct SnapshotContent: View {
                     Spacer()
                     ApprovalCountBadge(count: snapshot.pendingApprovals.count)
                 }
-                ForEach(snapshot.pendingApprovals.prefix(2)) { approval in
+                ForEach(visibleApprovals) { approval in
                     ApprovalRow(approval: approval)
                 }
             }
@@ -67,7 +73,7 @@ struct DetailContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SnapshotContent(snapshot: snapshot, mood: mood)
+            SnapshotContent(snapshot: snapshot, mood: mood, approvalLimit: nil)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
@@ -272,6 +278,8 @@ enum UsagePresentation {
     }
 
     private static func currency(cents: Int) -> String {
-        (Double(cents) / 100).formatted(.currency(code: "USD"))
+        (Double(cents) / 100).formatted(
+            .currency(code: "USD").locale(Locale(identifier: "en_US_POSIX"))
+        )
     }
 }
