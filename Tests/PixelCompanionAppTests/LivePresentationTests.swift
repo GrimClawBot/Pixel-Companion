@@ -18,7 +18,6 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
-
     func testApprovalAccessibilityIncludesWaitTimeAndCount() {
         let now = Date(timeIntervalSince1970: 10_000)
         let approval = ApprovalRequest(
@@ -67,7 +66,6 @@ final class LivePresentationTests: XCTestCase {
             [older]
         )
     }
-
 
     func testHistoryRemovesOnlyHighlightedDuplicateOccurrence() {
         let current = ActivityEvent(
