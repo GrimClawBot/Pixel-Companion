@@ -13,6 +13,28 @@ extension NSScreen {
     }
 }
 
+enum PresentationRefreshReason: Equatable {
+    case startup
+    case preference
+    case environmentChange
+}
+
+struct PresentationTransitionPlan: Equatable {
+    let mode: PresentationMode
+    let resetNotchInteraction: Bool
+
+    static func resolve(
+        preference: PresentationPreference,
+        notchAvailable: Bool,
+        reason: PresentationRefreshReason
+    ) -> PresentationTransitionPlan {
+        PresentationTransitionPlan(
+            mode: PresentationMode.resolve(preference: preference, notchAvailable: notchAvailable),
+            resetNotchInteraction: reason == .environmentChange
+        )
+    }
+}
+
 /// Chooses between the notch panel and the menu-bar item, and re-evaluates whenever displays,
 /// sleep state or the presentation preference change.
 @MainActor
@@ -34,18 +56,26 @@ final class PresentationCoordinator {
         let workspace = NSWorkspace.shared.notificationCenter
         observe(NSWorkspace.didWakeNotification, in: workspace)
         observe(NSWorkspace.screensDidWakeNotification, in: workspace)
-        model.onPresentationPreferenceChange = { [weak self] in self?.refresh() }
-        refresh()
+        model.onPresentationPreferenceChange = { [weak self] in self?.refresh(reason: .preference) }
+        refresh(reason: .startup)
     }
 
-    func refresh() {
+    func refresh(reason: PresentationRefreshReason = .preference) {
         // Prefer the built-in display: with the lid closed or on an external-only setup no screen
         // reports a notch and the companion moves to the menu bar.
         let notched = NSScreen.screens.lazy.compactMap(\.notchGeometry).first
-        let mode = PresentationMode.resolve(preference: model.presentation, notchAvailable: notched != nil)
-        model.updatePresentation(mode: mode, notchAvailable: notched != nil)
+        let plan = PresentationTransitionPlan.resolve(
+            preference: model.presentation,
+            notchAvailable: notched != nil,
+            reason: reason
+        )
+        model.updatePresentation(mode: plan.mode, notchAvailable: notched != nil)
 
-        if mode == .notch, let notched {
+        if plan.resetNotchInteraction {
+            notchController?.resetToCompact()
+        }
+
+        if plan.mode == .notch, let notched {
             statusController?.remove()
             statusController = nil
             let controller = notchController ?? NotchPanelController(model: model, openSettings: openSettings)
@@ -62,17 +92,17 @@ final class PresentationCoordinator {
 
     private func observe(_ name: Notification.Name, in center: NotificationCenter) {
         let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.scheduleRefresh() }
+            MainActor.assumeIsolated { self?.scheduleRefresh(reason: .environmentChange) }
         }
         observers.append(token)
     }
 
     /// Screen parameters settle shortly after wake and display changes; refresh now and once more.
-    private func scheduleRefresh() {
-        refresh()
+    private func scheduleRefresh(reason: PresentationRefreshReason) {
+        refresh(reason: reason)
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
-            self?.refresh()
+            self?.refresh(reason: reason)
         }
     }
 }
