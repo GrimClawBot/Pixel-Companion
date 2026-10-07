@@ -93,7 +93,6 @@ final class PaperclipTelemetryTests: XCTestCase {
         XCTAssertEqual(service.fetchCount, 2)
     }
 
-
     func testStaleTelemetryCannotOverwriteNewerRefresh() {
         let service = TelemetryDeferredService()
         let connector = PaperclipConnector(
