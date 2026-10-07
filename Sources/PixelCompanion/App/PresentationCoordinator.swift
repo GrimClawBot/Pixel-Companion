@@ -17,6 +17,7 @@ enum PresentationRefreshReason: Equatable {
     case startup
     case preference
     case environmentChange
+    case environmentFollowUp
 }
 
 struct PresentationTransitionPlan: Equatable {
@@ -102,7 +103,7 @@ final class PresentationCoordinator {
         refresh(reason: reason)
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
-            self?.refresh(reason: reason)
+            self?.refresh(reason: reason == .environmentChange ? .environmentFollowUp : reason)
         }
     }
 }
