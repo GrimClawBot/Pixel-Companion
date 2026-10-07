@@ -33,6 +33,14 @@ final class LivePresentationTests: XCTestCase {
 
         XCTAssertEqual(ApprovalPresentation.countLabel(1), "1 pending approval")
         XCTAssertEqual(ApprovalPresentation.countLabel(3), "3 pending approvals")
+        XCTAssertEqual(
+            ApprovalPresentation.accessibilityContext(recent),
+            "Waiting for approval: Ship release"
+        )
+        XCTAssertEqual(
+            ApprovalPresentation.accessibilityContext(unknown),
+            "Waiting for approval: Unknown time"
+        )
         XCTAssertTrue(ApprovalPresentation.showsTimestamp(recent))
         XCTAssertFalse(ApprovalPresentation.showsTimestamp(unknown))
     }
