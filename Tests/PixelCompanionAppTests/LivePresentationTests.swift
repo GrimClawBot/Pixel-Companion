@@ -47,12 +47,14 @@ final class LivePresentationTests: XCTestCase {
             runState: .completed,
             model: "gpt-5.6-sol",
             provider: "openai",
+            sessionID: "01a1159b-b36a-7fa1-a102-aa1988d6dfc7",
             inputTokens: 1_250,
             cachedInputTokens: 2_500_000,
             outputTokens: 250
         )
 
         XCTAssertEqual(AgentSessionPresentation.runtimeLabel(session), "openai · gpt-5.6-sol")
+        XCTAssertEqual(AgentSessionPresentation.identityLabel(session), "Session 01a1159b…")
         XCTAssertEqual(AgentSessionPresentation.tokenLabel(session), "1.2K in · 2.5M cached · 250 out")
         XCTAssertEqual(AgentSessionPresentation.sectionTitle([session]), "Recent agent sessions")
     }
