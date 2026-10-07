@@ -4,6 +4,20 @@ import PixelCompanionCore
 import XCTest
 
 final class LivePresentationTests: XCTestCase {
+
+    func testApprovalPresentationLimitsPreviewButNotDetail() {
+        let approvals = (1...3).map { index in
+            ApprovalRequest(
+                id: "approval-\(index)",
+                title: "Approval \(index)",
+                requestedAt: Date(timeIntervalSince1970: Double(index))
+            )
+        }
+
+        XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: 2), Array(approvals.prefix(2)))
+        XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
+    }
+
     func testHistoryRemovesCurrentActivityByID() {
         let now = ActivityEvent(
             id: "current",
