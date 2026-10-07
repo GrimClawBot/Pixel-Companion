@@ -160,8 +160,13 @@ final class PaperclipTelemetryFetcher {
         liveEndpointSucceeded: Bool
     ) -> [PaperclipHeartbeatRunResponse] {
         let liveIDs = Set(live.map(\.id))
-        let safeRecent = recent.filter { run in
-            !isActiveStatus(run.status) || (liveEndpointSucceeded && liveIDs.contains(run.id))
+        let safeRecent: [PaperclipHeartbeatRunResponse]
+        if liveEndpointSucceeded {
+            safeRecent = recent.filter { run in
+                !isActiveStatus(run.status) || liveIDs.contains(run.id)
+            }
+        } else {
+            safeRecent = recent.map(downgradeUnconfirmedActiveRun)
         }
         let merged = (safeRecent + live).reduce(into: [String: PaperclipHeartbeatRunResponse]()) {
             $0[$1.id] = $1
@@ -174,6 +179,25 @@ final class PaperclipTelemetryFetcher {
         case "queued", "running": return true
         default: return false
         }
+    }
+
+    private static func downgradeUnconfirmedActiveRun(
+        _ run: PaperclipHeartbeatRunResponse
+    ) -> PaperclipHeartbeatRunResponse {
+        guard isActiveStatus(run.status) else { return run }
+        return PaperclipHeartbeatRunResponse(
+            id: run.id,
+            agentId: run.agentId,
+            status: "unknown",
+            startedAt: run.startedAt,
+            finishedAt: run.finishedAt,
+            createdAt: run.createdAt,
+            updatedAt: run.updatedAt,
+            usageJson: run.usageJson,
+            sessionIdBefore: run.sessionIdBefore,
+            sessionIdAfter: run.sessionIdAfter,
+            contextSnapshot: run.contextSnapshot
+        )
     }
 
     private static func sessions(
