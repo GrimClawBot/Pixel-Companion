@@ -4,19 +4,18 @@ Pixel Companion is a single Swift package with no third-party dependencies.
 
 ```
 Package.swift
-├── Sources/PixelCompanionCore   library, Foundation + CoreGraphics only (no AppKit; also builds on Linux)
+├── Sources/PixelCompanionCore   library, Foundation + CoreGraphics only (no AppKit; headless-testable)
 │   ├── Connector/               connector protocols, models, snapshot, registry
 │   ├── Mock/                    MockConnector and MockScript
 │   ├── Character/               CharacterMood, CharacterStateMachine, CharacterSprite
 │   ├── Settings/                SettingsStore (UserDefaults)
 │   └── Presentation/            NotchGeometry, PresentationMode, NotchInteraction
-├── Sources/PixelCompanion       planned next slice (PC-001a app shell): AppKit + SwiftUI app
-└── Tests/PixelCompanionCoreTests
+├── Sources/PixelCompanion       AppKit + SwiftUI app shell
+├── Tests/PixelCompanionCoreTests
+└── Tests/PixelCompanionAppTests
 ```
 
-This change ships only `PixelCompanionCore` and its tests. The macOS app target
-`Sources/PixelCompanion` is the planned next slice, stacked on this one; until it lands, the
-"app" in the sections below refers to that planned shell.
+The package now includes both the platform-neutral core and the native macOS app shell.
 
 All decisions live in `PixelCompanionCore` as plain values and pure functions, so they can be
 unit-tested without a display. The app target only adapts AppKit inputs (screens, mouse,
@@ -68,6 +67,17 @@ auxiliary areas has no notch, which covers older Macs, external displays and a c
 | compact   | character and status beside the notch    | start, dismiss           | pointer enters, click          |
 | snapshot  | current activity, approvals, usage       | pointer enters (compact) | pointer exits, click, dismiss  |
 | detail    | activity feed, chat, settings, quit      | click                    | dismiss (Esc, click outside)   |
+
+## App shell
+
+| Type                       | Role |
+|----------------------------|------|
+| `PixelCompanionMain`       | Entry point; sets the accessory activation policy (no Dock icon). |
+| `AppModel`                 | Owns the connector and step timer; publishes snapshot and mood; reads and writes settings. |
+| `PresentationCoordinator`  | Resolves notch vs. menu bar on launch, display changes, wake and settings changes. |
+| `NotchPanelController`     | Borderless non-activating `NSPanel` at status-bar level on all Spaces; resizes per `NotchSurface`; hover via an `.activeAlways` tracking area; Esc and outside clicks dismiss. |
+| `StatusItemController`     | `NSStatusItem` with the mood symbol, tooltip snapshot and a detail popover. |
+| `SettingsWindowController` | SwiftUI settings form in a reusable window. |
 
 ## Character art
 
