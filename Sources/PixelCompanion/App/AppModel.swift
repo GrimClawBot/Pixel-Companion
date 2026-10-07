@@ -72,20 +72,17 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var paperclipBaseURL: String {
-        get { settings.paperclipBaseURL }
-        set {
-            guard newValue != settings.paperclipBaseURL else { return }
+    var paperclipBaseURL: String { settings.paperclipBaseURL }
+
+    func applyPaperclipBaseURL(_ newValue: String) {
+        guard isPaperclipConnector else { return }
+        if newValue != settings.paperclipBaseURL {
             objectWillChange.send()
             settings.paperclipBaseURL = newValue
+            settings.paperclipCompanyID = ""
+            paperclipCompanies = []
+            rebuildConnector(preservePaperclipCompanies: false)
         }
-    }
-
-    func applyPaperclipBaseURL() {
-        guard isPaperclipConnector else { return }
-        settings.paperclipCompanyID = ""
-        paperclipCompanies = []
-        rebuildConnector(preservePaperclipCompanies: false)
         refreshConnector()
     }
 
