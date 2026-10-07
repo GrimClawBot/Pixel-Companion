@@ -76,9 +76,11 @@ final class AppModel: ObservableObject {
 
     func applyPaperclipBaseURL(_ newValue: String) {
         guard isPaperclipConnector else { return }
-        if newValue != settings.paperclipBaseURL {
+        let normalized = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = settings.paperclipBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized != current {
             objectWillChange.send()
-            settings.paperclipBaseURL = newValue
+            settings.paperclipBaseURL = normalized
             settings.paperclipCompanyID = ""
             paperclipCompanies = []
             rebuildConnector(preservePaperclipCompanies: false)
