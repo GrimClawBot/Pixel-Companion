@@ -106,7 +106,10 @@ struct DetailContent: View {
                     SectionTitle(text: "Recent activity")
                     let history = ActivityPresentation.history(
                         snapshot.recentActivity,
-                        currentActivity: snapshot.currentActivity
+                        currentActivity: AgentSessionPresentation.highlightedActivity(
+                            activity: snapshot.currentActivity,
+                            sessions: snapshot.agentSessions
+                        )
                     )
                     if history.isEmpty {
                         Placeholder(text: "No additional activity yet")
