@@ -76,13 +76,19 @@ public final class SettingsStore {
     /// Base URL for an optional Paperclip instance. This is connection metadata, not a secret.
     public var paperclipBaseURL: String {
         get { defaults.string(forKey: Key.paperclipBaseURL.rawValue) ?? "" }
-        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.paperclipBaseURL.rawValue) }
+        set {
+            let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            defaults.set(value, forKey: Key.paperclipBaseURL.rawValue)
+        }
     }
 
     /// Selected Paperclip company identifier. Empty means "discover companies first".
     public var paperclipCompanyID: String {
         get { defaults.string(forKey: Key.paperclipCompanyID.rawValue) ?? "" }
-        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.paperclipCompanyID.rawValue) }
+        set {
+            let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            defaults.set(value, forKey: Key.paperclipCompanyID.rawValue)
+        }
     }
 
     /// Removes every stored preference so the defaults apply again.
