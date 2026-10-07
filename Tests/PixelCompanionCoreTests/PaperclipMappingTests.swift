@@ -75,6 +75,54 @@ final class PaperclipMappingTests: XCTestCase {
         XCTAssertFalse(session.isActive)
     }
 
+    func testConfirmedCompletedRunBeatsNewerUnconfirmedRun() throws {
+        let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+        let input = PaperclipMappingInput(
+            companies: [company],
+            company: company,
+            dashboard: PaperclipDashboardResponse(
+                costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+            ),
+            agents: [makeSessionAgent()],
+            issues: [],
+            approvals: [],
+            runs: [
+                PaperclipHeartbeatRunResponse(
+                    id: "newer-unconfirmed",
+                    agentId: "agent-1",
+                    status: "unknown",
+                    startedAt: "2026-10-07T19:00:00.000Z",
+                    finishedAt: nil,
+                    createdAt: "2026-10-07T19:00:00.000Z",
+                    updatedAt: "2026-10-07T19:01:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: nil
+                ),
+                PaperclipHeartbeatRunResponse(
+                    id: "older-completed",
+                    agentId: "agent-1",
+                    status: "completed",
+                    startedAt: "2026-10-07T18:00:00.000Z",
+                    finishedAt: "2026-10-07T18:10:00.000Z",
+                    createdAt: "2026-10-07T18:00:00.000Z",
+                    updatedAt: "2026-10-07T18:10:00.000Z",
+                    usageJson: nil,
+                    sessionIdBefore: nil,
+                    sessionIdAfter: nil,
+                    contextSnapshot: nil
+                )
+            ]
+        )
+
+        let session = try XCTUnwrap(PaperclipMapper.map(input).agentSessions.first)
+
+        XCTAssertEqual(session.runID, "older-completed")
+        XCTAssertEqual(session.runState, .completed)
+        XCTAssertFalse(session.isActive)
+    }
+
     func testAgentWithoutRunIsNeverInventedAsLive() {
         let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
         let input = PaperclipMappingInput(
