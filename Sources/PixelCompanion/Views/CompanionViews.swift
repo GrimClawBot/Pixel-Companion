@@ -250,7 +250,6 @@ struct Placeholder: View {
     }
 }
 
-
 enum ActivityPresentation {
     static func history(
         _ events: [ActivityEvent],
