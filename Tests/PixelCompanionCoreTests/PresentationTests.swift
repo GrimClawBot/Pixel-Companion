@@ -1,3 +1,6 @@
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 import Foundation
 import PixelCompanionCore
 import XCTest
@@ -28,6 +31,13 @@ final class PresentationTests: XCTestCase {
 
         XCTAssertEqual(geometry.notchRect.minX, -1_512 + sideWidth)
         XCTAssertEqual(geometry.notchRect.maxY, 1_382)
+    }
+
+    func testGeometryEqualityComparesScreenAndNotch() throws {
+        let geometry = try XCTUnwrap(notch())
+
+        XCTAssertEqual(geometry, try XCTUnwrap(notch()))
+        XCTAssertNotEqual(geometry, try XCTUnwrap(notch(in: screen.offsetBy(dx: 0, dy: 100))))
     }
 
     func testDisplaysWithoutANotchAreRejected() {

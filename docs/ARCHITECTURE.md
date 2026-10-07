@@ -4,7 +4,7 @@ Pixel Companion is a single Swift package with no third-party dependencies.
 
 ```
 Package.swift
-├── Sources/PixelCompanionCore   library, Foundation only (also builds on Linux)
+├── Sources/PixelCompanionCore   library, Foundation + CoreGraphics only (no AppKit; also builds on Linux)
 │   ├── Connector/               connector protocols, models, snapshot, registry
 │   ├── Mock/                    MockConnector and MockScript
 │   ├── Character/               CharacterMood, CharacterStateMachine, CharacterSprite

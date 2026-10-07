@@ -7,7 +7,8 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         // Platform-neutral domain logic: connector protocols, MockConnector, character state
-        // machine, settings and notch geometry. Foundation only, so it also builds and tests on Linux.
+        // machine, settings and notch geometry. Foundation (+ CoreGraphics where available), no AppKit,
+        // so it also builds and tests on Linux.
         .target(name: "PixelCompanionCore"),
         .testTarget(name: "PixelCompanionCoreTests", dependencies: ["PixelCompanionCore"])
     ]

@@ -1,3 +1,8 @@
+#if canImport(CoreGraphics)
+// CGRect's geometry members, initialisers and Equatable conformance live in the CoreGraphics
+// overlay; Foundation alone does not make them visible on current macOS SDKs.
+import CoreGraphics
+#endif
 import Foundation
 
 /// The camera housing on a display, derived from the values `NSScreen` reports
