@@ -1,7 +1,14 @@
 import Foundation
 
 /// Read-only Paperclip connector. Network requests update a synchronized cache off the UI path.
-public final class PaperclipConnector: Connector, AuthProvider, ActivitySource, ApprovalProvider, UsageProvider, AgentSessionSource {
+public final class PaperclipConnector:
+    Connector,
+    AuthProvider,
+    ActivitySource,
+    ApprovalProvider,
+    UsageProvider,
+    AgentSessionSource
+{
     public let id: ConnectorID = .paperclip
     public let configuration: PaperclipConfiguration
 
