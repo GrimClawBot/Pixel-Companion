@@ -7,8 +7,7 @@ public final class PaperclipConnector:
     ActivitySource,
     ApprovalProvider,
     UsageProvider,
-    AgentSessionSource
-{
+    AgentSessionSource {
     public let id: ConnectorID = .paperclip
     public let configuration: PaperclipConfiguration
 
