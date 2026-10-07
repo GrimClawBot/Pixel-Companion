@@ -53,6 +53,39 @@ final class LivePresentationTests: XCTestCase {
         )
     }
 
+
+    func testDetailHistoryKeepsCurrentActivityWhenActiveSessionIsHighlighted() {
+        let activity = ActivityEvent(
+            id: "activity",
+            kind: .running,
+            title: "Current activity",
+            timestamp: Date(timeIntervalSince1970: 10)
+        )
+        let active = makeAgentSession(
+            id: "active",
+            name: "Builder",
+            state: .running,
+            agentStatus: "running"
+        )
+
+        XCTAssertNil(
+            AgentSessionPresentation.highlightedActivity(
+                activity: activity,
+                sessions: [active]
+            )
+        )
+        XCTAssertEqual(
+            ActivityPresentation.history(
+                [activity],
+                currentActivity: AgentSessionPresentation.highlightedActivity(
+                    activity: activity,
+                    sessions: [active]
+                )
+            ),
+            [activity]
+        )
+    }
+
     func testAgentSessionPresentationPrefersActiveSession() {
         let recent = makeAgentSession(
             id: "recent",
