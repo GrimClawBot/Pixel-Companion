@@ -19,7 +19,6 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
-
     func testAgentSessionPresentationPrefersActiveSession() {
         let recent = makeAgentSession(
             id: "recent",
@@ -165,7 +164,6 @@ final class LivePresentationTests: XCTestCase {
         )
     }
 }
-
 
 private func makeAgentSession(
     id: String,
