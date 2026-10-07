@@ -1,11 +1,20 @@
 import Foundation
 
+private struct PaperclipFetchContext {
+    let baseURL: URL
+    let companies: [PaperclipCompany]
+    let company: PaperclipCompany
+}
+
+private struct PaperclipFetchPayload {
+    let context: PaperclipFetchContext
+    let dashboard: PaperclipDashboardResponse
+    let agents: [PaperclipAgentResponse]
+    let issues: [PaperclipIssueResponse]
+    let approvals: [PaperclipApprovalResponse]
+}
+
 final class URLSessionPaperclipService: PaperclipServiceProtocol {
-    private struct Context {
-        let baseURL: URL
-        let companies: [PaperclipCompany]
-        let company: PaperclipCompany
-    }
 
     private let session: URLSession
 
@@ -86,7 +95,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
         }
 
         fetchDashboard(
-            context: Context(baseURL: baseURL, companies: companies, company: company),
+            context: PaperclipFetchPaperclipFetchContext(baseURL: baseURL, companies: companies, company: company),
             completion: completion
         )
     }
@@ -104,7 +113,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     }
 
     private func fetchDashboard(
-        context: Context,
+        context: PaperclipFetchContext,
         completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
     ) {
         get(
@@ -123,7 +132,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     }
 
     private func fetchAgents(
-        context: Context,
+        context: PaperclipFetchContext,
         dashboard: PaperclipDashboardResponse,
         completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
     ) {
@@ -148,7 +157,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     }
 
     private func fetchIssues(
-        context: Context,
+        context: PaperclipFetchContext,
         dashboard: PaperclipDashboardResponse,
         agents: [PaperclipAgentResponse],
         completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
@@ -175,7 +184,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     }
 
     private func fetchApprovals(
-        context: Context,
+        context: PaperclipFetchContext,
         dashboard: PaperclipDashboardResponse,
         agents: [PaperclipAgentResponse],
         issues: [PaperclipIssueResponse],
@@ -190,48 +199,18 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             case let .failure(error):
                 completion(.failure(error))
             case let .success(approvals):
-                self.fetchHeartbeatRuns(
+                let payload = PaperclipFetchPayload(
                     context: context,
                     dashboard: dashboard,
                     agents: agents,
                     issues: issues,
-                    approvals: approvals,
-                    completion: completion
+                    approvals: approvals
                 )
+                self.fetchHeartbeatRuns(payload: payload, completion: completion)
             }
         }
     }
 
-    private func fetchHeartbeatRuns(
-        context: Context,
-        dashboard: PaperclipDashboardResponse,
-        agents: [PaperclipAgentResponse],
-        issues: [PaperclipIssueResponse],
-        approvals: [PaperclipApprovalResponse],
-        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
-    ) {
-        get(
-            baseURL: context.baseURL,
-            path: companyPath(context.company.id, resource: "heartbeat-runs"),
-            queryItems: [URLQueryItem(name: "limit", value: "40")],
-            as: [PaperclipHeartbeatRunResponse].self
-        ) { result in
-            switch result {
-            case let .failure(error):
-                completion(.failure(error))
-            case let .success(runs):
-                completion(.success(PaperclipMapper.map(PaperclipMappingInput(
-                    companies: context.companies,
-                    company: context.company,
-                    dashboard: dashboard,
-                    agents: agents,
-                    issues: issues,
-                    approvals: approvals,
-                    runs: runs
-                ))))
-            }
-        }
-    }
 
     private func companyPath(_ companyID: String, resource: String) -> String {
         "api/companies/\(companyID)/\(resource)"
@@ -286,6 +265,35 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             return .success(try JSONDecoder().decode(type, from: data))
         } catch {
             return .failure(error)
+        }
+    }
+}
+
+private extension URLSessionPaperclipService {
+    func fetchHeartbeatRuns(
+        payload: PaperclipFetchPayload,
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+    ) {
+        get(
+            baseURL: payload.context.baseURL,
+            path: companyPath(payload.context.company.id, resource: "heartbeat-runs"),
+            queryItems: [URLQueryItem(name: "limit", value: "40")],
+            as: [PaperclipHeartbeatRunResponse].self
+        ) { result in
+            switch result {
+            case let .failure(error):
+                completion(.failure(error))
+            case let .success(runs):
+                completion(.success(PaperclipMapper.map(PaperclipMappingInput(
+                    companies: payload.context.companies,
+                    company: payload.context.company,
+                    dashboard: payload.dashboard,
+                    agents: payload.agents,
+                    issues: payload.issues,
+                    approvals: payload.approvals,
+                    runs: runs
+                ))))
+            }
         }
     }
 }
