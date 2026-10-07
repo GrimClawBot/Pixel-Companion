@@ -37,8 +37,7 @@ struct SnapshotContent: View {
     var approvalLimit: Int? = 2
 
     private var visibleApprovals: [ApprovalRequest] {
-        guard let approvalLimit else { return snapshot.pendingApprovals }
-        return Array(snapshot.pendingApprovals.prefix(approvalLimit))
+        ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
     }
 
     var body: some View {
@@ -253,6 +252,16 @@ struct Placeholder: View {
         Text(text)
             .font(.callout)
             .foregroundStyle(.tertiary)
+    }
+}
+
+enum ApprovalPresentation {
+    static func visible(
+        _ approvals: [ApprovalRequest],
+        limit: Int?
+    ) -> [ApprovalRequest] {
+        guard let limit else { return approvals }
+        return Array(approvals.prefix(max(limit, 0)))
     }
 }
 
