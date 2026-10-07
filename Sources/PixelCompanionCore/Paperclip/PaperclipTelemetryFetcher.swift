@@ -28,6 +28,7 @@ final class PaperclipTelemetryFetcher {
     }
 
     private struct Pending {
+        let sequence: Int
         let key: Key
         let payload: PaperclipFetchPayload
         let completion: (Result<[AgentSessionSnapshot], Error>) -> Void
@@ -36,6 +37,8 @@ final class PaperclipTelemetryFetcher {
     private let client: PaperclipHTTPClient
     private let lock = NSLock()
     private var activeKey: Key?
+    private var activeBoundary: Int?
+    private var nextSequence = 0
     private var pending: [Pending] = []
 
     init(client: PaperclipHTTPClient) {
@@ -48,9 +51,16 @@ final class PaperclipTelemetryFetcher {
     ) {
         let key = Self.key(for: payload.context)
         let shouldStart = lock.withLock {
-            pending.append(Pending(key: key, payload: payload, completion: completion))
+            nextSequence += 1
+            pending.append(Pending(
+                sequence: nextSequence,
+                key: key,
+                payload: payload,
+                completion: completion
+            ))
             guard activeKey == nil else { return false }
             activeKey = key
+            activeBoundary = nextSequence
             return true
         }
         guard shouldStart else { return }
@@ -99,9 +109,13 @@ final class PaperclipTelemetryFetcher {
         liveResult: Result<[PaperclipHeartbeatRunResponse], Error>
     ) {
         let waiters = lock.withLock {
-            let current = pending.filter { $0.key == key }
-            pending.removeAll { $0.key == key }
-            if activeKey == key { activeKey = nil }
+            let boundary = activeBoundary ?? 0
+            let current = pending.filter { $0.key == key && $0.sequence <= boundary }
+            pending.removeAll { $0.key == key && $0.sequence <= boundary }
+            if activeKey == key {
+                activeKey = nil
+                activeBoundary = nil
+            }
             return current
         }
 
@@ -128,6 +142,7 @@ final class PaperclipTelemetryFetcher {
         let next = lock.withLock { () -> Pending? in
             guard activeKey == nil, let first = pending.first else { return nil }
             activeKey = first.key
+            activeBoundary = nextSequence
             return first
         }
         if let next {
