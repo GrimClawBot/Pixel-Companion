@@ -31,7 +31,7 @@ struct PaperclipAgentRuntimeConfig: Decodable, Sendable {
     let aiConnection: PaperclipAIConnectionResponse?
 }
 
-struct PaperclipAgentResponse: Decodable, Sendable {
+struct PaperclipAgentResponse: Sendable {
     let id: String
     let name: String
     let role: String?
@@ -42,6 +42,36 @@ struct PaperclipAgentResponse: Decodable, Sendable {
     let runtimeConfig: PaperclipAgentRuntimeConfig?
     let lastHeartbeatAt: String?
     let updatedAt: String?
+}
+
+extension PaperclipAgentResponse: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case role
+        case title
+        case status
+        case adapterType
+        case adapterConfig
+        case runtimeConfig
+        case lastHeartbeatAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        status = try container.decode(String.self, forKey: .status)
+
+        role = try? container.decode(String.self, forKey: .role)
+        title = try? container.decode(String.self, forKey: .title)
+        adapterType = try? container.decode(String.self, forKey: .adapterType)
+        adapterConfig = try? container.decode(PaperclipAgentAdapterConfig.self, forKey: .adapterConfig)
+        runtimeConfig = try? container.decode(PaperclipAgentRuntimeConfig.self, forKey: .runtimeConfig)
+        lastHeartbeatAt = try? container.decode(String.self, forKey: .lastHeartbeatAt)
+        updatedAt = try? container.decode(String.self, forKey: .updatedAt)
+    }
 }
 
 struct PaperclipHeartbeatRunResponse: Decodable, Sendable {
