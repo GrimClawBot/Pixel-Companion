@@ -53,7 +53,6 @@ final class LivePresentationTests: XCTestCase {
         )
     }
 
-
     func testDetailHistoryKeepsCurrentActivityWhenActiveSessionIsHighlighted() {
         let activity = ActivityEvent(
             id: "activity",
