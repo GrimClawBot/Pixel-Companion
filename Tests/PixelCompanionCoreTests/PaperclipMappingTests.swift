@@ -27,7 +27,6 @@ final class PaperclipMappingTests: XCTestCase {
         XCTAssertTrue(session.isActive)
     }
 
-
     func testRecentSessionSelectionDoesNotDependOnResponseOrder() throws {
         let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
         let input = PaperclipMappingInput(
