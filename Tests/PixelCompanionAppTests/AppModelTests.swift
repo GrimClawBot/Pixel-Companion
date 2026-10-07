@@ -63,7 +63,6 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.notchAvailable)
     }
 
-
     func testPaperclipSettingsRebuildAndRefreshImmediately() {
         let settings = SettingsStore(defaults: defaults)
         settings.connectorID = .paperclip
