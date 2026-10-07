@@ -51,3 +51,26 @@ defaults delete PixelCompanion   # domain name of an unbundled SwiftPM executabl
 
 `PixelCompanionCore` uses Foundation only and contains all of the logic, but the package also
 contains the AppKit app, so building it needs macOS.
+
+## macOS notifications (PC-005)
+
+System notifications are **off by default**. In Settings, enable them deliberately and
+approve the macOS permission prompt. If macOS has denied notifications, change permission in
+System Settings instead. Disable the toggle to stop future delivery.
+
+Only **new** Paperclip approval requests and observed agent run transitions from queued/running
+to completed/failed generate notifications. Notices use generic text; they do not contain task
+names, approval contents, agent names, session IDs, endpoints, logs or secrets. The app never
+acts on requests or runs on your behalf. It only watches while Pixel Companion is running.
+
+macOS Notification Center requires a properly installed app bundle with a stable bundle ID.
+The development-only \`swift run PixelCompanion\` executable is not an app bundle and therefore
+disables notification delivery safely. The notch, menu bar, Paperclip connector and other app
+features still work in development mode. A distributable, signed \`.app\` bundle is a separate
+release requirement; do not treat command-line tests as proof of system banner delivery.
+
+Manual macOS QA for a bundled build: check permission allow/deny, enabling after connecting,
+existing approvals not triggering, one new approval producing one notice, run completion/failure,
+repeated polls not producing duplicates, changing companies/reconnecting not replaying existing
+events, and disabling notifications. Verify the Notification Center content contains no private
+data. Do not change Paperclip production to manufacture test events.

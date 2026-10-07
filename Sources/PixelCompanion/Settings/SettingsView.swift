@@ -45,6 +45,7 @@ struct SettingsView: View {
             paperclipSection
             mockSection
             presentationSection
+            notificationSection
         }
         .formStyle(.grouped)
         .frame(width: 460)
@@ -136,6 +137,27 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var notificationSection: some View {
+        Section {
+            Toggle("System notifications", isOn: $model.notificationsEnabled)
+            Text(model.notificationStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if model.notificationPermissionNeedsRequest {
+                Button("Grant permission…") { model.requestNotificationPermission() }
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text(
+                "Off by default. New Paperclip approvals and agent run completions/failures only. "
+                    + "No task or identity details in banners; existing events are not replayed."
+            )
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
