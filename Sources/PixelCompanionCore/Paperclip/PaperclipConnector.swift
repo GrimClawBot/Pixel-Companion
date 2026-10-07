@@ -28,6 +28,7 @@ public final class PaperclipConnector:
     private let service: any PaperclipServiceProtocol
     private var cache: Cache
     private var refreshGeneration = 0
+    private var publishedCoreGeneration = 0
 
     /// Called on the main queue after cached state changes.
     public var onChange: (() -> Void)?
@@ -135,6 +136,7 @@ public final class PaperclipConnector:
             switch result {
             case let .success(state):
                 applyCore(state, to: &value)
+                publishedCoreGeneration = generation
             case let .failure(error):
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -147,7 +149,7 @@ public final class PaperclipConnector:
         generation: Int
     ) {
         update { value in
-            guard generation == refreshGeneration else { return }
+            guard generation == publishedCoreGeneration else { return }
             if case let .success(sessions) = result {
                 value.agentSessions = sessions
             }
