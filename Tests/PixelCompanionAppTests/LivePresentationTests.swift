@@ -67,8 +67,24 @@ final class LivePresentationTests: XCTestCase {
             agentStatus: "waiting_for_task"
         )
 
-        XCTAssertEqual(AgentSessionPresentation.stateLabel(session), "Waiting_For_Task")
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(session), "Waiting For Task")
         XCTAssertFalse(session.isActive)
+    }
+
+
+    func testAgentSessionPresentationClampsNegativeTokenCounts() {
+        let session = AgentSessionSnapshot(
+            id: "negative",
+            agentID: "negative",
+            agentName: "Agent",
+            agentStatus: "idle",
+            runState: .completed,
+            inputTokens: -1,
+            cachedInputTokens: -2,
+            outputTokens: -3
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.tokenLabel(session), "0 in · 0 cached · 0 out")
     }
 
     func testApprovalCountAndTimestampPolicies() {
