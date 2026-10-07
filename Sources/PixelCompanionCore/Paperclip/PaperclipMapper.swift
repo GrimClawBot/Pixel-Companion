@@ -63,8 +63,11 @@ enum PaperclipMapper {
             values[issue.id] = issue
         }
         let runsByAgent = Dictionary(grouping: input.runs, by: \.agentId)
+        let agentsByID = input.agents.reduce(into: [String: PaperclipAgentResponse]()) { values, agent in
+            values[agent.id] = agent
+        }
 
-        return input.agents.map { agent in
+        return agentsByID.values.map { agent in
             let runs = runsByAgent[agent.id] ?? []
             let selectedRun = runs.first(where: { isActiveRun($0.status) }) ?? runs.first
             let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
