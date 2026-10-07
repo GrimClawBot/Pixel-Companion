@@ -98,7 +98,8 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             companyName: nil,
             activity: [],
             approvals: [],
-            usage: nil
+            usage: nil,
+            agentSessions: []
         )
     }
 
@@ -189,13 +190,44 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             case let .failure(error):
                 completion(.failure(error))
             case let .success(approvals):
+                self.fetchHeartbeatRuns(
+                    context: context,
+                    dashboard: dashboard,
+                    agents: agents,
+                    issues: issues,
+                    approvals: approvals,
+                    completion: completion
+                )
+            }
+        }
+    }
+
+    private func fetchHeartbeatRuns(
+        context: Context,
+        dashboard: PaperclipDashboardResponse,
+        agents: [PaperclipAgentResponse],
+        issues: [PaperclipIssueResponse],
+        approvals: [PaperclipApprovalResponse],
+        completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
+    ) {
+        get(
+            baseURL: context.baseURL,
+            path: companyPath(context.company.id, resource: "heartbeat-runs"),
+            queryItems: [URLQueryItem(name: "limit", value: "40")],
+            as: [PaperclipHeartbeatRunResponse].self
+        ) { result in
+            switch result {
+            case let .failure(error):
+                completion(.failure(error))
+            case let .success(runs):
                 completion(.success(PaperclipMapper.map(PaperclipMappingInput(
                     companies: context.companies,
                     company: context.company,
                     dashboard: dashboard,
                     agents: agents,
                     issues: issues,
-                    approvals: approvals
+                    approvals: approvals,
+                    runs: runs
                 ))))
             }
         }
@@ -208,11 +240,21 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     private func get<Value: Decodable & Sendable>(
         baseURL: URL,
         path: String,
+        queryItems: [URLQueryItem] = [],
         as type: Value.Type,
         completion: @escaping (Result<Value, Error>) -> Void
     ) {
-        let url = path.split(separator: "/").reduce(baseURL) { partial, component in
+        let pathURL = path.split(separator: "/").reduce(baseURL) { partial, component in
             partial.appendingPathComponent(String(component))
+        }
+        guard var components = URLComponents(url: pathURL, resolvingAgainstBaseURL: false) else {
+            completion(.failure(PaperclipServiceError.invalidConfiguration))
+            return
+        }
+        if !queryItems.isEmpty { components.queryItems = queryItems }
+        guard let url = components.url else {
+            completion(.failure(PaperclipServiceError.invalidConfiguration))
+            return
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
