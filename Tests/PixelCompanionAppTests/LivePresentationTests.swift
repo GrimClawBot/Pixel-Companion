@@ -19,7 +19,6 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
-
     func testSnapshotPrimaryPrefersActiveSessionWithoutStackingActivity() {
         let activity = ActivityEvent(
             id: "activity",
