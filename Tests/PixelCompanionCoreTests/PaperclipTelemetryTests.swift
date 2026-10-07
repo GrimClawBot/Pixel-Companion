@@ -34,7 +34,8 @@ private final class TelemetryStubURLProtocol: URLProtocol {
 
 private final class TelemetryDeferredService: PaperclipServiceProtocol {
     private(set) var fetchCount = 0
-    private var coreCompletion: ((Result<PaperclipRemoteState, Error>) -> Void)?
+    private var coreCompletions: [Int: (Result<PaperclipRemoteState, Error>) -> Void] = [:]
+    private var sessionCompletions: [Int: (Result<[AgentSessionSnapshot], Error>) -> Void] = [:]
 
     func fetch(
         configuration: PaperclipConfiguration,
@@ -42,12 +43,23 @@ private final class TelemetryDeferredService: PaperclipServiceProtocol {
         sessionCompletion: @escaping (Result<[AgentSessionSnapshot], Error>) -> Void
     ) {
         fetchCount += 1
-        coreCompletion = completion
+        coreCompletions[fetchCount] = completion
+        sessionCompletions[fetchCount] = sessionCompletion
     }
 
-    func finishCore(_ result: Result<PaperclipRemoteState, Error>) {
-        let completion = coreCompletion
-        coreCompletion = nil
+    func finishCore(
+        _ result: Result<PaperclipRemoteState, Error>,
+        fetch: Int = 1
+    ) {
+        let completion = coreCompletions.removeValue(forKey: fetch)
+        completion?(result)
+    }
+
+    func finishSessions(
+        _ result: Result<[AgentSessionSnapshot], Error>,
+        fetch: Int
+    ) {
+        let completion = sessionCompletions.removeValue(forKey: fetch)
         completion?(result)
     }
 }
@@ -79,6 +91,50 @@ final class PaperclipTelemetryTests: XCTestCase {
         XCTAssertEqual(connector.connectionState, .connected)
         connector.refresh()
         XCTAssertEqual(service.fetchCount, 2)
+    }
+
+
+    func testStaleTelemetryCannotOverwriteNewerRefresh() {
+        let service = TelemetryDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(),
+            service: service
+        )
+        let core = PaperclipRemoteState(
+            companies: [PaperclipCompany(id: "company-1", name: "Example Co", status: "active")],
+            companyID: "company-1",
+            companyName: "Example Co",
+            activity: [],
+            approvals: [],
+            usage: nil,
+            agentSessions: []
+        )
+
+        connector.refresh()
+        service.finishCore(.success(core), fetch: 1)
+        connector.refresh()
+        service.finishCore(.success(core), fetch: 2)
+
+        let stale = AgentSessionSnapshot(
+            id: "stale",
+            agentID: "stale",
+            agentName: "Stale",
+            agentStatus: "running",
+            runState: .running
+        )
+        let current = AgentSessionSnapshot(
+            id: "current",
+            agentID: "current",
+            agentName: "Current",
+            agentStatus: "running",
+            runState: .running
+        )
+
+        service.finishSessions(.success([stale]), fetch: 1)
+        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
+
+        service.finishSessions(.success([current]), fetch: 2)
+        XCTAssertEqual(connector.agentSessions(limit: 8), [current])
     }
 
     func testLiveRunsRestoreActiveSessionOutsideRecentWindow() {
