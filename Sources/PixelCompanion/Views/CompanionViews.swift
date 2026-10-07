@@ -177,7 +177,7 @@ struct ApprovalRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .accessibilityLabel("Waiting for approval: \(approval.title)")
+        .accessibilityLabel(ApprovalPresentation.accessibilityLabel(approval))
     }
 }
 
@@ -191,7 +191,7 @@ struct ApprovalCountBadge: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(Color.orange))
-            .accessibilityLabel("\(count) pending approvals")
+            .accessibilityLabel(ApprovalPresentation.countLabel(count))
     }
 }
 
@@ -263,6 +263,27 @@ enum ApprovalPresentation {
         guard let limit else { return approvals }
         return Array(approvals.prefix(max(limit, 0)))
     }
+
+    static func countLabel(_ count: Int) -> String {
+        "\(count) pending \(count == 1 ? "approval" : "approvals")"
+    }
+
+    static func accessibilityLabel(
+        _ approval: ApprovalRequest,
+        now: Date = Date()
+    ) -> String {
+        let prefix = "Waiting for approval: \(approval.title)"
+        guard approval.requestedAt != .distantPast else { return prefix }
+
+        let elapsed = max(now.timeIntervalSince(approval.requestedAt), 0)
+        let minutes = Int(elapsed / 60)
+        if minutes < 1 { return "\(prefix). Requested less than a minute ago." }
+        if minutes < 60 {
+            return "\(prefix). Requested \(minutes) \(minutes == 1 ? "minute" : "minutes") ago."
+        }
+        let hours = minutes / 60
+        return "\(prefix). Requested \(hours) \(hours == 1 ? "hour" : "hours") ago."
+    }
 }
 
 enum ActivityPresentation {
@@ -270,8 +291,12 @@ enum ActivityPresentation {
         _ events: [ActivityEvent],
         currentActivity: ActivityEvent?
     ) -> [ActivityEvent] {
-        guard let currentActivity else { return events }
-        return events.filter { $0.id != currentActivity.id }
+        guard let currentActivity, let index = events.firstIndex(of: currentActivity) else {
+            return events
+        }
+        var history = events
+        history.remove(at: index)
+        return history
     }
 }
 
