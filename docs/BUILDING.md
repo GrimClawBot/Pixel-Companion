@@ -47,6 +47,38 @@ Settings are stored in the app's `UserDefaults` domain. To start fresh:
 defaults delete PixelCompanion   # domain name of an unbundled SwiftPM executable
 ```
 
+## Standalone macOS app bundle (PC-006)
+
+The local packaging command builds a true \`.app\`, with a stable identifier, original generated
+app icon, an accessory/menu-bar app plist, and an ad-hoc signature. No credentials are required:
+
+\`\`\`sh
+scripts/package_macos.sh --release
+open "dist/Pixel Companion.app"
+\`\`\`
+
+Output: \`dist/Pixel Companion.app\` (ignored by Git). The script validates the signature but
+never publishes or notarizes. It will replace its own default local bundle on rerun, but refuses
+to overwrite a custom destination that already exists. A macOS permission prompt should only
+appear if a future feature explicitly requests it; the current read-only features do not.
+
+For external distribution, a maintainer may supply a **Developer ID Application** signing
+identity already installed in the local Keychain:
+
+\`\`\`sh
+scripts/package_macos.sh --release --sign-identity "Developer ID Application: YOUR TEAM"
+\`\`\`
+
+This alone is **not** a public release. A maintainer must review the signing inputs, notarize
+with Apple's notary service, staple the ticket, verify Gatekeeper acceptance, and explicitly
+approve any GitHub Release upload. Never commit signing keys, passwords or private profiles.
+
+For real macOS QA: record the commit SHA, OS version, machine/notch availability, install path,
+bundle identifier, codesign verification, launch/quit, menu bar/notch behavior, sleep/wake, and
+permission prompts. Check notification allow/deny and delivery only after the PC-005 feature is
+included in a reviewed bundled build. A successful SwiftPM test or app launch alone is not
+evidence that system notifications work.
+
 ## Linux
 
 `PixelCompanionCore` uses Foundation only and contains all of the logic, but the package also
