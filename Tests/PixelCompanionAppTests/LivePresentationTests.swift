@@ -19,6 +19,57 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
+
+    func testAgentSessionPresentationPrefersActiveSession() {
+        let recent = makeAgentSession(
+            id: "recent",
+            name: "Recent",
+            state: .completed,
+            agentStatus: "idle"
+        )
+        let active = makeAgentSession(
+            id: "active",
+            name: "Builder",
+            state: .running,
+            agentStatus: "running"
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.primary([recent, active]), active)
+        XCTAssertEqual(AgentSessionPresentation.sectionTitle([recent, active]), "Agent sessions")
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(active), "Live")
+    }
+
+    func testAgentSessionPresentationFormatsRuntimeAndTokens() {
+        let session = AgentSessionSnapshot(
+            id: "agent-1",
+            agentID: "agent-1",
+            agentName: "Builder",
+            agentStatus: "idle",
+            runState: .completed,
+            model: "gpt-5.6-sol",
+            provider: "openai",
+            inputTokens: 1_250,
+            cachedInputTokens: 2_500_000,
+            outputTokens: 250
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.runtimeLabel(session), "openai · gpt-5.6-sol")
+        XCTAssertEqual(AgentSessionPresentation.tokenLabel(session), "1.2K in · 2.5M cached · 250 out")
+        XCTAssertEqual(AgentSessionPresentation.sectionTitle([session]), "Recent agent sessions")
+    }
+
+    func testAgentSessionUnknownStateUsesAgentStatusWithoutInventingLiveState() {
+        let session = makeAgentSession(
+            id: "unknown",
+            name: "Builder",
+            state: .unknown,
+            agentStatus: "waiting_for_task"
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(session), "Waiting_For_Task")
+        XCTAssertFalse(session.isActive)
+    }
+
     func testApprovalCountAndTimestampPolicies() {
         let recent = ApprovalRequest(
             id: "approval-1",
@@ -113,4 +164,20 @@ final class LivePresentationTests: XCTestCase {
             "42 / 100 tokens"
         )
     }
+}
+
+
+private func makeAgentSession(
+    id: String,
+    name: String,
+    state: AgentSessionSnapshot.RunState,
+    agentStatus: String
+) -> AgentSessionSnapshot {
+    AgentSessionSnapshot(
+        id: id,
+        agentID: id,
+        agentName: name,
+        agentStatus: agentStatus,
+        runState: state
+    )
 }
