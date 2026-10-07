@@ -137,6 +137,18 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertFalse(session.isActive)
     }
 
+    func testUnknownSessionNeverEchoesActiveAgentStatus() {
+        let session = makeAgentSession(
+            id: "unknown-running",
+            name: "Builder",
+            state: .unknown,
+            agentStatus: "running"
+        )
+
+        XCTAssertEqual(AgentSessionPresentation.stateLabel(session), "Unknown")
+        XCTAssertFalse(session.isActive)
+    }
+
     func testAgentSessionPresentationClampsNegativeTokenCounts() {
         let session = AgentSessionSnapshot(
             id: "negative",
