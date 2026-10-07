@@ -95,7 +95,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
         }
 
         fetchDashboard(
-            context: PaperclipFetchPaperclipFetchContext(baseURL: baseURL, companies: companies, company: company),
+            context: PaperclipFetchContext(baseURL: baseURL, companies: companies, company: company),
             completion: completion
         )
     }
