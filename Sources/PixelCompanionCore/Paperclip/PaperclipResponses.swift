@@ -20,12 +20,56 @@ struct PaperclipDashboardResponse: Decodable, Sendable {
 }
 
 struct PaperclipAgentResponse: Decodable, Sendable {
+    struct AdapterConfig: Decodable, Sendable {
+        let model: String?
+    }
+
+    struct RuntimeConfig: Decodable, Sendable {
+        struct AIConnection: Decodable, Sendable {
+            let provider: String?
+        }
+
+        let aiConnection: AIConnection?
+    }
+
     let id: String
     let name: String
+    let role: String?
     let title: String?
     let status: String
+    let adapterType: String?
+    let adapterConfig: AdapterConfig?
+    let runtimeConfig: RuntimeConfig?
     let lastHeartbeatAt: String?
     let updatedAt: String?
+}
+
+struct PaperclipHeartbeatRunResponse: Decodable, Sendable {
+    struct Usage: Decodable, Sendable {
+        let model: String?
+        let provider: String?
+        let inputTokens: Int?
+        let cachedInputTokens: Int?
+        let outputTokens: Int?
+        let persistedSessionId: String?
+    }
+
+    struct Context: Decodable, Sendable {
+        let issueId: String?
+        let taskId: String?
+    }
+
+    let id: String
+    let agentId: String
+    let status: String
+    let startedAt: String?
+    let finishedAt: String?
+    let createdAt: String?
+    let updatedAt: String?
+    let usageJson: Usage?
+    let sessionIdBefore: String?
+    let sessionIdAfter: String?
+    let contextSnapshot: Context?
 }
 
 struct PaperclipIssueResponse: Decodable, Sendable {
@@ -55,4 +99,5 @@ struct PaperclipMappingInput {
     let agents: [PaperclipAgentResponse]
     let issues: [PaperclipIssueResponse]
     let approvals: [PaperclipApprovalResponse]
+    let runs: [PaperclipHeartbeatRunResponse]
 }
