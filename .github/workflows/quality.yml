@@ -1,0 +1,24 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  native-checks:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Install SwiftLint
+        run: brew list swiftlint >/dev/null 2>&1 || brew install swiftlint
+      - name: Native quality checks
+        env:
+          QUALITY_XCODE_SCHEME: ${{ vars.QUALITY_XCODE_SCHEME }}
+          QUALITY_BASE_REF: ${{ github.base_ref || 'main' }}
+        run: scripts/quality/check.sh --base "origin/$QUALITY_BASE_REF"
