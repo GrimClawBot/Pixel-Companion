@@ -18,6 +18,36 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
+
+    func testApprovalAccessibilityIncludesWaitTimeAndCount() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let approval = ApprovalRequest(
+            id: "approval-1",
+            title: "Ship release",
+            requestedAt: now.addingTimeInterval(-125)
+        )
+
+        XCTAssertEqual(ApprovalPresentation.countLabel(1), "1 pending approval")
+        XCTAssertEqual(ApprovalPresentation.countLabel(3), "3 pending approvals")
+        XCTAssertEqual(
+            ApprovalPresentation.accessibilityLabel(approval, now: now),
+            "Waiting for approval: Ship release. Requested 2 minutes ago."
+        )
+    }
+
+    func testApprovalAccessibilityHandlesMissingTimestamp() {
+        let approval = ApprovalRequest(
+            id: "approval-1",
+            title: "Ship release",
+            requestedAt: .distantPast
+        )
+
+        XCTAssertEqual(
+            ApprovalPresentation.accessibilityLabel(approval, now: Date(timeIntervalSince1970: 10_000)),
+            "Waiting for approval: Ship release"
+        )
+    }
+
     func testHistoryRemovesCurrentActivityByID() {
         let now = ActivityEvent(
             id: "current",
@@ -35,6 +65,27 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(
             ActivityPresentation.history([now, older], currentActivity: now),
             [older]
+        )
+    }
+
+
+    func testHistoryRemovesOnlyHighlightedDuplicateOccurrence() {
+        let current = ActivityEvent(
+            id: "duplicate",
+            kind: .running,
+            title: "Current",
+            timestamp: Date(timeIntervalSince1970: 20)
+        )
+        let duplicate = ActivityEvent(
+            id: "duplicate",
+            kind: .running,
+            title: "Another agent event",
+            timestamp: Date(timeIntervalSince1970: 19)
+        )
+
+        XCTAssertEqual(
+            ActivityPresentation.history([current, duplicate], currentActivity: current),
+            [duplicate]
         )
     }
 
