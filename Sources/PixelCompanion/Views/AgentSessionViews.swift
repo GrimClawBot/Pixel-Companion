@@ -87,6 +87,16 @@ enum AgentSessionPresentation {
         return nil
     }
 
+    static func highlightedActivity(
+        activity: ActivityEvent?,
+        sessions: [AgentSessionSnapshot]
+    ) -> ActivityEvent? {
+        guard case let .activity(event) = snapshotPrimary(activity: activity, sessions: sessions) else {
+            return nil
+        }
+        return event
+    }
+
     static func sectionTitle(_ sessions: [AgentSessionSnapshot]) -> String {
         sessions.contains(where: \.isActive) ? "Agent sessions" : "Recent agent sessions"
     }
