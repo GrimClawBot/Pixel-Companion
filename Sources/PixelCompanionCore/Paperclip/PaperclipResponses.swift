@@ -19,27 +19,27 @@ struct PaperclipDashboardResponse: Decodable, Sendable {
     let costs: Costs
 }
 
+struct PaperclipAgentAdapterConfig: Decodable, Sendable {
+    let model: String?
+}
+
+struct PaperclipAIConnectionResponse: Decodable, Sendable {
+    let provider: String?
+}
+
+struct PaperclipAgentRuntimeConfig: Decodable, Sendable {
+    let aiConnection: PaperclipAIConnectionResponse?
+}
+
 struct PaperclipAgentResponse: Decodable, Sendable {
-    struct AdapterConfig: Decodable, Sendable {
-        let model: String?
-    }
-
-    struct RuntimeConfig: Decodable, Sendable {
-        struct AIConnection: Decodable, Sendable {
-            let provider: String?
-        }
-
-        let aiConnection: AIConnection?
-    }
-
     let id: String
     let name: String
     let role: String?
     let title: String?
     let status: String
     let adapterType: String?
-    let adapterConfig: AdapterConfig?
-    let runtimeConfig: RuntimeConfig?
+    let adapterConfig: PaperclipAgentAdapterConfig?
+    let runtimeConfig: PaperclipAgentRuntimeConfig?
     let lastHeartbeatAt: String?
     let updatedAt: String?
 }
