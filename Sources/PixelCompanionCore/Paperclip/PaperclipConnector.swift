@@ -40,7 +40,7 @@ public struct PaperclipCompany: Identifiable, Hashable, Sendable {
     }
 }
 
-private struct PaperclipRemoteState {
+struct PaperclipRemoteState {
     let companies: [PaperclipCompany]
     let companyID: String?
     let companyName: String?
@@ -49,7 +49,7 @@ private struct PaperclipRemoteState {
     let usage: UsageSnapshot?
 }
 
-private enum PaperclipServiceError: LocalizedError {
+enum PaperclipServiceError: LocalizedError {
     case invalidConfiguration
     case http(Int)
     case invalidResponse
@@ -65,14 +65,14 @@ private enum PaperclipServiceError: LocalizedError {
     }
 }
 
-private protocol PaperclipServiceProtocol: AnyObject {
+protocol PaperclipServiceProtocol: AnyObject {
     func fetch(
         configuration: PaperclipConfiguration,
         completion: @escaping (Result<PaperclipRemoteState, Error>) -> Void
     )
 }
 
-private final class URLSessionPaperclipService: PaperclipServiceProtocol {
+final class URLSessionPaperclipService: PaperclipServiceProtocol {
     private let session: URLSession
     private let decoder = JSONDecoder()
 
