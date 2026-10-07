@@ -69,7 +69,9 @@ enum PaperclipMapper {
 
         return agentsByID.values.map { agent in
             let runs = (runsByAgent[agent.id] ?? []).sorted { runTimestamp($0) > runTimestamp($1) }
-            let selectedRun = runs.first(where: { isActiveRun($0.status) }) ?? runs.first
+            let selectedRun = runs.first(where: { isActiveRun($0.status) })
+                ?? runs.first(where: { isConfirmedRecentRun($0.status) })
+                ?? runs.first
             let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
             let usage = selectedRun?.usageJson
             let taskTitle = issue.map { issue in
@@ -122,6 +124,11 @@ enum PaperclipMapper {
 
     private static func isActiveRun(_ status: String) -> Bool {
         ["queued", "running"].contains(status.lowercased())
+    }
+
+    private static func isConfirmedRecentRun(_ status: String) -> Bool {
+        let value = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return ["completed", "succeeded", "success", "failed", "error", "cancelled", "canceled"].contains(value)
     }
 
     private static func runState(
