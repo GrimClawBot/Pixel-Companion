@@ -63,6 +63,7 @@ struct SettingsView: View {
             Section {
                 TextField("Base URL", text: $model.paperclipBaseURL)
                     .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.applyPaperclipBaseURL() }
                 if model.paperclipCompanies.isEmpty {
                     TextField("Company ID", text: $model.paperclipCompanyID)
                         .textFieldStyle(.roundedBorder)
