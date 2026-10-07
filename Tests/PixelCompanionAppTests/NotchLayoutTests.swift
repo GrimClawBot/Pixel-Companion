@@ -5,8 +5,12 @@ import XCTest
 final class NotchLayoutTests: XCTestCase {
     private let notchSize = CGSize(width: 185, height: 32)
 
-    func testCompactSurfaceMatchesPhysicalNotchExactly() {
-        XCTAssertEqual(NotchLayout.size(for: .compact, notchSize: notchSize), notchSize)
+    func testCompactSurfaceStaysWithinNotchWidthAndExtendsBelowIt() {
+        XCTAssertEqual(
+            NotchLayout.size(for: .compact, notchSize: notchSize),
+            CGSize(width: 185, height: 56)
+        )
+        XCTAssertEqual(NotchLayout.compactBarHeight, 24)
     }
 
     func testSnapshotExpandsBelowAndBeyondNotchOnlyDuringInteraction() {
