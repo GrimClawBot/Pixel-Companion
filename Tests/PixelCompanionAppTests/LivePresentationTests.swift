@@ -19,6 +19,41 @@ final class LivePresentationTests: XCTestCase {
         XCTAssertEqual(ApprovalPresentation.visible(approvals, limit: nil), approvals)
     }
 
+
+    func testSnapshotPrimaryPrefersActiveSessionWithoutStackingActivity() {
+        let activity = ActivityEvent(
+            id: "activity",
+            kind: .running,
+            title: "Current activity",
+            timestamp: Date(timeIntervalSince1970: 10)
+        )
+        let active = makeAgentSession(
+            id: "active",
+            name: "Builder",
+            state: .running,
+            agentStatus: "running"
+        )
+        let recent = makeAgentSession(
+            id: "recent",
+            name: "Recent",
+            state: .completed,
+            agentStatus: "idle"
+        )
+
+        XCTAssertEqual(
+            AgentSessionPresentation.snapshotPrimary(activity: activity, sessions: [recent, active]),
+            .session(active)
+        )
+        XCTAssertEqual(
+            AgentSessionPresentation.snapshotPrimary(activity: activity, sessions: [recent]),
+            .activity(activity)
+        )
+        XCTAssertEqual(
+            AgentSessionPresentation.snapshotPrimary(activity: nil, sessions: [recent]),
+            .session(recent)
+        )
+    }
+
     func testAgentSessionPresentationPrefersActiveSession() {
         let recent = makeAgentSession(
             id: "recent",
