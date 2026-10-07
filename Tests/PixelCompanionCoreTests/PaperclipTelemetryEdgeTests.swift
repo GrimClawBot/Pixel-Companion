@@ -62,7 +62,7 @@ final class PaperclipTelemetryEdgeTests: XCTestCase {
         super.tearDown()
     }
 
-    func testTelemetryRequestsCoalesceWhileNetworkFetchIsInFlight() {
+    func testNewerTelemetryPollWaitsForAFreshNetworkSnapshot() {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [EdgeStubURLProtocol.self]
         let client = PaperclipHTTPClient(session: URLSession(configuration: configuration))
@@ -90,14 +90,14 @@ final class PaperclipTelemetryEdgeTests: XCTestCase {
             }
         }
 
-        let first = expectation(description: "First coalesced telemetry result")
-        let second = expectation(description: "Second coalesced telemetry result")
+        let first = expectation(description: "First telemetry result")
+        let second = expectation(description: "Second telemetry result")
         fetcher.fetch(payload: payload) { _ in first.fulfill() }
         fetcher.fetch(payload: payload) { _ in second.fulfill() }
 
         wait(for: [first, second], timeout: 2)
-        XCTAssertEqual(heartbeatCount, 1)
-        XCTAssertEqual(liveCount, 1)
+        XCTAssertEqual(heartbeatCount, 2)
+        XCTAssertEqual(liveCount, 2)
     }
 
     func testTelemetryFailureClearsPreviouslyPublishedSessions() {
