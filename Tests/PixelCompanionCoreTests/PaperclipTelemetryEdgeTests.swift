@@ -194,7 +194,9 @@ final class PaperclipTelemetryEdgeTests: XCTestCase {
                     sessionExpectation.fulfill()
                     return
                 }
-                XCTAssertFalse(sessions.contains(where: \.isActive))
+                XCTAssertEqual(sessions.first?.runID, "finished-between-requests")
+                XCTAssertEqual(sessions.first?.runState, .unknown)
+                XCTAssertFalse(sessions.first?.isActive ?? true)
                 sessionExpectation.fulfill()
             }
         )
