@@ -56,7 +56,7 @@ class LockfileTests(unittest.TestCase):
             tracked = {pbx_rel}
             errors = vc.lockfile_errors(root, tracked)
             self.assertEqual(1, len(errors))
-            self.assertIn("Xcode project declares remote Swift packages", errors[0])
+            self.assertIn("PixelCompanion.xcodeproj/project.pbxproj declares remote Swift packages", errors[0])
 
             lock_rel = (
                 "PixelCompanion.xcodeproj/project.xcworkspace/"
@@ -64,6 +64,53 @@ class LockfileTests(unittest.TestCase):
             )
             self.assertTrue(vc.is_xcode_lockfile(lock_rel))
             self.assertEqual([], vc.lockfile_errors(root, tracked | {lock_rel}))
+
+    def test_unrelated_xcode_lockfile_does_not_satisfy_another_project(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            projects = []
+            for name in ("AppA", "AppB"):
+                rel = f"{name}.xcodeproj/project.pbxproj"
+                path = root / rel
+                path.parent.mkdir(parents=True)
+                path.write_text(
+                    "/* Begin XCRemoteSwiftPackageReference section */\n"
+                    "repositoryURL = https://example.invalid/repo.git;\n"
+                )
+                projects.append(rel)
+
+            app_a_lock = (
+                "AppA.xcodeproj/project.xcworkspace/"
+                "xcshareddata/swiftpm/Package.resolved"
+            )
+            errors = vc.lockfile_errors(root, set(projects) | {app_a_lock})
+            self.assertEqual(1, len(errors))
+            self.assertIn("AppB.xcodeproj/project.pbxproj", errors[0])
+
+    def test_workspace_lockfile_satisfies_only_its_member_project(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_rel = "App.xcodeproj/project.pbxproj"
+            project = root / project_rel
+            project.parent.mkdir(parents=True)
+            project.write_text(
+                "/* Begin XCRemoteSwiftPackageReference section */\n"
+                "repositoryURL = https://example.invalid/repo.git;\n"
+            )
+            workspace_rel = "Product.xcworkspace/contents.xcworkspacedata"
+            workspace = root / workspace_rel
+            workspace.parent.mkdir(parents=True)
+            workspace.write_text(
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<Workspace version="1.0">\n'
+                '  <FileRef location="group:App.xcodeproj"></FileRef>\n'
+                '</Workspace>\n'
+            )
+            lock_rel = (
+                "Product.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+            )
+            tracked = {project_rel, workspace_rel, lock_rel}
+            self.assertEqual([], vc.lockfile_errors(root, tracked))
 
     def test_xcode_project_without_remote_packages_needs_no_lockfile(self):
         with tempfile.TemporaryDirectory() as td:

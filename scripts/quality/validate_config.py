@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import plistlib
 import re
+import posixpath
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +41,38 @@ def is_xcode_lockfile(path: str) -> bool:
     )
 
 
+def xcode_project_lockfiles(root: Path, tracked: set[str], project_rel: str) -> set[str]:
+    """Return committed lockfiles that can actually govern one Xcode project."""
+    project_dir = project_rel.removesuffix("/project.pbxproj")
+    candidates = {
+        f"{project_dir}/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+    }
+
+    # A standalone workspace may own package resolution for member projects.
+    for rel in sorted(tracked):
+        if not rel.endswith(".xcworkspace/contents.xcworkspacedata"):
+            continue
+        if ".xcodeproj/project.xcworkspace/" in rel:
+            continue
+        workspace_file = root / rel
+        if not workspace_file.is_file():
+            continue
+        workspace_dir = rel.removesuffix("/contents.xcworkspacedata")
+        workspace_parent = posixpath.dirname(workspace_dir)
+        text = workspace_file.read_text(encoding="utf-8", errors="replace")
+        for location in re.findall(r'\blocation\s*=\s*"([^"]+)"', text):
+            kind, sep, value = location.partition(":")
+            if not sep or kind not in {"group", "container"}:
+                continue
+            member = posixpath.normpath(posixpath.join(workspace_parent, value))
+            if member == project_dir:
+                candidates.add(
+                    f"{workspace_dir}/xcshareddata/swiftpm/Package.resolved"
+                )
+
+    return candidates & tracked
+
+
 def lockfile_errors(root: Path, tracked: set[str]) -> list[str]:
     errors: list[str] = []
 
@@ -60,11 +93,12 @@ def lockfile_errors(root: Path, tracked: set[str]) -> list[str]:
         if "XCRemoteSwiftPackageReference" in text or re.search(r"\brepositoryURL\s*=", text):
             remote_xcode_projects.append(rel)
 
-    if remote_xcode_projects and not any(is_xcode_lockfile(rel) for rel in tracked):
-        errors.append(
-            "Xcode project declares remote Swift packages but no committed "
-            "xcshareddata/swiftpm/Package.resolved was found"
-        )
+    for project_rel in remote_xcode_projects:
+        if not xcode_project_lockfiles(root, tracked, project_rel):
+            errors.append(
+                f"{project_rel} declares remote Swift packages but no applicable committed "
+                "Package.resolved was found"
+            )
     return errors
 
 

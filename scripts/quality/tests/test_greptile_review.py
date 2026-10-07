@@ -67,6 +67,18 @@ class ClassifySensitiveTests(unittest.TestCase):
         )
         self.assertEqual(["public-api"], gr.classify_sensitive(["Sources/Lib/API.swift"], diff))
 
+    def test_unrelated_change_near_unchanged_public_api_is_not_sensitive(self):
+        diff = (
+            "--- a/Sources/Lib/API.swift\n"
+            "+++ b/Sources/Lib/API.swift\n"
+            "@@ -1,3 +1,3 @@\n"
+            " public func render() -> View { buildView() }\n"
+            "-let cacheSize = 1\n"
+            "+let cacheSize = 2\n"
+            " private func helper() {}\n"
+        )
+        self.assertEqual([], gr.classify_sensitive(["Sources/Lib/API.swift"], diff))
+
     def test_login_and_session_changes_require_human_review(self):
         diff = "+++ b/Sources/App/LoginCoordinator.swift\n+    func signIn() { session = newSession }\n"
         reasons = gr.classify_sensitive(["Sources/App/LoginCoordinator.swift"], diff)

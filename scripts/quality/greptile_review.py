@@ -66,6 +66,16 @@ SENSITIVE_PATHS: list[tuple[str, str]] = [
     ("*/security/*", "security"),
 ]
 PUBLIC_API_PATTERN = re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s")
+PUBLIC_CALLABLE_PATTERN = re.compile(
+    r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s+"
+    r"(?:override\s+|final\s+|static\s+|class\s+|mutating\s+|nonmutating\s+)*"
+    r"(?:func|init|subscript)\b"
+)
+PUBLIC_TYPE_PATTERN = re.compile(
+    r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s+"
+    r"(?:final\s+|indirect\s+)*"
+    r"(?:class|struct|enum|protocol|actor|extension)\b"
+)
 SENSITIVE_CONTENT: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b(?:SecItem\w*|kSecClass\w*|Keychain)\b"), "secrets"),
     (re.compile(r"\b(?:authorization|bearer|api[_-]?key|access[_-]?token|password|passwd|signin|sign_in|login|logout|session|oauth|credential)\b", re.IGNORECASE), "auth"),
@@ -99,6 +109,66 @@ class Report:
     notes: list[str] = field(default_factory=list)
 
 
+def _public_declaration_end(lines: list[tuple[str, str]], start: int) -> int:
+    """Return the last logical line that belongs to a public/open declaration."""
+    first = lines[start][1]
+    if PUBLIC_CALLABLE_PATTERN.search(first):
+        depth = 0
+        saw_paren = False
+        end = start
+        for index in range(start, len(lines)):
+            text = lines[index][1]
+            depth += text.count("(") - text.count(")")
+            saw_paren = saw_paren or "(" in text
+            end = index
+            if saw_paren and depth > 0:
+                continue
+            if index + 1 < len(lines):
+                nxt = lines[index + 1][1].lstrip()
+                if nxt.startswith(("->", "where ", "async ", "throws ", "rethrows ")):
+                    continue
+            break
+        return end
+
+    if PUBLIC_TYPE_PATTERN.search(first):
+        end = start
+        for index in range(start, len(lines)):
+            text = lines[index][1]
+            end = index
+            if "{" in text:
+                break
+            stripped = text.rstrip()
+            nxt = lines[index + 1][1].lstrip() if index + 1 < len(lines) else ""
+            if not (
+                stripped.endswith((",", ":", " where"))
+                or nxt.startswith(("{", "where ", ","))
+            ):
+                break
+        return end
+
+    return start
+
+
+def _hunk_changes_public_api(hunk: list[tuple[str, str]]) -> bool:
+    """Check old and new logical hunk views for edits inside public API signatures."""
+    for changed_prefix in ("+", "-"):
+        logical = [
+            (prefix, text)
+            for prefix, text in hunk
+            if prefix == " " or prefix == changed_prefix
+        ]
+        for index, (prefix, text) in enumerate(logical):
+            if not PUBLIC_API_PATTERN.search(text):
+                continue
+            end = _public_declaration_end(logical, index)
+            if any(
+                logical[pos][0] == changed_prefix
+                for pos in range(index, end + 1)
+            ):
+                return True
+    return False
+
+
 def classify_sensitive(paths: list[str], diff: str) -> list[str]:
     """Return sorted, de-duplicated reasons a change needs human review."""
     reasons: set[str] = set()
@@ -106,17 +176,16 @@ def classify_sensitive(paths: list[str], diff: str) -> list[str]:
         for pattern, reason in SENSITIVE_PATHS:
             if fnmatch.fnmatch(path.lower(), pattern.lower()):
                 reasons.add(f"{reason}: {path}")
+
     current_path = ""
     old_path = ""
-    hunk_has_change = False
-    hunk_has_public_api = False
+    hunk: list[tuple[str, str]] = []
 
     def flush_hunk() -> None:
-        nonlocal hunk_has_change, hunk_has_public_api
-        if current_path.lower().endswith(".swift") and hunk_has_change and hunk_has_public_api:
+        nonlocal hunk
+        if current_path.lower().endswith(".swift") and _hunk_changes_public_api(hunk):
             reasons.add("public-api")
-        hunk_has_change = False
-        hunk_has_public_api = False
+        hunk = []
 
     for line in diff.splitlines():
         if line.startswith("--- "):
@@ -134,14 +203,12 @@ def classify_sensitive(paths: list[str], diff: str) -> list[str]:
         if not line or line[0] not in " +-":
             continue
 
-        content = line[1:]
-        if line[0] in "+-":
-            hunk_has_change = True
+        prefix, content = line[0], line[1:]
+        hunk.append((prefix, content))
+        if prefix in "+-":
             for pattern, reason in SENSITIVE_CONTENT:
                 if pattern.search(content):
                     reasons.add(reason)
-        if PUBLIC_API_PATTERN.search(content):
-            hunk_has_public_api = True
 
     flush_hunk()
     return sorted(reasons)
