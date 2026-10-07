@@ -69,6 +69,26 @@ let script = MockScript(steps: [
 let connector = MockConnector(id: ConnectorID(rawValue: "mock.custom"), displayName: "Custom", script: script)
 ```
 
+## PaperclipConnector
+
+`PaperclipConnector` is the first real runtime connector. It is intentionally read-only and only
+uses GET requests for health, company discovery, dashboard summary, agents, issues, and approvals.
+
+- The Paperclip base URL and company selection are local `UserDefaults` settings.
+- No endpoint, company ID, credential, Pixel HQ org detail, adapter command, environment value, or
+  secret is compiled into the public repository.
+- Network work happens asynchronously. `Connector.refresh()` only starts/coalesces a refresh and
+  the UI reads the most recent synchronized cache.
+- Agent payloads are decoded into narrow DTOs: only identity/status/timestamps needed for generic
+  companion activity are read. Adapter configuration and other runtime internals are ignored.
+- Multiple companies can be discovered before a company is selected. A single active company may
+  be selected automatically in memory.
+- Approval data is display-only. There are no approve/reject/send/deploy mutation APIs in the
+  connector.
+
+For local/private deployments, point Settings at the URL that is reachable from the Mac (for
+example a user-managed tunnel or private network address) and select the desired company.
+
 ## Adding a real connector
 
 1. Implement `Connector` and whichever capability protocols the service supports, in a new file or
