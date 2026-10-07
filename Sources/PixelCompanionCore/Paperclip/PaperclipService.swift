@@ -279,20 +279,22 @@ private extension URLSessionPaperclipService {
             queryItems: [URLQueryItem(name: "limit", value: "40")],
             as: [PaperclipHeartbeatRunResponse].self
         ) { result in
+            let runs: [PaperclipHeartbeatRunResponse]
             switch result {
-            case let .failure(error):
-                completion(.failure(error))
-            case let .success(runs):
-                completion(.success(PaperclipMapper.map(PaperclipMappingInput(
-                    companies: payload.context.companies,
-                    company: payload.context.company,
-                    dashboard: payload.dashboard,
-                    agents: payload.agents,
-                    issues: payload.issues,
-                    approvals: payload.approvals,
-                    runs: runs
-                ))))
+            case .failure:
+                runs = []
+            case let .success(value):
+                runs = value
             }
+            completion(.success(PaperclipMapper.map(PaperclipMappingInput(
+                companies: payload.context.companies,
+                company: payload.context.company,
+                dashboard: payload.dashboard,
+                agents: payload.agents,
+                issues: payload.issues,
+                approvals: payload.approvals,
+                runs: runs
+            ))))
         }
     }
 }
