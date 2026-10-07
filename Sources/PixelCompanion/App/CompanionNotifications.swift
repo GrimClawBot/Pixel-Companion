@@ -229,6 +229,8 @@ final class CompanionNotificationManager {
     func refreshPermission() {
         guard enabled else { setPermission(.off); return }
         guard isBundled else { setPermission(.unavailable); return }
+        // Never invalidate an in-flight permission prompt when the app gains focus.
+        guard permission != .checking else { return }
         authorizationGeneration += 1
         let generation = authorizationGeneration
         if permission == .off { setPermission(.checking) }

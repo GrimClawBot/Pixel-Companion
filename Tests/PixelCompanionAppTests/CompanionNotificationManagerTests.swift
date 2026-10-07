@@ -97,6 +97,23 @@ final class CompanionNotificationManagerTests: XCTestCase {
         XCTAssertTrue(center.delivered.isEmpty)
     }
 
+    func testAppActivationDoesNotCancelInFlightPermissionPrompt() async {
+        let center = FakeCenter()
+        let manager = makeManager(center: center)
+        manager.setEnabled(true)
+        manager.observe(snapshot(["old"]), isPaperclip: true)
+        manager.observe(snapshot(["old", "new"]), isPaperclip: true)
+        await drain()
+        XCTAssertEqual(center.permissionRequests, 1)
+        center.authorizationValue = .notDetermined
+        manager.refreshPermission()
+        XCTAssertEqual(manager.permission, .checking)
+        center.answer(true)
+        await drain()
+        XCTAssertEqual(manager.permission, .ready)
+        XCTAssertEqual(center.delivered, [.approvals(1)])
+    }
+
     func testDisableDuringPermissionRequestInvalidatesResult() async {
         let center = FakeCenter()
         let manager = makeManager(center: center)
