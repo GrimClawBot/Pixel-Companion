@@ -79,7 +79,9 @@ enum AgentSessionPresentation {
         case .cancelled: return "Cancelled"
         case .idle: return "Idle"
         case .unknown:
-            let status = session.agentStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+            let status = session.agentStatus
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "_", with: " ")
             return status.isEmpty ? "Unknown" : status.capitalized
         }
     }
@@ -139,14 +141,14 @@ enum AgentSessionPresentation {
     }
 
     private static func count(_ value: Int) -> String {
-        let magnitude = abs(value)
-        if magnitude >= 1_000_000 {
-            return String(format: "%.1fM", Double(value) / 1_000_000)
+        let safeValue = max(value, 0)
+        if safeValue >= 1_000_000 {
+            return String(format: "%.1fM", Double(safeValue) / 1_000_000)
         }
-        if magnitude >= 1_000 {
-            return String(format: "%.1fK", Double(value) / 1_000)
+        if safeValue >= 1_000 {
+            return String(format: "%.1fK", Double(safeValue) / 1_000)
         }
-        return "\(value)"
+        return "\(safeValue)"
     }
 }
 
