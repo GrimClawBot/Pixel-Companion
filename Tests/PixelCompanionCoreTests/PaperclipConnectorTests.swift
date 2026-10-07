@@ -101,7 +101,8 @@ final class PaperclipConnectorTests: XCTestCase {
             companyName: "Example Co",
             activity: [activity],
             approvals: [approval],
-            usage: UsageSnapshot(used: 25, limit: 100, unit: "cents", periodLabel: "This month")
+            usage: UsageSnapshot(used: 25, limit: 100, unit: "cents", periodLabel: "This month"),
+            agentSessions: []
         )))
 
         XCTAssertEqual(connector.connectionState, .connected)
@@ -133,6 +134,12 @@ final class PaperclipConnectorTests: XCTestCase {
             XCTAssertEqual(state.approvals.map(\.title), ["Ship build"])
             XCTAssertEqual(state.usage?.used, 125)
             XCTAssertEqual(state.usage?.limit, 1000)
+            XCTAssertEqual(state.agentSessions.count, 2)
+            XCTAssertEqual(state.agentSessions.first?.agentName, "Builder")
+            XCTAssertEqual(state.agentSessions.first?.runState, .running)
+            XCTAssertEqual(state.agentSessions.first?.model, "gpt-5.6-sol")
+            XCTAssertEqual(state.agentSessions.first?.provider, "openai")
+            XCTAssertEqual(state.agentSessions.first?.taskTitle, "EX-1 · Build native connector")
             expectation.fulfill()
         }
         wait(for: [expectation], timeout: 2)
@@ -208,6 +215,8 @@ final class PaperclipConnectorTests: XCTestCase {
             return (200, issuesJSON())
         case "/api/companies/company-1/approvals":
             return (200, approvalsJSON())
+        case "/api/companies/company-1/heartbeat-runs":
+            return (200, heartbeatRunsJSON())
         default:
             XCTFail("Unexpected path: \(path ?? "nil")")
             return (404, Data())
@@ -223,15 +232,23 @@ final class PaperclipConnectorTests: XCTestCase {
             [
                 "id": "agent-1",
                 "name": "Builder",
+                "role": "engineer",
                 "title": "Engineer",
                 "status": "running",
+                "adapterType": "codex_local",
+                "adapterConfig": ["model": "gpt-5.6-sol"],
+                "runtimeConfig": ["aiConnection": ["provider": "openai"]],
                 "updatedAt": "2026-10-07T18:00:00.000Z"
             ],
             [
                 "id": "agent-2",
                 "name": "QA",
+                "role": "qa",
                 "title": "QA Engineer",
                 "status": "idle",
+                "adapterType": "claude_local",
+                "adapterConfig": ["model": "claude-sonnet-5-5"],
+                "runtimeConfig": ["aiConnection": ["provider": "anthropic"]],
                 "updatedAt": "2026-10-07T17:00:00.000Z"
             ]
         ])
@@ -257,6 +274,27 @@ final class PaperclipConnectorTests: XCTestCase {
             "title": "Ship build",
             "status": "pending",
             "requestedAt": "2026-10-07T18:05:00.000Z"
+        ]])
+    }
+
+
+    private func heartbeatRunsJSON() -> Data {
+        json([[
+            "id": "run-1",
+            "agentId": "agent-1",
+            "status": "running",
+            "startedAt": "2026-10-07T18:11:00.000Z",
+            "createdAt": "2026-10-07T18:11:00.000Z",
+            "updatedAt": "2026-10-07T18:12:00.000Z",
+            "usageJson": [
+                "model": "gpt-5.6-sol",
+                "provider": "openai",
+                "inputTokens": 1200,
+                "cachedInputTokens": 800,
+                "outputTokens": 250,
+                "persistedSessionId": "session-1"
+            ],
+            "contextSnapshot": ["issueId": "issue-1"]
         ]])
     }
 
