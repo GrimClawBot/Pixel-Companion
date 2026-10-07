@@ -287,8 +287,10 @@ enum UsagePresentation {
     }
 
     private static func currency(cents: Int) -> String {
-        (Double(cents) / 100).formatted(
-            .currency(code: "USD").locale(Locale(identifier: "en_US_POSIX"))
-        )
+        let sign = cents < 0 ? "-" : ""
+        let absolute = cents.magnitude
+        let dollars = absolute / 100
+        let remainder = absolute % 100
+        return "\(sign)$\(dollars).\(String(format: "%02d", remainder))"
     }
 }
