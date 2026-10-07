@@ -150,11 +150,8 @@ public final class PaperclipConnector:
     ) {
         update { value in
             guard generation == publishedCoreGeneration else { return }
-            switch result {
-            case let .success(sessions):
+            if case let .success(sessions) = result {
                 value.agentSessions = sessions
-            case .failure:
-                value.agentSessions = []
             }
         }
     }
@@ -168,6 +165,7 @@ public final class PaperclipConnector:
         value.activity = state.activity
         value.approvals = state.approvals
         value.usage = state.usage
+        value.agentSessions = state.agentSessions
     }
 
     private static func initialCache(_ configuration: PaperclipConfiguration) -> Cache {
