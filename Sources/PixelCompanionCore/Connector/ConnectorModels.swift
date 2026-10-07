@@ -115,7 +115,6 @@ public struct ChatMessage: Identifiable, Hashable, Sendable {
     }
 }
 
-
 /// Read-only summary of one agent and its active or most recent execution session.
 public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     public enum RunState: String, CaseIterable, Sendable {
