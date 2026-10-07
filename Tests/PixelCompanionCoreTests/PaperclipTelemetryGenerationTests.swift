@@ -74,6 +74,29 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
         XCTAssertEqual(connector.agentSessions(limit: 8), [current])
     }
 
+
+    func testOlderTelemetryCannotReturnAfterNewerCoreFailure() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(),
+            service: service
+        )
+        let core = coreState()
+        let stale = session(id: "stale")
+
+        connector.refresh()
+        service.finishCore(.success(core), fetch: 1)
+
+        connector.refresh()
+        service.finishCore(.failure(URLError(.timedOut)), fetch: 2)
+        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
+        XCTAssertEqual(connector.connectionState, .error)
+
+        service.finishSessions(.success([stale]), fetch: 1)
+        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
+        XCTAssertEqual(connector.connectionState, .error)
+    }
+
     private func selectedConfiguration() -> PaperclipConfiguration {
         PaperclipConfiguration(
             baseURLString: "https://paperclip.example",
