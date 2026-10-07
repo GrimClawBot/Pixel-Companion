@@ -23,6 +23,10 @@ final class AppModel: ObservableObject {
         self.settings = settings
     }
 
+    deinit {
+        stepTimer?.invalidate()
+    }
+
     // MARK: Settings
 
     var connectorID: ConnectorID {
