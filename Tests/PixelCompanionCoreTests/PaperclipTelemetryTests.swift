@@ -127,6 +127,54 @@ final class PaperclipTelemetryTests: XCTestCase {
         wait(for: [sessionExpectation], timeout: 2)
     }
 
+
+    func testMalformedOptionalAgentTelemetryDoesNotBlockCoreRefresh() {
+        let service = makeService()
+        TelemetryStubURLProtocol.handler = { request in
+            switch request.url?.path {
+            case "/api/companies/company-1/agents":
+                return (200, self.json([[
+                    "id": "agent-1",
+                    "name": "Builder",
+                    "status": "running",
+                    "adapterConfig": "malformed",
+                    "runtimeConfig": ["aiConnection": "malformed"],
+                    "updatedAt": "2026-10-07T18:00:00.000Z"
+                ]]))
+            case "/api/companies/company-1/heartbeat-runs",
+                 "/api/companies/company-1/live-runs":
+                return (200, self.json([]))
+            default:
+                return self.coreResponse(for: request.url?.path)
+            }
+        }
+
+        let coreExpectation = expectation(description: "Core survives optional telemetry shape drift")
+        let sessionExpectation = expectation(description: "Telemetry completes")
+        service.fetch(
+            configuration: selectedConfiguration(),
+            completion: { result in
+                guard case let .success(state) = result else {
+                    XCTFail("Expected core refresh to ignore malformed optional agent telemetry")
+                    coreExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(state.companyName, "Example Co")
+                XCTAssertEqual(state.activity.first?.title, "Builder · running")
+                coreExpectation.fulfill()
+            },
+            sessionCompletion: { result in
+                guard case .success = result else {
+                    XCTFail("Expected telemetry request to complete")
+                    sessionExpectation.fulfill()
+                    return
+                }
+                sessionExpectation.fulfill()
+            }
+        )
+        wait(for: [coreExpectation, sessionExpectation], timeout: 2)
+    }
+
     func testTelemetryFailureDoesNotBlockCoreSuccess() {
         let service = makeService()
         TelemetryStubURLProtocol.handler = { request in
