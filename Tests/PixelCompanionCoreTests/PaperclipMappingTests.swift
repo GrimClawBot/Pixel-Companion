@@ -4,56 +4,7 @@ import XCTest
 
 final class PaperclipMappingTests: XCTestCase {
     func testDuplicateAgentIDsDoNotCrashMapper() {
-        let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
-        let input = PaperclipMappingInput(
-            companies: [company],
-            company: company,
-            dashboard: PaperclipDashboardResponse(
-                costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
-            ),
-            agents: [
-                PaperclipAgentResponse(
-                    id: "agent-1",
-                    name: "Old Name",
-                    role: nil,
-                    title: nil,
-                    status: "idle",
-                    adapterType: nil,
-                    adapterConfig: nil,
-                    runtimeConfig: nil,
-                    lastHeartbeatAt: nil,
-                    updatedAt: "2026-10-07T17:00:00.000Z"
-                ),
-                PaperclipAgentResponse(
-                    id: "agent-1",
-                    name: "Current Name",
-                    role: nil,
-                    title: nil,
-                    status: "idle",
-                    adapterType: nil,
-                    adapterConfig: nil,
-                    runtimeConfig: nil,
-                    lastHeartbeatAt: nil,
-                    updatedAt: "2026-10-07T18:00:00.000Z"
-                )
-            ],
-            issues: [
-                PaperclipIssueResponse(
-                    id: "issue-1",
-                    identifier: "EX-1",
-                    title: "Duplicate-safe mapping",
-                    status: "in_progress",
-                    assigneeAgentId: "agent-1",
-                    lastActivityAt: "2026-10-07T19:00:00.000Z",
-                    updatedAt: nil,
-                    createdAt: nil
-                )
-            ],
-            approvals: [],
-            runs: []
-        )
-
-        let state = PaperclipMapper.map(input)
+        let state = PaperclipMapper.map(makeDuplicateAgentInput())
 
         XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Current Name")
         XCTAssertEqual(state.agentSessions.count, 1)
@@ -143,6 +94,58 @@ final class PaperclipMappingTests: XCTestCase {
 
         XCTAssertEqual(connector.currentActivity, newestFailure)
     }
+}
+
+
+private func makeDuplicateAgentInput() -> PaperclipMappingInput {
+    let company = PaperclipCompany(id: "company-1", name: "Example Co", status: "active")
+    return PaperclipMappingInput(
+        companies: [company],
+        company: company,
+        dashboard: PaperclipDashboardResponse(
+            costs: PaperclipDashboardResponse.Costs(monthSpendCents: 0, monthBudgetCents: 0)
+        ),
+        agents: [
+            PaperclipAgentResponse(
+                id: "agent-1",
+                name: "Old Name",
+                role: nil,
+                title: nil,
+                status: "idle",
+                adapterType: nil,
+                adapterConfig: nil,
+                runtimeConfig: nil,
+                lastHeartbeatAt: nil,
+                updatedAt: "2026-10-07T17:00:00.000Z"
+            ),
+            PaperclipAgentResponse(
+                id: "agent-1",
+                name: "Current Name",
+                role: nil,
+                title: nil,
+                status: "idle",
+                adapterType: nil,
+                adapterConfig: nil,
+                runtimeConfig: nil,
+                lastHeartbeatAt: nil,
+                updatedAt: "2026-10-07T18:00:00.000Z"
+            )
+        ],
+        issues: [
+            PaperclipIssueResponse(
+                id: "issue-1",
+                identifier: "EX-1",
+                title: "Duplicate-safe mapping",
+                status: "in_progress",
+                assigneeAgentId: "agent-1",
+                lastActivityAt: "2026-10-07T19:00:00.000Z",
+                updatedAt: nil,
+                createdAt: nil
+            )
+        ],
+        approvals: [],
+        runs: []
+    )
 }
 
 private func makeSessionMappingInput() -> PaperclipMappingInput {
