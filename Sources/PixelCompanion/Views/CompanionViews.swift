@@ -47,7 +47,7 @@ struct SnapshotContent: View {
                 SectionTitle(text: "Now")
                 ActivityRow(event: activity, emphasizesTitle: true)
             }
-            if !snapshot.pendingApprovals.isEmpty {
+            if !visibleApprovals.isEmpty {
                 HStack {
                     SectionTitle(text: "Waiting on you")
                     Spacer()
@@ -77,7 +77,11 @@ struct DetailContent: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     if !snapshot.pendingApprovals.isEmpty {
-                        SectionTitle(text: "Pending approvals")
+                        HStack {
+                            SectionTitle(text: "Pending approvals")
+                            Spacer()
+                            ApprovalCountBadge(count: snapshot.pendingApprovals.count)
+                        }
                         ForEach(snapshot.pendingApprovals) { approval in
                             ApprovalRow(approval: approval)
                         }
@@ -178,6 +182,7 @@ struct ApprovalRow: View {
             Text(approval.title)
                 .font(.callout)
                 .lineLimit(1)
+                .accessibilityLabel("Waiting for approval: \(approval.title)")
             Spacer(minLength: 0)
             if ApprovalPresentation.showsTimestamp(approval) {
                 Text(approval.requestedAt, style: .relative)
