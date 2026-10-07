@@ -124,60 +124,84 @@ final class PaperclipConnectorTests: XCTestCase {
         XCTAssertEqual(service.fetchCount, 2)
     }
 
-    func testURLServiceMapsOnlyReadOnlyDashboardData() {
+    func testURLServiceMapsCoreAndSessionTelemetrySeparately() {
         let service = makeService()
         installDashboardFixture()
 
-        let expectation = expectation(description: "Paperclip fetch")
-        service.fetch(configuration: selectedConfiguration()) { result in
-            guard case let .success(state) = result else {
-                XCTFail("Expected successful mapping: \(result)")
-                expectation.fulfill()
-                return
+        let coreExpectation = expectation(description: "Paperclip core fetch")
+        let sessionExpectation = expectation(description: "Paperclip session enrichment")
+        service.fetch(
+            configuration: selectedConfiguration(),
+            completion: { result in
+                guard case let .success(state) = result else {
+                    XCTFail("Expected successful core mapping: \(result)")
+                    coreExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(state.companyName, "Example Co")
+                XCTAssertEqual(state.companies.count, 1)
+                XCTAssertEqual(state.activity.first?.title, "Build native connector")
+                XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Builder")
+                XCTAssertTrue(state.activity.contains { $0.title == "Builder · running" })
+                XCTAssertEqual(state.approvals.map(\.title), ["Ship build"])
+                XCTAssertEqual(state.usage?.used, 125)
+                XCTAssertEqual(state.usage?.limit, 1000)
+                XCTAssertTrue(state.agentSessions.isEmpty)
+                coreExpectation.fulfill()
+            },
+            sessionCompletion: { result in
+                guard case let .success(sessions) = result else {
+                    XCTFail("Expected successful session enrichment: \(result)")
+                    sessionExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(sessions.count, 2)
+                XCTAssertEqual(sessions.first?.agentName, "Builder")
+                XCTAssertEqual(sessions.first?.runState, .running)
+                XCTAssertEqual(sessions.first?.model, "gpt-5.6-sol")
+                XCTAssertEqual(sessions.first?.provider, "openai")
+                XCTAssertEqual(sessions.first?.taskTitle, "EX-1 · Build native connector")
+                sessionExpectation.fulfill()
             }
-            XCTAssertEqual(state.companyName, "Example Co")
-            XCTAssertEqual(state.companies.count, 1)
-            XCTAssertEqual(state.activity.first?.title, "Build native connector")
-            XCTAssertEqual(state.activity.first?.detail, "EX-1 · in progress · Builder")
-            XCTAssertTrue(state.activity.contains { $0.title == "Builder · running" })
-            XCTAssertEqual(state.approvals.map(\.title), ["Ship build"])
-            XCTAssertEqual(state.usage?.used, 125)
-            XCTAssertEqual(state.usage?.limit, 1000)
-            XCTAssertEqual(state.agentSessions.count, 2)
-            XCTAssertEqual(state.agentSessions.first?.agentName, "Builder")
-            XCTAssertEqual(state.agentSessions.first?.runState, .running)
-            XCTAssertEqual(state.agentSessions.first?.model, "gpt-5.6-sol")
-            XCTAssertEqual(state.agentSessions.first?.provider, "openai")
-            XCTAssertEqual(state.agentSessions.first?.taskTitle, "EX-1 · Build native connector")
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 2)
+        )
+        wait(for: [coreExpectation, sessionExpectation], timeout: 2)
     }
 
     func testRunTelemetryFailureDoesNotBreakBaseConnectorData() {
         let service = makeService()
         StubURLProtocol.handler = { request in
-            if request.url?.path == "/api/companies/company-1/heartbeat-runs" {
+            if request.url?.path.hasSuffix("/heartbeat-runs") == true
+                || request.url?.path.hasSuffix("/live-runs") == true {
                 return (403, Data("{}".utf8))
             }
             return self.dashboardResponse(for: request.url?.path)
         }
 
-        let expectation = expectation(description: "Paperclip partial fetch")
-        service.fetch(configuration: selectedConfiguration()) { result in
-            guard case let .success(state) = result else {
-                XCTFail("Expected base connector data to survive telemetry failure: \(result)")
-                expectation.fulfill()
-                return
+        let coreExpectation = expectation(description: "Paperclip core fetch")
+        let sessionExpectation = expectation(description: "Paperclip telemetry failure")
+        service.fetch(
+            configuration: selectedConfiguration(),
+            completion: { result in
+                guard case let .success(state) = result else {
+                    XCTFail("Expected base connector data to survive telemetry failure: \(result)")
+                    coreExpectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(state.companyName, "Example Co")
+                XCTAssertEqual(state.activity.first?.title, "Build native connector")
+                XCTAssertTrue(state.agentSessions.isEmpty)
+                coreExpectation.fulfill()
+            },
+            sessionCompletion: { result in
+                guard case .failure = result else {
+                    XCTFail("Expected optional telemetry failure")
+                    sessionExpectation.fulfill()
+                    return
+                }
+                sessionExpectation.fulfill()
             }
-            XCTAssertEqual(state.companyName, "Example Co")
-            XCTAssertEqual(state.activity.first?.title, "Build native connector")
-            XCTAssertEqual(state.agentSessions.count, 2)
-            XCTAssertTrue(state.agentSessions.allSatisfy { $0.runID == nil })
-            XCTAssertEqual(state.agentSessions.first?.model, "gpt-5.6-sol")
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 2)
+        )
+        wait(for: [coreExpectation, sessionExpectation], timeout: 2)
     }
 
     func testURLServiceReportsHTTPFailure() {
@@ -185,15 +209,19 @@ final class PaperclipConnectorTests: XCTestCase {
         StubURLProtocol.handler = { _ in (503, Data("{}".utf8)) }
 
         let expectation = expectation(description: "Paperclip failure")
-        service.fetch(configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example")) { result in
-            guard case let .failure(error) = result else {
-                XCTFail("Expected failure")
+        service.fetch(
+            configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example"),
+            completion: { result in
+                guard case let .failure(error) = result else {
+                    XCTFail("Expected failure")
+                    expectation.fulfill()
+                    return
+                }
+                XCTAssertEqual(error.localizedDescription, "Paperclip returned HTTP 503.")
                 expectation.fulfill()
-                return
-            }
-            XCTAssertEqual(error.localizedDescription, "Paperclip returned HTTP 503.")
-            expectation.fulfill()
-        }
+            },
+            sessionCompletion: { _ in }
+        )
         wait(for: [expectation], timeout: 2)
     }
 
@@ -215,17 +243,21 @@ final class PaperclipConnectorTests: XCTestCase {
         }
 
         let expectation = expectation(description: "Company discovery")
-        service.fetch(configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example")) { result in
-            guard case let .success(state) = result else {
-                XCTFail("Expected discovery success")
+        service.fetch(
+            configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example"),
+            completion: { result in
+                guard case let .success(state) = result else {
+                    XCTFail("Expected discovery success")
+                    expectation.fulfill()
+                    return
+                }
+                XCTAssertNil(state.companyID)
+                XCTAssertEqual(state.companies.map(\.name), ["Alpha", "Beta"])
+                XCTAssertTrue(state.activity.isEmpty)
                 expectation.fulfill()
-                return
-            }
-            XCTAssertNil(state.companyID)
-            XCTAssertEqual(state.companies.map(\.name), ["Alpha", "Beta"])
-            XCTAssertTrue(state.activity.isEmpty)
-            expectation.fulfill()
-        }
+            },
+            sessionCompletion: { _ in }
+        )
         wait(for: [expectation], timeout: 2)
     }
 
@@ -258,6 +290,8 @@ private extension PaperclipConnectorTests {
         case "/api/companies/company-1/approvals":
             return (200, approvalsJSON())
         case "/api/companies/company-1/heartbeat-runs":
+            return (200, heartbeatRunsJSON())
+        case "/api/companies/company-1/live-runs":
             return (200, heartbeatRunsJSON())
         default:
             XCTFail("Unexpected path: \(path ?? "nil")")
