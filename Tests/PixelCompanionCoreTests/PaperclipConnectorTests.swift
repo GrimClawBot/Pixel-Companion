@@ -145,6 +145,33 @@ final class PaperclipConnectorTests: XCTestCase {
         wait(for: [expectation], timeout: 2)
     }
 
+
+    func testRunTelemetryFailureDoesNotBreakBaseConnectorData() {
+        let service = makeService()
+        StubURLProtocol.handler = { request in
+            if request.url?.path == "/api/companies/company-1/heartbeat-runs" {
+                return (403, Data("{}".utf8))
+            }
+            return self.dashboardResponse(for: request.url?.path)
+        }
+
+        let expectation = expectation(description: "Paperclip partial fetch")
+        service.fetch(configuration: selectedConfiguration()) { result in
+            guard case let .success(state) = result else {
+                XCTFail("Expected base connector data to survive telemetry failure: \(result)")
+                expectation.fulfill()
+                return
+            }
+            XCTAssertEqual(state.companyName, "Example Co")
+            XCTAssertEqual(state.activity.first?.title, "Build native connector")
+            XCTAssertEqual(state.agentSessions.count, 2)
+            XCTAssertTrue(state.agentSessions.allSatisfy { $0.runID == nil })
+            XCTAssertEqual(state.agentSessions.first?.model, "gpt-5.6-sol")
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2)
+    }
+
     func testURLServiceReportsHTTPFailure() {
         let service = makeService()
         StubURLProtocol.handler = { _ in (503, Data("{}".utf8)) }
@@ -197,6 +224,10 @@ final class PaperclipConnectorTests: XCTestCase {
     private func installDashboardFixture() {
         StubURLProtocol.handler = { request in
             XCTAssertEqual(request.httpMethod, "GET")
+            if request.url?.path == "/api/companies/company-1/heartbeat-runs" {
+                let components = URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)
+                XCTAssertEqual(components?.queryItems?.first(where: { $0.name == "limit" })?.value, "40")
+            }
             return self.dashboardResponse(for: request.url?.path)
         }
     }
