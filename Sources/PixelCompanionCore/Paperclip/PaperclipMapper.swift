@@ -58,7 +58,6 @@ enum PaperclipMapper {
         )
     }
 
-
     private static func agentSessions(_ input: PaperclipMappingInput) -> [AgentSessionSnapshot] {
         let issuesByID = input.issues.reduce(into: [String: PaperclipIssueResponse]()) { values, issue in
             values[issue.id] = issue
