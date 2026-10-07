@@ -1,17 +1,17 @@
 import PixelCompanionCore
 import SwiftUI
 
-/// Panel sizes per surface. The compact surface is exactly the physical notch width so the
-/// companion never overlays or intercepts adjacent menu-bar items. Expanded surfaces may grow
-/// below and beyond the notch while the user is actively interacting with the companion.
+/// Panel sizes per surface. Compact mode stays within the physical notch width and adds a
+/// short status strip below the camera housing, so adjacent menu-bar items remain untouched.
 enum NotchLayout {
+    static let compactBarHeight: CGFloat = 24
     static let snapshotSize = CGSize(width: 400, height: 200)
     static let detailSize = CGSize(width: 440, height: 440)
 
     static func size(for surface: NotchSurface, notchSize: CGSize) -> CGSize {
         switch surface {
         case .compact:
-            return notchSize
+            return CGSize(width: notchSize.width, height: notchSize.height + compactBarHeight)
         case .snapshot:
             return CGSize(
                 width: max(snapshotSize.width, notchSize.width),
@@ -43,10 +43,18 @@ struct NotchRootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            CompactBar(snapshot: model.snapshot, mood: model.mood)
-                .frame(height: state.notchSize.height)
-                .padding(.horizontal, 12)
-            expandedContent
+            if state.surface == .compact {
+                Color.clear
+                    .frame(height: state.notchSize.height)
+                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                    .frame(height: NotchLayout.compactBarHeight)
+                    .padding(.horizontal, 8)
+            } else {
+                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                    .frame(height: state.notchSize.height)
+                    .padding(.horizontal, 12)
+                expandedContent
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(
@@ -73,7 +81,7 @@ struct NotchRootView: View {
     }
 }
 
-/// The always-visible strip: character on the left wing, status on the right wing.
+/// The compact status strip: character on the left, status on the right.
 struct CompactBar: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
