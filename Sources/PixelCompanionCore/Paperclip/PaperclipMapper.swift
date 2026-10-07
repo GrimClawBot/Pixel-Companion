@@ -69,9 +69,7 @@ enum PaperclipMapper {
 
         return agentsByID.values.map { agent in
             let runs = (runsByAgent[agent.id] ?? []).sorted { runTimestamp($0) > runTimestamp($1) }
-            let selectedRun = runs.first(where: { isActiveRun($0.status) })
-                ?? runs.first(where: { isConfirmedRecentRun($0.status) })
-                ?? runs.first
+            let selectedRun = preferredRun(from: runs)
             let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
             let usage = selectedRun?.usageJson
             let taskTitle = issue.map { issue in
@@ -112,6 +110,14 @@ enum PaperclipMapper {
             if leftDate != rightDate { return leftDate > rightDate }
             return lhs.agentName.localizedCaseInsensitiveCompare(rhs.agentName) == .orderedAscending
         }
+    }
+
+    private static func preferredRun(
+        from runs: [PaperclipHeartbeatRunResponse]
+    ) -> PaperclipHeartbeatRunResponse? {
+        runs.first(where: { isActiveRun($0.status) })
+            ?? runs.first(where: { isConfirmedRecentRun($0.status) })
+            ?? runs.first
     }
 
     private static func runTimestamp(_ run: PaperclipHeartbeatRunResponse) -> Date {
