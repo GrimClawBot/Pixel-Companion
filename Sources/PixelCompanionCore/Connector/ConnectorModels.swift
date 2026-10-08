@@ -147,6 +147,8 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     /// Context occupancy is known only if the runtime reports both exact values.
     public let contextUsedTokens: Int?
     public let contextWindowTokens: Int?
+    /// At most five recent runs returned by the current bounded telemetry fetch.
+    public let recentRuns: [AgentRunSnapshot]
     public let startedAt: Date?
     public let finishedAt: Date?
     public let updatedAt: Date?
@@ -170,6 +172,7 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         monthlyBudgetCents: Int? = nil,
         contextUsedTokens: Int? = nil,
         contextWindowTokens: Int? = nil,
+        recentRuns: [AgentRunSnapshot] = [],
         startedAt: Date? = nil,
         finishedAt: Date? = nil,
         updatedAt: Date? = nil
@@ -192,6 +195,7 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         self.monthlyBudgetCents = monthlyBudgetCents
         self.contextUsedTokens = contextUsedTokens
         self.contextWindowTokens = contextWindowTokens
+        self.recentRuns = recentRuns
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.updatedAt = updatedAt

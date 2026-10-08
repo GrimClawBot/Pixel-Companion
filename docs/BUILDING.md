@@ -304,3 +304,27 @@ history based on matching text alone. No extra Paperclip endpoints, writes,
 data persistence, privileges or third-party dependencies are added.
 Human macOS QA must test Search and filter together, changing dates, cached
 history, approvals/messages, and both 440pt notch and 360pt menu bar.
+
+## Verified recent runs in each Agent inspector (PC-018)
+
+Paperclip telemetry already fetches up to 40 recent heartbeat runs and
+50 live runs, with each run's structured agentId. The agent inspector now
+shows a maximum of five of these already-retrieved runs, sorted newest-first
+and deduplicated by run ID. It does not send new API requests or write to
+Paperclip. A run's task label comes from its structured issueId joined to
+the current issue snapshot (which may have a newer title than at run time).
+Per-run provider/model and tokens come only from each run's usageJson, with
+invalid/negative values discarded. Missing fields, timestamps, and metrics
+are clearly unavailable. Runs that cannot be confirmed active are not shown
+as running.
+
+This is bounded recent history, not a complete historical audit trail.
+The existing latest session and monthly budget remain separate from per-run
+data. The public AgentSessionSnapshot gained the backward-compatible
+recentRuns default-empty field and the new AgentRunSnapshot type, making
+PC-018 a public API change that needs independent human/security review
+under PC-000 even when all automated checks pass.
+
+Real Mac QA: several agents, both notch/menu-bar layouts, missing runs/usage,
+newest-first order, stale/disconnected feeds, status transitions, and selecting
+another agent must not show somebody else's runs. Public release remains blocked.
