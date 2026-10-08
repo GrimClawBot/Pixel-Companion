@@ -32,6 +32,7 @@ public final class SettingsStore {
         case outputVolumeHUDEnabled = "pixelCompanion.outputVolumeHUDEnabled"
         case displayBrightnessHUDEnabled = "pixelCompanion.displayBrightnessHUDEnabled"
         case downloadHUDEnabled = "pixelCompanion.downloadHUDEnabled"
+        case fileShelfEnabled = "pixelCompanion.fileShelfEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -147,6 +148,12 @@ public final class SettingsStore {
     public var downloadHUDEnabled: Bool {
         get { (defaults.object(forKey: Key.downloadHUDEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.downloadHUDEnabled.rawValue) }
+    }
+
+    /// Explicitly selected ephemeral file references; never persisted.
+    public var fileShelfEnabled: Bool {
+        get { (defaults.object(forKey: Key.fileShelfEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.fileShelfEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.
