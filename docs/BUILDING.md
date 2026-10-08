@@ -646,3 +646,14 @@ Physical macOS Automation prompt/deny/revoke tests and actual Apple Music
 play/pause/stopped playback, VoiceOver, 360pt/440pt hardware layouts and
 signing entitlement review remain mandatory before merge or distribution.
 No Apple Events are executed in the deterministic tests.
+
+## Read-only output volume HUD (PC-033 draft)
+
+Settings → Standalone utilities → **Enable Output volume HUD** is OFF by default.
+When enabled, the Overview card shows only the default macOS audio output device’s
+reported master volume percentage and reported mute flag, read with public CoreAudio
+GET-only APIs. Devices without a readable master scalar display **unavailable**;
+missing mute-state reports remain unknown. The feature does not capture audio, ask for
+microphone access, change system sound, or persist any volume/device history. It polls
+periodically every 10 seconds, stops and clears on disable, and refreshes after wake.
+Human QA of physical output types and both layouts remains a separate release gate.

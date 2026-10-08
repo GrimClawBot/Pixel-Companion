@@ -217,6 +217,8 @@ struct SettingsView: View {
                 .accessibilityIdentifier("companion.settings.focus-timer")
             Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
                 .accessibilityIdentifier("companion.settings.battery-hud")
+            Toggle("Enable Output volume HUD", isOn: $model.outputVolumeHUDEnabled)
+                .accessibilityIdentifier("companion.settings.output-volume-hud")
             MusicSettingsControls(model: model)
             Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
                 .accessibilityIdentifier("companion.settings.calendar-widget")
@@ -230,6 +232,10 @@ struct SettingsView: View {
             }
             Text("A local 25/5/15-minute focus and break timer in Overview. " +
                  "No account, new permissions, notifications, or timer data stored on disk.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Output volume reads the default macOS sound output only. " +
+                 "No changes to volume, audio capture, or device history.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text("Battery & Power uses public macOS power information only. " +
@@ -280,6 +286,12 @@ struct SettingsView: View {
         }
     }
 
+    private var selectedSummary: String {
+        ConnectorRegistry.options.first { $0.id == model.connectorID }?.summary ?? ""
+    }
+}
+
+extension SettingsView {
     private var aboutSection: some View {
         Section("About") {
             LabeledContent("Version", value: CompanionBuildInfo.version)
@@ -289,7 +301,4 @@ struct SettingsView: View {
         }
     }
 
-    private var selectedSummary: String {
-        ConnectorRegistry.options.first { $0.id == model.connectorID }?.summary ?? ""
-    }
 }
