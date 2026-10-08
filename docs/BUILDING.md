@@ -51,3 +51,20 @@ defaults delete PixelCompanion   # domain name of an unbundled SwiftPM executabl
 
 `PixelCompanionCore` uses Foundation only and contains all of the logic, but the package also
 contains the AppKit app, so building it needs macOS.
+
+## Agent usage dashboard (PC-009, local QA)
+
+In the expanded notch or menu-bar detail view, Agent usage · latest
+reported run retains the existing sessions list and adds per-agent
+model/provider, input/cached/output token counts (for the selected reported
+run), and monthly agent spend/budget from Paperclip agent telemetry
+(spentMonthlyCents, budgetMonthlyCents). These billing amounts are not
+per-run estimates. Unknown metrics are shown as unavailable, not zero.
+
+Context percentage and 80%/90% warnings are shown only if the runtime
+explicitly returns valid usageJson.contextUsedTokens and
+usageJson.contextWindowTokens for that run. No context limit is inferred
+from a model name, the cumulative input tokens, or the number of messages.
+When Paperclip doesn't return these fields, the UI says Context usage
+unavailable. The dashboard requires no extra HTTP endpoints, credentials,
+or writes. The standalone mock connector works with no Paperclip instance.

@@ -42,6 +42,8 @@ struct PaperclipAgentResponse: Sendable {
     let runtimeConfig: PaperclipAgentRuntimeConfig?
     let lastHeartbeatAt: String?
     let updatedAt: String?
+    var spentMonthlyCents: Int?
+    var budgetMonthlyCents: Int?
 }
 
 extension PaperclipAgentResponse: Decodable {
@@ -56,6 +58,8 @@ extension PaperclipAgentResponse: Decodable {
         case runtimeConfig
         case lastHeartbeatAt
         case updatedAt
+        case spentMonthlyCents
+        case budgetMonthlyCents
     }
 
     init(from decoder: Decoder) throws {
@@ -71,6 +75,8 @@ extension PaperclipAgentResponse: Decodable {
         runtimeConfig = try? container.decode(PaperclipAgentRuntimeConfig.self, forKey: .runtimeConfig)
         lastHeartbeatAt = try? container.decode(String.self, forKey: .lastHeartbeatAt)
         updatedAt = try? container.decode(String.self, forKey: .updatedAt)
+        spentMonthlyCents = try? container.decode(Int.self, forKey: .spentMonthlyCents)
+        budgetMonthlyCents = try? container.decode(Int.self, forKey: .budgetMonthlyCents)
     }
 }
 
@@ -81,6 +87,9 @@ struct PaperclipHeartbeatRunResponse: Decodable, Sendable {
         let inputTokens: Int?
         let cachedInputTokens: Int?
         let outputTokens: Int?
+        /// Optional, authoritative runtime context metrics; absent in many Paperclip installs.
+        var contextUsedTokens: Int?
+        var contextWindowTokens: Int?
         let persistedSessionId: String?
     }
 
