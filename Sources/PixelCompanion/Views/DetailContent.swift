@@ -128,6 +128,16 @@ struct DetailContent: View {
                 metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
                        label: "Approvals", shortcut: .approvals)
             }
+            LiveOperationsPulseView(
+                sessions: liveSessions,
+                pendingApprovalCount: snapshot.pendingApprovals.count,
+                isLive: canShowLive,
+                onSelectAgent: { agentID in
+                    selectedAgentID = agentID
+                    navigate(to: .agents)
+                },
+                onShowApprovals: { navigate(to: .activity) }
+            )
             SnapshotContent(
                 snapshot: snapshot, mood: mood, approvalLimit: 2,
                 showsHeader: false
