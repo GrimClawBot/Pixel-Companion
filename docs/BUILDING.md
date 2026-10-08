@@ -236,3 +236,18 @@ enabled, in which case the selection switches without animation. No persistent
 theme settings, backend writes, network endpoints, or additional dependencies
 were added. Compare the notch (440pt) and menu-bar popover (360pt) manually for
 clipping and long text before releasing any public binary.
+
+## Detail keyboard navigation (PC-014)
+
+While the notch detail panel or menu-bar popover has keyboard focus:
+Command-1 opens Overview, Command-2 Agents, Command-3 Usage, and
+Command-4 Activity. Left/right arrows move through tabs when the tab strip
+has focus, stopping at the first/last tab. Each tab has an accessibility
+label, selected trait/value and a high-contrast underline. Content scroll
+resets to the top on tab change; a long Usage list must not leave the user
+partway down Activity. Selection remains shared in memory across the two
+surfaces. macOS Reduce Motion continues to disable navigation animations.
+
+Mac manual QA is needed for tab keyboard focus and actual VoiceOver
+announcement in both the notch and menu-bar popover; unit tests verify
+shortcut/destination logic but cannot replace interactive verification.

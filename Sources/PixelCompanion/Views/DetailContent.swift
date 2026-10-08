@@ -11,6 +11,24 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Fixed keyboard shortcuts keep destinations predictable across display modes.
+    var keyboardNumber: Character {
+        switch self {
+        case .overview: return "1"
+        case .agents: return "2"
+        case .usage: return "3"
+        case .activity: return "4"
+        }
+    }
+
+    /// Arrow navigation stops at either end rather than unexpectedly wrapping.
+    func moving(by offset: Int) -> CompanionDetailTab {
+        let tabs = Self.allCases
+        guard let index = tabs.firstIndex(of: self) else { return self }
+        let target = min(max(index + offset, 0), tabs.count - 1)
+        return tabs[target]
+    }
+
     var label: String {
         switch self {
         case .overview: return "Overview"
@@ -86,6 +104,8 @@ struct DetailContent: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 6)
             }
+            // Switching tabs creates a fresh scroll position and a predictable reading start.
+            .id(selectedTab)
             .accessibilityIdentifier("companion.detail.content")
             Divider()
             footer
@@ -102,7 +122,9 @@ struct DetailContent: View {
                         Image(systemName: tab.symbol)
                             .font(.system(size: 14, weight: .medium))
                         Text(tab.label)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(
+                                size: 10, weight: selectedTab == tab ? .semibold : .medium
+                            ))
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
@@ -123,12 +145,23 @@ struct DetailContent: View {
                     .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(KeyEquivalent(tab.keyboardNumber), modifiers: [.command])
                 .accessibilityLabel(tab.label + " tab")
                 .accessibilityValue(selectedTab == tab ? "Selected" : "Not selected")
+                .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
                 .accessibilityIdentifier("companion.tab." + tab.rawValue)
             }
         }
+        .focusable()
+        .onMoveCommand { direction in
+            switch direction {
+            case .left: navigate(to: selectedTab.moving(by: -1))
+            case .right: navigate(to: selectedTab.moving(by: 1))
+            default: break
+            }
+        }
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("companion.tabs")
     }
 
     @ViewBuilder private var tabContent: some View {
