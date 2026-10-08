@@ -35,24 +35,37 @@ if [[ "$IDENTITY" != "-" && "$MODE" != "release" ]]; then
 fi
 for tool in swift codesign sips iconutil python3 plutil; do command -v "$tool" >/dev/null; done
 plutil -lint "$ROOT/packaging/Info.plist"
+
+# An exclusive, on-filesystem directory lock prevents overlapping runs targeting the
+# same path; never remove a lock acquired by a different packaging process.
+mkdir -p "$(dirname "$OUTPUT")"
+LOCK="$OUTPUT.pixel-companion.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "Packaging already in progress (or stale lock): $LOCK" >&2
+  exit 2
+fi
+TMP=""
+STAGE=""
+cleanup() {
+  if [[ -n "$TMP" ]]; then rm -rf "$TMP"; fi
+  if [[ -n "$STAGE" ]]; then
+    # Never delete the only rollback copy, including when another app has appeared
+    # at the destination and an automatic restore cannot finish.
+    if [[ -e "$STAGE/Previous.app" ]]; then
+      echo "RECOVERY REQUIRED: previous app preserved at $STAGE/Previous.app" >&2
+    else
+      rm -rf "$STAGE"
+    fi
+  fi
+  rmdir "$LOCK" 2>/dev/null || true
+}
+trap cleanup EXIT
 cd "$ROOT"
 swift build -c "$MODE" --product PixelCompanion -Xswiftc -warnings-as-errors
 EXECUTABLE="$(swift build -c "$MODE" --show-bin-path)/PixelCompanion"
 [[ -x "$EXECUTABLE" ]] || { echo "Executable missing" >&2; exit 1; }
 
 TMP="$(mktemp -d /tmp/pixel-companion-package.XXXXXXXX)"
-STAGE=""
-cleanup() {
-  rm -rf "$TMP"
-  if [[ -n "$STAGE" ]]; then
-    if [[ -e "$STAGE/Previous.app" && ! -e "$OUTPUT" ]]; then
-      echo "RECOVERY REQUIRED: previous app preserved at $STAGE/Previous.app" >&2
-    else
-      rm -rf "$STAGE"
-    fi
-  fi
-}
-trap cleanup EXIT
 APP="$TMP/Pixel Companion.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$TMP/PixelCompanion.iconset"
 cp "$EXECUTABLE" "$APP/Contents/MacOS/PixelCompanion"
@@ -76,7 +89,6 @@ fi
 codesign --verify --strict --verbose=2 "$APP"
 
 # Stage on the destination filesystem before touching an existing bundle.
-mkdir -p "$(dirname "$OUTPUT")"
 STAGE="$(mktemp -d "$(dirname "$OUTPUT")/.pixel-companion-stage.XXXXXXXX")"
 cp -R "$APP" "$STAGE/New.app"
 codesign --verify --strict "$STAGE/New.app"

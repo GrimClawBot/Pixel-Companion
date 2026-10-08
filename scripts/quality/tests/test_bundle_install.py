@@ -53,6 +53,33 @@ class BundleInstallationTests(unittest.TestCase):
             self.assertEqual((output / "version").read_text(), "working")
             self.assertTrue(staged.exists())
 
+    def test_failed_restore_preserves_only_rollback_copy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            output = parent / "Pixel Companion.app"
+            output.mkdir()
+            (output / "version").write_text("original")
+            staged = parent / "stage" / "New.app"
+            staged.mkdir(parents=True)
+            (staged / "version").write_text("replacement")
+            original_rename = Path.rename
+
+            def interleaved_rename(path, destination):
+                if path == staged and Path(destination) == output:
+                    # Simulate a non-cooperating writer taking the output path.
+                    output.mkdir()
+                    (output / "version").write_text("competing")
+                    raise OSError("injected staged installation failure")
+                if path == staged.parent / "Previous.app" and Path(destination) == output:
+                    raise FileExistsError("a different bundle already occupies destination")
+                return original_rename(path, destination)
+
+            with mock.patch.object(Path, "rename", interleaved_rename):
+                with self.assertRaises(FileExistsError):
+                    install(staged, output, output)
+            self.assertEqual((output / "version").read_text(), "competing")
+            self.assertEqual((staged.parent / "Previous.app" / "version").read_text(), "original")
+
     def test_custom_existing_output_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
@@ -68,6 +95,21 @@ class BundleInstallationTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "darwin" and shutil.which("swift"), "macOS toolchain required")
 class RealMacOSPackagingTests(unittest.TestCase):
+    def test_concurrent_lock_blocks_packaging_before_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            output = base / "Pixel Companion.app"
+            lock = Path(str(output) + ".pixel-companion.lock")
+            lock.mkdir()
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug", "--output", str(output)],
+                cwd=base, capture_output=True, text=True, timeout=15
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("Packaging already in progress", result.stderr)
+            self.assertTrue(lock.is_dir())
+            self.assertFalse(output.exists())
+
     def test_bundle_signs_and_relative_output_respects_caller(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
