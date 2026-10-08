@@ -217,12 +217,22 @@ struct SettingsView: View {
                 .accessibilityIdentifier("companion.settings.focus-timer")
             Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
                 .accessibilityIdentifier("companion.settings.battery-hud")
+            Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
+                .accessibilityIdentifier("companion.settings.calendar-widget")
+            if model.calendarWidgetEnabled {
+                Toggle("Show event titles", isOn: $model.calendarShowTitles)
+                    .accessibilityIdentifier("companion.settings.calendar-show-titles")
+                Text("Calendar is read-only. Grant access explicitly in the widget. " +
+                     "Event titles are hidden by default; no event details are saved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Text("A local 25/5/15-minute focus and break timer in Overview. " +
                  "No account, new permissions, notifications, or timer data stored on disk.")
-            Text("Battery & Power uses public macOS power information only. " +
-                 "No permission, device history, or personal data is collected.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("Battery & Power uses public macOS power information only. " +
+                 "No permission, device history, or personal data is collected.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

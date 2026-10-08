@@ -583,3 +583,36 @@ or brightness overlays, system Now Playing and calendar integrations remain
 separate open tasks. Before release, physically test actual Mac battery/
 adapter transitions, Low Power Mode changes, both 360pt/440pt layouts,
 keyboard and VoiceOver, and an external Mac without a battery.
+
+## Optional private next Calendar event (PC-031)
+
+In Settings → Standalone utilities, Enable Calendar widget is OFF by default.
+Enabling **does not request macOS Calendar permission**. The Overview card
+then offers an explicit Grant Calendar access… button, which requests
+EventKit full read access only when clicked. A packaged app includes the
+NSCalendarsFullAccessUsageDescription reason. An unbundled swift-run
+process deliberately cannot request access without that usage description.
+
+When full access is authorized, the widget reads only the next upcoming
+calendar event from macOS EventKit, using a seven-calendar-day bounded
+window. A currently ongoing all-day event is a fallback if no future event
+exists. It shows event start time/all-day status and initially masks the
+title as "Calendar event"; Show event titles is a SEPARATE default-OFF
+setting. It neither shows nor stores attendees, location, calendar source,
+event IDs, notes or descriptions. Event summaries remain in RAM only,
+are cleared when the widget is disabled or Calendar permission becomes
+unavailable, and are never sent to Pixel HQ, Paperclip, GitHub or files.
+
+Full-access permission can be denied/restricted by macOS. The view
+honestly reports unavailable/denied/restricted/empty states and does not
+prompt automatically on first app launch, waking, or enabling Settings.
+The calendar source refreshes at most every 120 seconds while both
+enabled and authorized and on normal macOS wake. It does not create,
+modify, delete or accept Calendar invitations; no additional network
+clients, entitlement or background daemon are introduced.
+
+This is a limited third native-utility slice of original-spec issue #62.
+Real physical macOS calendar grant/deny/revoke, multiple calendars,
+recurring/all-day event, 360pt/440pt Mac UI/VoiceOver and privacy
+acceptance remain release gates. No request for actual Calendar
+permission occurs in automated tests or during QA package installation.
