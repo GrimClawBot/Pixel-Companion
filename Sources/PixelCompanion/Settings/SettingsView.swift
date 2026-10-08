@@ -127,6 +127,10 @@ struct SettingsView: View {
                         aboutSection
                     case .connections:
                         AgentHookGuidedSetupView(model: model)
+                        AgentHookVerificationSettings(
+                            codex: model.codexTurnMonitor,
+                            claude: model.claudeHookMonitor
+                        )
                         LocalConnectionHealthSettings(
                             process: model.codexProcessMonitor,
                             codex: model.codexTurnMonitor,

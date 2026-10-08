@@ -966,3 +966,32 @@ cannot be assumed to work for the VS Code Codex app-server.
 
 References: https://developers.openai.com/codex/config-reference
 and https://code.claude.com/docs/en/hooks
+
+## Verify hook delivery without provider access (PC-048)
+
+Under Settings -> Connections -> Verify hook delivery, each provider has
+a Start check and Check now action. First enable the corresponding optional
+read-only display and choose its private output folder through Guided setup
+or the provider's manual picker. Start check refreshes that already-approved
+local marker and saves its event kind/timestamp in RAM as a BASELINE.
+
+Trigger ONE NORMAL turn in the corresponding real provider manually. If the
+selected valid local marker changes to an allowlisted event with a timestamp
+from after the check started, Pixel Companion displays "New marker observed".
+The optional source monitors continue their existing 15-second polling, and
+Check now merely refreshes that already-connected local read-only source.
+Existing markers, repeated unchanged timestamp/type, files older than
+30 seconds, and events already old before arming DO NOT count. The check
+times out after 3 minutes and can be cancelled. Disconnecting or disabling
+the source clears its result, and leaving Settings resets all attempts.
+
+**Trust limitation:** this verifies only that a selected local status marker
+changed since you pressed Start. It CANNOT cryptographically authenticate
+the process that wrote the file or establish that the agent completed a
+task successfully. Another local process that can write the chosen folder
+could forge a marker. Do not use this as an authorization gate or audit
+record. Codex CLI's notify hook may not be invoked by Codex IDE app-server
+sessions; validate that provider behavior separately. Nothing in the
+verification UI creates synthetic agent events, reads private transcripts,
+configures Codex/Claude, edits a hook, launches an agent command, changes
+permissions or contacts Paperclip. The verification state is RAM-only.
