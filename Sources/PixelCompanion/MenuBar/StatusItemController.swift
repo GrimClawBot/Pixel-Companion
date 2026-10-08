@@ -27,8 +27,10 @@ final class StatusItemController: NSObject {
         statusItem.button?.action = #selector(togglePopover(_:))
 
         model.$mood
-            .combineLatest(model.$snapshot)
-            .sink { [weak self] mood, snapshot in self?.render(mood: mood, snapshot: snapshot) }
+            .combineLatest(model.$snapshot, model.$feedFreshness)
+            .sink { [weak self] mood, snapshot, freshness in
+                self?.render(mood: mood, snapshot: snapshot, freshness: freshness)
+            }
             .store(in: &subscriptions)
     }
 
@@ -47,13 +49,17 @@ final class StatusItemController: NSObject {
         }
     }
 
-    private func render(mood: CharacterMood, snapshot: ConnectorSnapshot) {
+    private func render(
+        mood: CharacterMood, snapshot: ConnectorSnapshot, freshness: FeedFreshness
+    ) {
         guard let button = statusItem.button else { return }
         let label = "Pixel Companion: \(mood.title)"
         let image = NSImage(systemSymbolName: mood.symbolName, accessibilityDescription: label)
         image?.isTemplate = true
         button.image = image
-        let activity = snapshot.currentActivity?.title ?? snapshot.connectionState.displayName
+        let activity = freshness.canPresentAsLive
+            ? (snapshot.currentActivity?.title ?? snapshot.connectionState.displayName)
+            : (freshness.warning ?? snapshot.connectionState.displayName)
         button.toolTip = "\(mood.title) · \(activity)"
     }
 }
@@ -63,7 +69,11 @@ struct MenuBarPopoverView: View {
     let openSettings: () -> Void
 
     var body: some View {
-        DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
+        DetailContent(
+            snapshot: model.snapshot, mood: model.mood,
+            openSettings: openSettings, feedFreshness: model.feedFreshness,
+            lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+        )
             .padding(16)
             .frame(width: 360, height: 440, alignment: .top)
     }

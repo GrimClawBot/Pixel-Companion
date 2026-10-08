@@ -14,6 +14,7 @@ public final class PaperclipConnector:
     private struct Cache {
         var connectionState: ConnectionState
         var lastError: String?
+        var lastSuccessfulRefreshAt: Date?
         var companyName: String?
         var companyID: String?
         var companies: [PaperclipCompany] = []
@@ -51,6 +52,8 @@ public final class PaperclipConnector:
 
     public var connectionState: ConnectionState { locked { cache.connectionState } }
     public var lastError: String? { locked { cache.lastError } }
+    /// Client-side time of the most recent successful core refresh; not server activity time.
+    public var lastSuccessfulRefreshAt: Date? { locked { cache.lastSuccessfulRefreshAt } }
     public var auth: (any AuthProvider)? { self }
     public var activity: (any ActivitySource)? { self }
     public var approvals: (any ApprovalProvider)? { self }
@@ -165,6 +168,7 @@ public final class PaperclipConnector:
         let companyChanged = value.companyID != state.companyID
         value.connectionState = .connected
         value.lastError = nil
+        value.lastSuccessfulRefreshAt = Date()
         value.companyName = state.companyName
         value.companyID = state.companyID
         value.companies = state.companies

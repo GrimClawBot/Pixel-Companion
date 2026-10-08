@@ -8,6 +8,8 @@ import PixelCompanionCore
 final class AppModel: ObservableObject {
     @Published private(set) var snapshot: ConnectorSnapshot = .noConnector
     @Published private(set) var mood: CharacterMood = .offline
+    @Published private(set) var feedFreshness: FeedFreshness = .notApplicable
+    @Published private(set) var lastSuccessfulPaperclipSync: Date?
     @Published private(set) var activeMode: PresentationMode = .menuBar
     @Published private(set) var notchAvailable = false
     @Published private(set) var paperclipCompanies: [PaperclipCompany] = []
@@ -228,7 +230,18 @@ final class AppModel: ObservableObject {
     private func capture() {
         let next = ConnectorSnapshot(capturing: connector)
         if next != snapshot { snapshot = next }
-        if stateMachine.update(with: next) != nil { mood = stateMachine.mood }
+        let syncDate = paperclipConnector?.lastSuccessfulRefreshAt
+        if lastSuccessfulPaperclipSync != syncDate { lastSuccessfulPaperclipSync = syncDate }
+        let health = FeedFreshness.evaluate(
+            isPaperclip: isPaperclipConnector,
+            state: next.connectionState,
+            lastSuccess: syncDate
+        )
+        if feedFreshness != health { feedFreshness = health }
+        _ = stateMachine.update(with: next)
+        // A delayed Paperclip poll must not leave a misleading "working" mood.
+        let nextMood: CharacterMood = health == .stale ? .offline : stateMachine.mood
+        if mood != nextMood { mood = nextMood }
         let notificationSnapshot = notificationsEnabled && isPaperclipConnector
             ? ConnectorSnapshot(capturing: connector, sessionLimit: 128) : next
         notificationManager.observe(notificationSnapshot, isPaperclip: isPaperclipConnector)
