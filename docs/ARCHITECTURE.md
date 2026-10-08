@@ -12,6 +12,8 @@ Pixel Companion is a generic standalone macOS front door, not the Pixel HQ serve
 
 The public connector protocols support optional AuthProvider, ActivitySource, ApprovalProvider, UsageProvider, AgentSessionSource, TaskSource, and read-only ChatBackend capabilities. New providers can be added behind these interfaces without requiring a Pixel HQ installation.
 
+A separately configured optional public GitHub CI side source uses a sanitized owner/repo identifier and fixed api.github.com HTTPS GET endpoints for bounded public Actions runs and PRs; no account, tokens or arbitrary network URLs. Its three-minute polling and failure state are independent of Paperclip; private repos, CI mutation and privileged GitHub integrations are not supported by this source.
+
 Run association is based on structured Paperclip agentId; assigned tasks use structured assigneeAgentId. Never infer ownership from free-form issue text, or treat input/output token totals as context occupancy. Bounded recent runs are not a full audit log. An unknown or delayed backend refresh cannot be shown as confirmed current information: agent detail, tasks, operations and warnings are suppressed until the feed is live. Existing cached event history is labeled.
 
 ## Native behaviors
