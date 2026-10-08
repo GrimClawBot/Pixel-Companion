@@ -72,7 +72,8 @@ struct MenuBarPopoverView: View {
         DetailContent(
             snapshot: model.snapshot, mood: model.mood,
             openSettings: openSettings, feedFreshness: model.feedFreshness,
-            lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+            lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+            selectedTab: $model.selectedDetailTab
         )
             .padding(16)
             .frame(width: 360, height: 440, alignment: .top)

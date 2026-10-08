@@ -10,6 +10,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var mood: CharacterMood = .offline
     @Published private(set) var feedFreshness: FeedFreshness = .notApplicable
     @Published private(set) var lastSuccessfulPaperclipSync: Date?
+    /// Transient navigation shared by the notch and the menu-bar fallback.
+    /// Never persisted or sent to Paperclip.
+    @Published var selectedDetailTab: CompanionDetailTab = .overview
     @Published private(set) var activeMode: PresentationMode = .menuBar
     @Published private(set) var notchAvailable = false
     @Published private(set) var paperclipCompanies: [PaperclipCompany] = []

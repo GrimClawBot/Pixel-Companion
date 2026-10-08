@@ -89,7 +89,8 @@ struct NotchRootView: View {
             DetailContent(
                 snapshot: model.snapshot, mood: model.mood,
                 openSettings: openSettings, feedFreshness: model.feedFreshness,
-                lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+                selectedTab: $model.selectedDetailTab
             )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)

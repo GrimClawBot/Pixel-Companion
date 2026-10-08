@@ -209,3 +209,15 @@ For macOS visual QA, verify each of the four tabs in the **notch detail** and
 the **360-point menu-bar popover**. Test clicking/keyboard navigation, long
 agent names, 0/4/many agents, connection loss, approvals, notifications,
 and switching back and forth without dismissing the detail surface.
+
+## Shared detail navigation (PC-012)
+
+The selected tab lives in the in-memory AppModel, not in UserDefaults.
+Notch details and the menu-bar fallback bind to the same selected tab. Hover
+collapse, opening the menu bar, and changing presentation mode preserve the
+selection during the current app session. Relaunching starts at Overview.
+
+The Overview Agents, Active, and Approvals summary tiles are
+keyboard-accessible navigation buttons to their respective tabs. The separate
+View usage details link opens Usage. No shortcut acts on Paperclip or
+changes its permissions.
