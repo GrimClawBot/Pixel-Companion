@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Reusable 4-destination tab strip for notch and narrow menu-bar detail.
+/// Compact native-style selection, shared between notch and menu-bar popovers.
 struct CompanionTabBar: View {
     @Binding var selectedTab: CompanionDetailTab
     let reduceMotion: Bool
@@ -12,7 +12,7 @@ struct CompanionTabBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             ForEach(CompanionDetailTab.allCases) { tab in
                 Button {
                     navigate(to: tab)
@@ -27,18 +27,12 @@ struct CompanionTabBar: View {
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .contentShape(RoundedRectangle(cornerRadius: 10))
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.primary.opacity(selectedTab == tab ? 0.18 : 0.04))
-                    )
-                    .overlay(alignment: .bottom) {
+                    .frame(height: 43)
+                    .contentShape(RoundedRectangle(cornerRadius: 9))
+                    .background {
                         if selectedTab == tab {
-                            Capsule()
-                                .fill(Color.accentColor)
-                                .frame(width: 24, height: 2)
-                                .padding(.bottom, 1)
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(Color.accentColor.opacity(0.14))
                         }
                     }
                     .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
@@ -51,6 +45,11 @@ struct CompanionTabBar: View {
                 .accessibilityIdentifier("companion.tab." + tab.rawValue)
             }
         }
+        .padding(4)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(0.055))
+        }
         .focusable()
         .onMoveCommand { direction in
             switch direction {
@@ -62,5 +61,4 @@ struct CompanionTabBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("companion.tabs")
     }
-
 }

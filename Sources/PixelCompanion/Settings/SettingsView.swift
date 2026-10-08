@@ -23,18 +23,59 @@ final class SettingsWindowController {
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
         window.title = CompanionBuildInfo.settingsTitle
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.minSize = NSSize(width: 700, height: 490)
+        window.setContentSize(NSSize(width: 850, height: 610))
         window.isReleasedWhenClosed = false
         window.center()
         return window
     }
 }
 
+/// Stable native Settings destinations; selection is a local navigation choice,
+/// never a connector mutation or a permission request.
+enum CompanionSettingsPane: String, CaseIterable, Identifiable {
+    case general
+    case connections
+    case utilities
+    case notifications
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .connections: return "Connections"
+        case .utilities: return "Utilities"
+        case .notifications: return "Notifications"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: return "gearshape"
+        case .connections: return "point.3.connected.trianglepath.dotted"
+        case .utilities: return "square.grid.2x2"
+        case .notifications: return "bell"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .general: return "Appearance, startup, and power preferences"
+        case .connections: return "Choose which sources Pixel Companion can read"
+        case .utilities: return "Optional tools that work independently of Pixel HQ"
+        case .notifications: return "Control when the Mac can alert you"
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: AppModel
-    @StateObject private var loginItem = LaunchAtLoginController()
-    @State private var paperclipBaseURLDraft: String
-    @State private var githubPublicRepositoryDraft: String
+    @StateObject var loginItem = LaunchAtLoginController()
+    @State private var selectedPane: CompanionSettingsPane = .general
+    @State var paperclipBaseURLDraft: String
+    @State var githubPublicRepositoryDraft: String
 
     init(model: AppModel) {
         self.model = model
@@ -43,270 +84,69 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        Form {
-            connectorSection
-            paperclipSection
-            githubPublicSection
-            mockSection
-            presentationSection
-            startupSection
-            energySection
-            focusTimerSection
-            notificationSection
-            aboutSection
-        }
-        .formStyle(.grouped)
-        .frame(width: 460)
-        .fixedSize()
-    }
-
-    private var connectorSection: some View {
-        Section("Connector") {
-            Picker("Connector", selection: $model.connectorID) {
-                ForEach(ConnectorRegistry.options) { option in
-                    Text(option.displayName).tag(option.id)
+        NavigationSplitView {
+            List(selection: $selectedPane) {
+                Section("Preferences") {
+                    ForEach(CompanionSettingsPane.allCases) { pane in
+                        Label(pane.title, systemImage: pane.symbol)
+                            .tag(pane)
+                            .accessibilityIdentifier("companion.settings.pane." + pane.rawValue)
+                    }
                 }
             }
-            Text(selectedSummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder private var paperclipSection: some View {
-        if model.isPaperclipConnector {
-            Section {
-                TextField("Base URL", text: $paperclipBaseURLDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
-                if model.paperclipCompanies.isEmpty {
-                    TextField("Company ID", text: $model.paperclipCompanyID)
-                        .textFieldStyle(.roundedBorder)
-                } else {
-                    Picker("Company", selection: $model.paperclipCompanyID) {
-                        Text("Choose a company").tag("")
-                        ForEach(model.paperclipCompanies) { company in
-                            Text(company.name).tag(company.id)
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 195, max: 225)
+            .accessibilityIdentifier("companion.settings.sidebar")
+        } detail: {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Image(systemName: selectedPane.symbol)
+                        .font(.title2)
+                        .foregroundStyle(.tint)
+                        .frame(width: 40, height: 40)
+                        .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 11))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(selectedPane.title)
+                            .font(.title2.weight(.semibold))
+                        Text(selectedPane.detail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+                Form {
+                    switch selectedPane {
+                    case .general:
+                        presentationSection
+                        startupSection
+                        energySection
+                        aboutSection
+                    case .connections:
+                        connectorSection
+                        paperclipSection
+                        githubPublicSection
+                        if model.isMockConnector {
+                            mockSection
                         }
+                    case .utilities:
+                        focusTimerSection
+                    case .notifications:
+                        notificationSection
                     }
                 }
-                HStack {
-                    LabeledContent("Status", value: model.snapshot.connectionState.displayName)
-                    Spacer()
-                    Button("Refresh") { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
-                }
-                if let lastSync = model.lastSuccessfulPaperclipSync {
-                    LabeledContent("Last successful sync") {
-                        Text(lastSync, style: .relative)
-                    }
-                } else {
-                    LabeledContent("Last successful sync", value: "Not yet")
-                }
-                if let warning = model.feedFreshness.warning {
-                    Text(warning)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                if let error = model.snapshot.lastError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            } header: {
-                Text("Paperclip")
-            } footer: {
-                Text("Read-only. Pixel Companion sends GET requests only and stores no Paperclip credentials.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .accessibilityIdentifier("companion.settings.details")
             }
+            .navigationTitle(selectedPane.title)
         }
-    }
-
-    private var githubPublicSection: some View {
-        Section("GitHub · public repositories only") {
-            TextField("owner/repo (optional)", text: $githubPublicRepositoryDraft)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { model.applyGitHubPublicRepository(githubPublicRepositoryDraft) }
-                .accessibilityIdentifier("companion.github.repository")
-            Button("Apply public repository") {
-                model.applyGitHubPublicRepository(githubPublicRepositoryDraft)
-            }
-            .disabled(githubPublicRepositoryDraft == model.githubPublicRepository)
-            Text("Optional. Reads public workflow runs and open PRs using GitHub GET requests. " +
-                 "No login, private repository access, credentials or GitHub actions.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let error = model.publicGitHubState.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-    }
-
-    private var mockSection: some View {
-        Section {
-            Picker("Connection", selection: $model.mockConnectionState) {
-                ForEach(ConnectionState.allCases, id: \.self) { state in
-                    Text(state.displayName).tag(state)
-                }
-            }
-            Stepper(value: $model.mockStepInterval, in: SettingsStore.stepIntervalRange, step: 1) {
-                Text("Next step every \(Int(model.mockStepInterval)) s")
-            }
-            Button("Restart script") { model.restartScript() }
-        } header: {
-            Text("Mock connector")
-        } footer: {
-            Text("Simulates the connection locally. Nothing outside this app is contacted or changed.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .disabled(!model.isMockConnector)
-    }
-
-    private var startupSection: some View {
-        Section("Startup") {
-            Toggle("Launch at Login", isOn: Binding(
-                get: { loginItem.enabled },
-                set: { loginItem.setEnabled($0) }
-            ))
-            .disabled(!loginItem.canChange)
-            .accessibilityIdentifier("companion.settings.launch-at-login")
-            Text(loginItem.statusText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if loginItem.canChange {
-                Button("Refresh login status") { loginItem.refresh() }
-                    .controlSize(.small)
-            }
-        }
-    }
-
-    private var presentationSection: some View {
-        Section("Presentation") {
-            Picker("Show in", selection: $model.presentation) {
-                ForEach(PresentationPreference.allCases, id: \.self) { preference in
-                    Text(preference.displayName).tag(preference)
-                }
-            }
-            .pickerStyle(.radioGroup)
-            LabeledContent("Now showing in", value: model.activeMode == .notch ? "Notch" : "Menu bar")
-            if !model.notchAvailable {
-                Text("No display with a notch is connected, so the menu bar is used.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var energySection: some View {
-        Section("Energy") {
-            Toggle("Conserve energy in Low Power Mode", isOn: $model.conserveEnergy)
-                .accessibilityIdentifier("companion.settings.conserve-energy")
-            Text("When macOS Low Power Mode is on, Paperclip checks slow from " +
-                 "5 seconds to 20 seconds. Mock mode and GitHub refresh are unchanged.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var notificationSection: some View {
-        Section {
-            Toggle("System notifications", isOn: $model.notificationsEnabled)
-            Text(model.notificationStatus)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if model.notificationPermissionNeedsRequest {
-                Button("Grant permission…") { model.requestNotificationPermission() }
-            }
-            Button("Send test notification") {
-                Task { await model.sendTestNotification() }
-            }
-            .disabled(!model.canSendTestNotification)
-            if CompanionBuildInfo.qaUpdate != nil {
-                Button("Simulate new approval (local QA)") { model.simulateQAEvent(.newApproval) }
-                    .disabled(!model.canSimulateQAEvent)
-                Button("Simulate run completed (local QA)") { model.simulateQAEvent(.runCompleted) }
-                    .disabled(!model.canSimulateQAEvent)
-                Button("Simulate run failed (local QA)") { model.simulateQAEvent(.runFailed) }
-                    .disabled(!model.canSimulateQAEvent)
-                Text("QA-only simulated events. No data is sent to Paperclip.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if let status = model.notificationTestStatus {
-                Text(status)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Notifications")
-        } footer: {
-            Text(
-                "Off by default. New Paperclip approvals and agent run completions/failures only. "
-                    + "No task or identity details in banners; existing events are not replayed."
-            )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var selectedSummary: String {
-        ConnectorRegistry.options.first { $0.id == model.connectorID }?.summary ?? ""
-    }
-}
-
-extension SettingsView {
-    private var focusTimerSection: some View {
-        Section("Standalone utilities") {
-            Toggle("Enable Focus timer", isOn: $model.focusTimerEnabled)
-                .accessibilityIdentifier("companion.settings.focus-timer")
-            Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
-                .accessibilityIdentifier("companion.settings.battery-hud")
-            Toggle("Enable Output volume HUD", isOn: $model.outputVolumeHUDEnabled)
-                .accessibilityIdentifier("companion.settings.output-volume-hud")
-            Toggle("Enable Display brightness HUD", isOn: $model.displayBrightnessHUDEnabled)
-                .accessibilityIdentifier("companion.settings.display-brightness-hud")
-            Toggle("Show connected download progress", isOn: $model.downloadHUDEnabled)
-                .accessibilityIdentifier("companion.settings.download-hud")
-            MusicSettingsControls(model: model)
-            Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
-                .accessibilityIdentifier("companion.settings.calendar-widget")
-            if model.calendarWidgetEnabled {
-                Toggle("Show event titles", isOn: $model.calendarShowTitles)
-                    .accessibilityIdentifier("companion.settings.calendar-show-titles")
-                Text("Calendar is read-only. Grant access explicitly in the widget. " +
-                     "Event titles are hidden by default; no event details are saved.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Text("A local 25/5/15-minute focus and break timer in Overview. " +
-                 "No account, new permissions, notifications, or timer data stored on disk.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Display brightness reads a public macOS display property when available. " +
-                 "No access to screen content, brightness changes, or history.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Output volume reads the default macOS sound output only. " +
-                 "No changes to volume, audio capture, or device history.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Battery & Power uses public macOS power information only. " +
-                 "No permission, device history, or personal data is collected.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var aboutSection: some View {
-        Section("About") {
-            LabeledContent("Version", value: CompanionBuildInfo.version)
-            if let qaUpdate = CompanionBuildInfo.qaUpdate {
-                LabeledContent("Update", value: qaUpdate)
-            }
-        }
+        .frame(minWidth: 700, minHeight: 490)
+        .accessibilityIdentifier("companion.settings.window")
     }
 
 }
