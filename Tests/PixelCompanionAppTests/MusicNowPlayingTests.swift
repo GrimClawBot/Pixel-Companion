@@ -42,6 +42,33 @@ final class MusicNowPlayingTests: XCTestCase {
         XCTAssertEqual(paused?.album?.count, 160)
     }
 
+    func testMetadataStripsControlCharactersAndDirectionalSpoofing() {
+        let rawTitle = "Secret\nTrack\tName\u{202E}spoof\u{2066}"
+        let item = MusicNowPlayingSnapshot.validated(
+            fields: ["playing", rawTitle, "Artist\u{200F} Name", "Album"]
+        )
+        XCTAssertEqual(item?.title, "SecretTrackNamespoof")
+        XCTAssertEqual(item?.artist, "Artist Name")
+    }
+
+    func testControlOnlyMetadataDoesNotProduceFakeTitle() {
+        let item = MusicNowPlayingSnapshot.validated(
+            fields: ["playing", "\n\r\t\u{202D}\u{2069}", "", ""]
+        )
+        XCTAssertNil(item?.title)
+        XCTAssertEqual(item?.displayedTitle(showTitles: false), "Track details hidden")
+        XCTAssertEqual(item?.displayedTitle(showTitles: true), "Track title not reported")
+    }
+
+    func testMetadataLengthBoundAppliesAfterRemovingUnsafeScalars() {
+        let rawTitle = String(repeating: "\u{202E}", count: 200)
+            + String(repeating: "Z", count: 200)
+        let item = MusicNowPlayingSnapshot.validated(
+            fields: ["playing", rawTitle, "", ""]
+        )
+        XCTAssertEqual(item?.title, String(repeating: "Z", count: 160))
+    }
+
     func testTracksAreMaskedUntilUserSeparatelyEnablesDetails() {
         let item = MusicNowPlayingSnapshot.validated(
             fields: ["playing", "Private track", "Artist", "Album"]
