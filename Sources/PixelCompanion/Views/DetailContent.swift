@@ -231,20 +231,16 @@ struct DetailContent: View {
                 }
                 Divider()
             }
-            SectionTitle(text: canShowLive ? "Recent activity" : "Cached history")
-            let history = ActivityPresentation.history(
-                snapshot.recentActivity,
-                currentActivity: AgentSessionPresentation.highlightedActivity(
-                    activity: snapshot.currentActivity,
-                    sessions: snapshot.agentSessions
-                )
+            ActivityTimelineView(
+                events: ActivityPresentation.history(
+                    snapshot.recentActivity,
+                    currentActivity: AgentSessionPresentation.highlightedActivity(
+                        activity: snapshot.currentActivity,
+                        sessions: snapshot.agentSessions
+                    )
+                ),
+                isLive: canShowLive
             )
-            if history.isEmpty {
-                Placeholder(text: "No additional activity yet")
-            }
-            ForEach(history) { event in
-                ActivityRow(event: event)
-            }
             if !snapshot.recentMessages.isEmpty {
                 SectionTitle(text: "Messages").padding(.top, 4)
                 ForEach(snapshot.recentMessages) { message in
