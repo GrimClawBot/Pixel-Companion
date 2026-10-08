@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
     let clipboardHistory = TransientClipboardHistory()
     let localAgentFeed = LocalAgentFeedMonitor()
     let codexProcessMonitor = CodexProcessMonitor()
+    let codexTurnMonitor = CodexTurnMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -296,6 +297,7 @@ extension AppModel {
         clipboardHistory.configure(enabled: settings.clipboardHistoryEnabled)
         localAgentFeed.configure(enabled: settings.localAgentFeedEnabled)
         codexProcessMonitor.configure(enabled: settings.codexPresenceEnabled)
+        codexTurnMonitor.configure(enabled: settings.codexTurnEventsEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
@@ -322,6 +324,7 @@ extension AppModel {
         downloadMonitor.refresh()
         localAgentFeed.refresh()
         codexProcessMonitor.refresh()
+        codexTurnMonitor.refresh()
         calendarMonitor.refresh()
         musicMonitor.refresh()
         scheduleStepTimer()

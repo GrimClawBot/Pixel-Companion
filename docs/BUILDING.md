@@ -761,3 +761,47 @@ Pixel Companion does not call Codex CLI, inspect ~/.codex, or use private
 libproc APIs. The explicit status-feed transport from PC-040 remains a
 separate optional integration, and Paperclip data stays authoritative
 for company agents.
+
+## Codex turn-completion notifications (PC-042 draft)
+
+Codex's supported top-level notify configuration calls a user-supplied
+program at the end of a Codex agent turn. The documented event currently
+available is agent-turn-complete, **not** started, running, approval-needed,
+success or failure. Pixel Companion never reads raw Codex history or
+transcripts. It includes an OPTIONAL Python hook which discards all fields
+except event type and the fact that a notification was received.
+
+The hook writes only the fixed filename pixel-companion-codex-turn.json in
+a folder you explicitly configure. Create a private folder of your choosing
+with mkdir -m 700. Example for Codex config.toml, at its TOP LEVEL
+(replace both placeholder absolute paths):
+
+    notify = ["/usr/bin/python3", "/ABSOLUTE/PATH/TO/Pixel-Companion/scripts/codex_notify_bridge.py", "--directory", "/ABSOLUTE/PRIVATE/EVENT/FOLDER"]
+
+**Do not overwrite an existing notify configuration:** Codex supports one
+top-level notify program; compose a safe dispatcher if another integration
+already uses it. This build NEVER writes to your Codex config automatically,
+installs a hook, starts Codex or modifies existing controls. The event
+script receives one raw notification JSON argument (which can carry
+sensitive content) solely to detect the supported event. It never prints,
+stores, transmits, hashes or forwards prompts, assistant answers, workspace
+paths, session/turn IDs, tokens or any other incoming payload fields. The
+marker is atomically written mode 0600. No network dependency. The hook is
+only active when a compatible Codex runtime invokes its configured notify.
+In particular, do not assume the VS Code Codex app-server emits CLI notify
+events without confirming that provider's behavior.
+
+Then enable Settings → Connections → Show Codex turn completions and select
+the same event FOLDER (not a file). The app watches only the expected fixed
+filename in that user-chosen directory. Until the first event, it shows
+No valid turn-completion event available. A valid timestamp is displayed
+as recent only for two minutes, otherwise Previous turn completion (not live).
+Event source authenticity is not cryptographically guaranteed; another
+process with write access to that local folder could forge this marker.
+
+**Turning the Pixel Companion display off forgets its folder immediately,
+but does not remove or stop a separately installed Codex notify hook.**
+To fully stop event-file writes, remove the external notify setting yourself.
+The marker file stays on disk until you remove it; it contains only the
+event type and timestamp. Private directories and explicit local consent
+remain important. No credentials are stored or transmitted by Pixel Companion.

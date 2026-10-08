@@ -76,4 +76,13 @@ extension AppModel {
             codexProcessMonitor.configure(enabled: newValue)
         }
     }
+    var codexTurnEventsEnabled: Bool {
+        get { settings.codexTurnEventsEnabled }
+        set {
+            guard newValue != settings.codexTurnEventsEnabled else { return }
+            objectWillChange.send()
+            settings.codexTurnEventsEnabled = newValue
+            codexTurnMonitor.configure(enabled: newValue)
+        }
+    }
 }
