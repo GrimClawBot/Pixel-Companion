@@ -30,12 +30,26 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
     }
 }
 
+/// Data-independent shortcut routing; tiles never grant actions against Paperclip.
+enum CompanionOverviewShortcut: String, CaseIterable {
+    case agents
+    case active
+    case approvals
+
+    var target: CompanionDetailTab {
+        switch self {
+        case .agents, .active: return .agents
+        case .approvals: return .activity
+        }
+    }
+}
+
 /// A compact panel: status and controls stay visible while each section scrolls independently.
 struct DetailContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
     let openSettings: () -> Void
-    @State private var selectedTab: CompanionDetailTab = .overview
+    @Binding var selectedTab: CompanionDetailTab
     @State private var agentUsageScope: AgentUsageScope = .all
 
     private var canShowLive: Bool { snapshot.connectionState == .connected }
@@ -110,14 +124,22 @@ struct DetailContent: View {
     private var overviewContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                metric(value: canShowLive ? "\(snapshot.agentSessions.count)" : "—", label: "Agents")
-                metric(value: canShowLive ? "\(liveSessions.filter(\.isActive).count)" : "—", label: "Active")
-                metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—", label: "Approvals")
+                metric(value: canShowLive ? "\(snapshot.agentSessions.count)" : "—",
+                       label: "Agents", shortcut: .agents)
+                metric(value: canShowLive ? "\(liveSessions.filter(\.isActive).count)" : "—",
+                       label: "Active", shortcut: .active)
+                metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
+                       label: "Approvals", shortcut: .approvals)
             }
             SnapshotContent(
                 snapshot: snapshot, mood: mood, approvalLimit: 2,
                 showsHeader: false
             )
+            Button("View usage details") { selectedTab = .usage }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .accessibilityIdentifier("companion.overview.usage")
             if canShowLive && snapshot.pendingApprovals.count > 2 {
                 Button("View all approvals in Activity") { selectedTab = .activity }
                     .font(.caption)
@@ -127,21 +149,30 @@ struct DetailContent: View {
         }
     }
 
-    private func metric(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(value)
-                .font(.title3.weight(.semibold).monospacedDigit())
-            Text(label.uppercased())
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
+    private func metric(
+        value: String, label: String, shortcut: CompanionOverviewShortcut
+    ) -> some View {
+        Button {
+            selectedTab = shortcut.target
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(value)
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                Text(label.uppercased())
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .padding(9)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.primary.opacity(0.065))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10))
         }
-        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-        .padding(9)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.primary.opacity(0.065))
-        )
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show \(label.lowercased())")
+        .accessibilityIdentifier("companion.overview." + shortcut.rawValue)
     }
 
     private var agentsContent: some View {
