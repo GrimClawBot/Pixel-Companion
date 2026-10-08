@@ -25,8 +25,11 @@ def install(staged: Path, destination: Path, default_destination: Path) -> None:
     except Exception:
         backup.rename(destination)
         raise
-    # Successful installation: the newly installed app is now in place.
-    shutil.rmtree(backup)
+    # Successful installation: a cleanup failure must not mark the new app as failed.
+    try:
+        shutil.rmtree(backup)
+    except OSError as error:
+        print(f"WARNING: new app installed; backup remains at {backup}: {error}", file=sys.stderr)
 
 
 if __name__ == "__main__":

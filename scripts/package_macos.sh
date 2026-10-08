@@ -39,20 +39,28 @@ plutil -lint "$ROOT/packaging/Info.plist"
 # An exclusive, on-filesystem directory lock prevents overlapping runs targeting the
 # same path; never remove a lock acquired by a different packaging process.
 mkdir -p "$(dirname "$OUTPUT")"
-LOCK="$OUTPUT.pixel-companion.lock"
+# Hash the full output path so a valid long .app filename never exceeds
+# the filesystem basename limit when deriving its lock directory.
+LOCK_DIGEST="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32])' "$OUTPUT")"
+LOCK="$(dirname "$OUTPUT")/.pixel-companion-$LOCK_DIGEST.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
   echo "Packaging already in progress (or stale lock): $LOCK" >&2
   exit 2
 fi
 TMP=""
 STAGE=""
+INSTALL_SUCCESS=0
 cleanup() {
   if [[ -n "$TMP" ]]; then rm -rf "$TMP"; fi
   if [[ -n "$STAGE" ]]; then
     # Never delete the only rollback copy, including when another app has appeared
     # at the destination and an automatic restore cannot finish.
     if [[ -e "$STAGE/Previous.app" ]]; then
-      echo "RECOVERY REQUIRED: previous app preserved at $STAGE/Previous.app" >&2
+      if [[ "$INSTALL_SUCCESS" == 1 ]]; then
+        echo "WARNING: previous app backup retained at $STAGE/Previous.app" >&2
+      else
+        echo "RECOVERY REQUIRED: previous app preserved at $STAGE/Previous.app" >&2
+      fi
     else
       rm -rf "$STAGE"
     fi
@@ -93,6 +101,7 @@ STAGE="$(mktemp -d "$(dirname "$OUTPUT")/.pixel-companion-stage.XXXXXXXX")"
 cp -R "$APP" "$STAGE/New.app"
 codesign --verify --strict "$STAGE/New.app"
 python3 scripts/quality/install_bundle.py "$STAGE/New.app" "$OUTPUT" "$DEFAULT"
+INSTALL_SUCCESS=1
 echo "BUNDLE: $OUTPUT"
 echo "SIGNING: $([[ "$IDENTITY" == "-" ]] && echo local-ad-hoc || echo developer-id)"
 echo "NOTE: No notarization or publishing occurred."

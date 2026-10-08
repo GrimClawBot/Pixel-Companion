@@ -61,7 +61,7 @@ Output: `dist/Pixel Companion.app` (ignored by Git). Relative `--output` paths r
 from the caller's working directory, not the repository root. The script validates the signature,
 stages the app on the destination filesystem, and preserves the previous default app if the
 replacement fails. It refuses to overwrite existing custom destinations and rejects concurrent
-packaging for the same output using a sibling lock directory. If packaging is interrupted by a
+packaging for the same output using a short, hashed sibling lock directory. If packaging is interrupted by a
 forced termination, verify that no packaging process remains before manually removing a stale
 lock. If the script reports RECOVERY REQUIRED, preserve the named Previous.app backup for
 manual inspection/recovery; do not delete its stage directory. No app is published or notarized.

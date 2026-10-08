@@ -1,5 +1,7 @@
 """Behavioral checks for app-bundle replacement and macOS package generation."""
 import plistlib
+from contextlib import redirect_stderr
+from io import StringIO
 import shutil
 import subprocess
 import sys
@@ -80,6 +82,24 @@ class BundleInstallationTests(unittest.TestCase):
             self.assertEqual((output / "version").read_text(), "competing")
             self.assertEqual((staged.parent / "Previous.app" / "version").read_text(), "original")
 
+    def test_cleanup_failure_after_success_does_not_fail_install(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            output = parent / "Pixel Companion.app"
+            output.mkdir()
+            (output / "version").write_text("old")
+            stage = parent / "stage"
+            staged = stage / "New.app"
+            staged.mkdir(parents=True)
+            (staged / "version").write_text("updated")
+            stderr = StringIO()
+            with mock.patch("scripts.quality.install_bundle.shutil.rmtree", side_effect=OSError("busy")):
+                with redirect_stderr(stderr):
+                    install(staged, output, output)
+            self.assertEqual((output / "version").read_text(), "updated")
+            self.assertEqual((stage / "Previous.app" / "version").read_text(), "old")
+            self.assertIn("WARNING: new app installed", stderr.getvalue())
+
     def test_custom_existing_output_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
@@ -99,7 +119,9 @@ class RealMacOSPackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             output = base / "Pixel Companion.app"
-            lock = Path(str(output) + ".pixel-companion.lock")
+            import hashlib
+            digest = hashlib.sha256(str(output).encode()).hexdigest()[:32]
+            lock = base / (".pixel-companion-" + digest + ".lock")
             lock.mkdir()
             result = subprocess.run(
                 ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug", "--output", str(output)],
@@ -109,6 +131,17 @@ class RealMacOSPackagingTests(unittest.TestCase):
             self.assertIn("Packaging already in progress", result.stderr)
             self.assertTrue(lock.is_dir())
             self.assertFalse(output.exists())
+
+    def test_long_valid_app_name_has_short_lock_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            # A 250-byte UTF-8 filename is valid on APFS, unlike filename+lock suffix.
+            output = base / ("a" * 246 + ".app")
+            cmd = ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug", "--output", str(output)]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((output / "Contents/MacOS/PixelCompanion").is_file())
+            self.assertFalse(list(base.glob(".pixel-companion-*.lock")))
 
     def test_bundle_signs_and_relative_output_respects_caller(self):
         with tempfile.TemporaryDirectory() as directory:
