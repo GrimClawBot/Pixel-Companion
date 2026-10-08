@@ -50,13 +50,29 @@ public struct ActivityEvent: Identifiable, Hashable, Sendable {
     public let title: String
     public let detail: String?
     public let timestamp: Date
+    /// Optional canonical signal from a source-provided status, never inferred from free text.
+    public let signal: CompanionSignalKind?
+    /// Exact connector and backend entity identifiers, when supplied.
+    public let sourceID: String?
+    public let entityID: String?
+    /// Explicit source-reported progress only; do not infer progress from tokens or elapsed time.
+    public let progress: CompanionReportedProgress?
 
-    public init(id: String, kind: Kind, title: String, detail: String? = nil, timestamp: Date) {
+    public init(
+        id: String, kind: Kind, title: String, detail: String? = nil,
+        timestamp: Date, signal: CompanionSignalKind? = nil,
+        sourceID: String? = nil, entityID: String? = nil,
+        progress: CompanionReportedProgress? = nil
+    ) {
         self.id = id
         self.kind = kind
         self.title = title
         self.detail = detail
         self.timestamp = timestamp
+        self.signal = signal
+        self.sourceID = sourceID
+        self.entityID = entityID
+        self.progress = progress
     }
 }
 
