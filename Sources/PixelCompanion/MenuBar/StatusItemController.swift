@@ -81,6 +81,9 @@ struct MenuBarPopoverView: View {
             calendarWidgetEnabled: model.calendarWidgetEnabled,
             calendarShowTitles: model.calendarShowTitles,
             calendarMonitor: model.calendarMonitor,
+            musicWidgetEnabled: model.musicWidgetEnabled,
+            musicShowTrackDetails: model.musicShowTrackDetails,
+            musicMonitor: model.musicMonitor,
             selectedTab: $model.selectedDetailTab
         )
             .padding(16)

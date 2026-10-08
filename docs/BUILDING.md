@@ -616,3 +616,33 @@ Real physical macOS calendar grant/deny/revoke, multiple calendars,
 recurring/all-day event, 360pt/440pt Mac UI/VoiceOver and privacy
 acceptance remain release gates. No request for actual Calendar
 permission occurs in automated tests or during QA package installation.
+
+## Optional Apple Music Now Playing (PC-032)
+
+Apple Music Now Playing is OFF by default in Settings / Standalone
+utilities. Enabling it does not contact Music or request Apple Events
+Automation permission. The Overview card provides a separate, explicit
+Connect to Apple Music button. Only that user interaction may request
+permission via the read-only NSAppleScript Music.app player-state and
+track metadata interface. The packaged app declares a reason in
+NSAppleEventsUsageDescription. Without this reason, nonpackaged swift-run
+must fail closed. Pixel Companion does not launch the Music app.
+
+The connector reads playing/paused/stopped status and optionally current
+song title, artist and album, without any playback commands or access to
+library/playlist history. Song details are separately hidden by default.
+Reading resumes only after an explicit connection within the current app
+session, every 30 seconds while enabled, and after Mac wake. Disabling
+clears RAM-only metadata and stops polling. Reopening Pixel Companion
+requires connecting again; denial and unavailable Music stay explicit.
+
+This is Music.app ONLY. Apple's documented MPNowPlayingInfoCenter is for
+publishing the app's own media metadata, not reading a global third-party
+media session. Pixel Companion does not use the private MediaRemote
+framework or claim Spotify/browser support. Future provider adapters
+require separate opt-in, compatibility tests and security review.
+
+Physical macOS Automation prompt/deny/revoke tests and actual Apple Music
+play/pause/stopped playback, VoiceOver, 360pt/440pt hardware layouts and
+signing entitlement review remain mandatory before merge or distribution.
+No Apple Events are executed in the deterministic tests.

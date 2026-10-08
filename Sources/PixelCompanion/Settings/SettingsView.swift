@@ -217,6 +217,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("companion.settings.focus-timer")
             Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
                 .accessibilityIdentifier("companion.settings.battery-hud")
+            MusicSettingsControls(model: model)
             Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
                 .accessibilityIdentifier("companion.settings.calendar-widget")
             if model.calendarWidgetEnabled {

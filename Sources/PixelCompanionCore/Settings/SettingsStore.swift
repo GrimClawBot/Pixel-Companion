@@ -31,6 +31,8 @@ public final class SettingsStore {
         case batteryHUDEnabled = "pixelCompanion.batteryHUDEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
+        case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
+        case musicShowTrackDetails = "pixelCompanion.musicShowTrackDetails"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -136,6 +138,18 @@ public final class SettingsStore {
     public var calendarShowTitles: Bool {
         get { (defaults.object(forKey: Key.calendarShowTitles.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.calendarShowTitles.rawValue) }
+    }
+
+    /// Music.app Automation requires a separate explicit Connect action.
+    public var musicWidgetEnabled: Bool {
+        get { (defaults.object(forKey: Key.musicWidgetEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.musicWidgetEnabled.rawValue) }
+    }
+
+    /// Track details are sensitive and hidden until separately enabled.
+    public var musicShowTrackDetails: Bool {
+        get { (defaults.object(forKey: Key.musicShowTrackDetails.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.musicShowTrackDetails.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.

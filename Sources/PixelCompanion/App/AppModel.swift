@@ -22,6 +22,7 @@ final class AppModel: ObservableObject {
     let focusTimer = FocusTimerController()
     let batteryMonitor = BatteryPowerMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
+    let musicMonitor = MusicNowPlayingMonitor()
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
@@ -209,6 +210,7 @@ final class AppModel: ObservableObject {
         publicGitHubMonitor.configure(settings.githubPublicRepository)
         batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
+        musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
         if powerObserver == nil {
             powerObserver = NotificationCenter.default.addObserver(
@@ -305,8 +307,28 @@ extension AppModel {
         focusTimer.refresh()
         batteryMonitor.refresh()
         calendarMonitor.refresh()
+        musicMonitor.refresh()
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }
+    }
+
+    var musicWidgetEnabled: Bool {
+        get { settings.musicWidgetEnabled }
+        set {
+            guard newValue != settings.musicWidgetEnabled else { return }
+            objectWillChange.send()
+            settings.musicWidgetEnabled = newValue
+            musicMonitor.configure(enabled: newValue)
+        }
+    }
+
+    var musicShowTrackDetails: Bool {
+        get { settings.musicShowTrackDetails }
+        set {
+            guard newValue != settings.musicShowTrackDetails else { return }
+            objectWillChange.send()
+            settings.musicShowTrackDetails = newValue
+        }
     }
 
     var calendarWidgetEnabled: Bool {

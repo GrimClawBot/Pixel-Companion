@@ -77,6 +77,9 @@ struct DetailContent: View {
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
+    var musicWidgetEnabled = false
+    var musicShowTrackDetails = false
+    var musicMonitor: MusicNowPlayingMonitor?
     @Binding var selectedTab: CompanionDetailTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
@@ -169,6 +172,11 @@ struct DetailContent: View {
             if calendarWidgetEnabled, let calendarMonitor {
                 CalendarNextEventView(
                     monitor: calendarMonitor, showTitles: calendarShowTitles
+                )
+            }
+            if musicWidgetEnabled, let musicMonitor {
+                MusicNowPlayingView(
+                    monitor: musicMonitor, showDetails: musicShowTrackDetails
                 )
             }
             SnapshotContent(
