@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var publicGitHubState: GitHubPublicState = .off
     let focusTimer = FocusTimerController()
     let batteryMonitor = BatteryPowerMonitor()
+    let calendarMonitor = CalendarNextEventMonitor()
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
@@ -207,6 +208,7 @@ final class AppModel: ObservableObject {
         notificationManager.start()
         publicGitHubMonitor.configure(settings.githubPublicRepository)
         batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
+        calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         rebuildConnector()
         if powerObserver == nil {
             powerObserver = NotificationCenter.default.addObserver(
@@ -302,8 +304,28 @@ extension AppModel {
     func didWake() {
         focusTimer.refresh()
         batteryMonitor.refresh()
+        calendarMonitor.refresh()
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }
+    }
+
+    var calendarWidgetEnabled: Bool {
+        get { settings.calendarWidgetEnabled }
+        set {
+            guard newValue != settings.calendarWidgetEnabled else { return }
+            objectWillChange.send()
+            settings.calendarWidgetEnabled = newValue
+            calendarMonitor.configure(enabled: newValue)
+        }
+    }
+
+    var calendarShowTitles: Bool {
+        get { settings.calendarShowTitles }
+        set {
+            guard newValue != settings.calendarShowTitles else { return }
+            objectWillChange.send()
+            settings.calendarShowTitles = newValue
+        }
     }
 
     var batteryHUDEnabled: Bool {

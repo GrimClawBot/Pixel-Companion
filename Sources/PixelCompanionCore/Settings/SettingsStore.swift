@@ -29,6 +29,8 @@ public final class SettingsStore {
         case conserveEnergy = "pixelCompanion.conserveEnergy"
         case focusTimerEnabled = "pixelCompanion.focusTimerEnabled"
         case batteryHUDEnabled = "pixelCompanion.batteryHUDEnabled"
+        case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
+        case calendarShowTitles = "pixelCompanion.calendarShowTitles"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -122,6 +124,18 @@ public final class SettingsStore {
     public var batteryHUDEnabled: Bool {
         get { (defaults.object(forKey: Key.batteryHUDEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.batteryHUDEnabled.rawValue) }
+    }
+
+    /// Calendar access itself is always controlled by macOS, never by a preference.
+    public var calendarWidgetEnabled: Bool {
+        get { (defaults.object(forKey: Key.calendarWidgetEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.calendarWidgetEnabled.rawValue) }
+    }
+
+    /// Event titles are sensitive; show only after a separate explicit opt-in.
+    public var calendarShowTitles: Bool {
+        get { (defaults.object(forKey: Key.calendarShowTitles.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.calendarShowTitles.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.

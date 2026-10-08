@@ -15,4 +15,5 @@
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>Pixel Companion can show your next calendar event when you explicitly enable Calendar and grant read access. Events are not saved or shared.</string>
 </dict></plist>

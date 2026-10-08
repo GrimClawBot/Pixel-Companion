@@ -74,6 +74,9 @@ struct DetailContent: View {
     var focusTimer: FocusTimerController?
     var batteryHUDEnabled = false
     var batteryMonitor: BatteryPowerMonitor?
+    var calendarWidgetEnabled = false
+    var calendarShowTitles = false
+    var calendarMonitor: CalendarNextEventMonitor?
     @Binding var selectedTab: CompanionDetailTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
@@ -162,6 +165,11 @@ struct DetailContent: View {
             }
             if batteryHUDEnabled, let batteryMonitor {
                 BatteryPowerView(monitor: batteryMonitor)
+            }
+            if calendarWidgetEnabled, let calendarMonitor {
+                CalendarNextEventView(
+                    monitor: calendarMonitor, showTitles: calendarShowTitles
+                )
             }
             SnapshotContent(
                 snapshot: snapshot, mood: mood, approvalLimit: 2,

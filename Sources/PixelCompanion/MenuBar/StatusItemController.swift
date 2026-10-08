@@ -78,6 +78,9 @@ struct MenuBarPopoverView: View {
             focusTimer: model.focusTimer,
             batteryHUDEnabled: model.batteryHUDEnabled,
             batteryMonitor: model.batteryMonitor,
+            calendarWidgetEnabled: model.calendarWidgetEnabled,
+            calendarShowTitles: model.calendarShowTitles,
+            calendarMonitor: model.calendarMonitor,
             selectedTab: $model.selectedDetailTab
         )
             .padding(16)
