@@ -31,6 +31,7 @@ final class AppModel: ObservableObject {
     let codexTurnMonitor = CodexTurnMonitor()
     let claudeHookMonitor = ClaudeHookMonitor()
     let localActivityTimeline = LocalAgentActivityTimeline()
+    let localAgentAttention = LocalAgentAttention()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -56,6 +57,9 @@ final class AppModel: ObservableObject {
         self.publicGitHubMonitor = publicGitHubMonitor ?? PublicGitHubMonitor()
         notificationStatus = self.notificationManager.statusText
         localActivityTimeline.bind(codex: codexTurnMonitor, claude: claudeHookMonitor)
+        localAgentAttention.bind(timeline: localActivityTimeline) { [weak self] alert in
+            self?.notificationManager.deliverLocalAgent(alert)
+        }
         publicGitHubSubscription = self.publicGitHubMonitor.$state.sink { [weak self] next in
             self?.publicGitHubState = next
         }
@@ -285,7 +289,6 @@ final class AppModel: ObservableObject {
             ? ConnectorSnapshot(capturing: connector, sessionLimit: 128) : next
         notificationManager.observe(notificationSnapshot, isPaperclip: isPaperclipConnector)
     }
-
 }
 
 extension AppModel {
@@ -302,6 +305,8 @@ extension AppModel {
         codexProcessMonitor.configure(enabled: settings.codexPresenceEnabled)
         codexTurnMonitor.configure(enabled: settings.codexTurnEventsEnabled)
         claudeHookMonitor.configure(enabled: settings.claudeHookEventsEnabled)
+        // Baseline existing local markers before allowing any alert deliveries.
+        localAgentAttention.configureNotifications(enabled: settings.localAgentAlertsEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()

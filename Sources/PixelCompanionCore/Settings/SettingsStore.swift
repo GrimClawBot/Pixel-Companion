@@ -38,6 +38,7 @@ public final class SettingsStore {
         case codexPresenceEnabled = "pixelCompanion.codexPresenceEnabled"
         case codexTurnEventsEnabled = "pixelCompanion.codexTurnEventsEnabled"
         case claudeHookEventsEnabled = "pixelCompanion.claudeHookEventsEnabled"
+        case localAgentAlertsEnabled = "pixelCompanion.localAgentAlertsEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -189,6 +190,12 @@ public final class SettingsStore {
     public var claudeHookEventsEnabled: Bool {
         get { (defaults.object(forKey: Key.claudeHookEventsEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.claudeHookEventsEnabled.rawValue) }
+    }
+
+    /// Secondary opt-in, requiring the existing macOS notification permission.
+    public var localAgentAlertsEnabled: Bool {
+        get { (defaults.object(forKey: Key.localAgentAlertsEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.localAgentAlertsEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.

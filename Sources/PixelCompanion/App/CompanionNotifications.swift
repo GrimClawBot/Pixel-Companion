@@ -8,6 +8,7 @@ enum CompanionNotice: Equatable {
     case completedRuns(Int)
     case failedRuns(Int)
     case test
+    case localAgent(LocalAgentAlert)
 
     var title: String {
         switch self {
@@ -15,6 +16,7 @@ enum CompanionNotice: Equatable {
         case .completedRuns: return "Agent run completed"
         case .failedRuns: return "Agent run failed"
         case .test: return "Pixel Companion test"
+        case let .localAgent(alert): return alert.title
         }
     }
 
@@ -28,6 +30,8 @@ enum CompanionNotice: Equatable {
             return count == 1 ? "An agent run needs attention." : "\(count) agent runs need attention."
         case .test:
             return "This is a local test notification."
+        case let .localAgent(alert):
+            return alert.detail + ". Review local activity in Pixel Companion."
         }
     }
 }
@@ -325,6 +329,13 @@ final class CompanionNotificationManager {
         testStatus = result
         submittingTest = false
         onChange?()
+    }
+
+    /// Nonreplayed local notices must never be queued while permission
+    /// is pending, denied or unavailable. The caller handles dedup/cooldown.
+    func deliverLocalAgent(_ alert: LocalAgentAlert) {
+        guard enabled, isBundled, permission == .ready else { return }
+        center.deliver(.localAgent(alert))
     }
 
     var canSimulateQAEvent: Bool {

@@ -103,4 +103,13 @@ extension AppModel {
             if !newValue { focusTimer.stop() }
         }
     }
+    var localAgentAlertsEnabled: Bool {
+        get { settings.localAgentAlertsEnabled }
+        set {
+            guard newValue != settings.localAgentAlertsEnabled else { return }
+            objectWillChange.send()
+            settings.localAgentAlertsEnabled = newValue
+            localAgentAttention.configureNotifications(enabled: newValue)
+        }
+    }
 }

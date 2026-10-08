@@ -89,6 +89,7 @@ struct DetailContent: View {
     var codexTurnMonitor: CodexTurnMonitor?
     var claudeHookMonitor: ClaudeHookMonitor?
     var localActivityTimeline: LocalAgentActivityTimeline?
+    var localAgentAttention: LocalAgentAttention?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -292,6 +293,12 @@ extension DetailContent {
                        label: "Approvals", shortcut: .approvals)
             }
             LiveActivityDigestView(snapshot: snapshot, isLive: canShowLive)
+            if let localAgentAttention,
+               codexTurnMonitor?.enabled == true || claudeHookMonitor?.enabled == true {
+                LocalAgentAttentionView(attention: localAgentAttention) {
+                    navigate(to: .activity)
+                }
+            }
             PublicGitHubPulseView(state: publicGitHubState)
             LiveOperationsPulseView(
                 sessions: liveSessions,
