@@ -17,6 +17,7 @@ enum AgentInspectorSelection {
 /// Read-only, optional field-aware detail for the selected agent.
 struct AgentInspectorView: View {
     let session: AgentSessionSnapshot
+    var assignedTasks: [TaskSnapshot] = []
     let back: () -> Void
 
     var body: some View {
@@ -83,6 +84,22 @@ struct AgentInspectorView: View {
             Text("Reported usage")
                 .font(.callout.weight(.semibold))
             AgentUsageCard(session: session, showsContext: false)
+            if !assignedTasks.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Text("Assigned tasks")
+                            .font(.callout.weight(.semibold))
+                        Spacer()
+                        Text("\(assignedTasks.count) reported")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(assignedTasks.prefix(5)) { task in
+                        ReadOnlyTaskRow(task: task)
+                    }
+                }
+                .accessibilityIdentifier("companion.agent.assigned-tasks")
+            }
             AgentRunHistoryView(runs: session.recentRuns)
             Text("Read-only · Fields not supplied by the runtime remain unavailable")
                 .font(.caption2)

@@ -42,6 +42,7 @@ enum AgentsDirectoryFilter {
 struct AgentsDirectoryView: View {
     let sessions: [AgentSessionSnapshot]
     let isLive: Bool
+    var tasks: [TaskSnapshot] = []
     @Binding var selectedAgentID: String?
     @State private var query = ""
     @State private var scope: AgentUsageScope = .all
@@ -59,7 +60,12 @@ struct AgentsDirectoryView: View {
             } else if let selected = AgentInspectorSelection.resolve(
                 agentID: selectedAgentID, sessions: sessions, isLive: isLive
             ) {
-                AgentInspectorView(session: selected) { selectedAgentID = nil }
+                AgentInspectorView(
+                    session: selected,
+                    assignedTasks: CompanyTaskPresentation.assigned(
+                        tasks, to: selected.agentID, isLive: isLive
+                    )
+                ) { selectedAgentID = nil }
             } else {
                 directory
             }

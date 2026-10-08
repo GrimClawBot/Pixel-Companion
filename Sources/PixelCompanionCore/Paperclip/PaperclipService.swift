@@ -236,7 +236,8 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
             activity: mapped.activity,
             approvals: mapped.approvals,
             usage: mapped.usage,
-            agentSessions: []
+            agentSessions: [],
+            tasks: mapped.tasks
         )
     }
 
