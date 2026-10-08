@@ -513,3 +513,23 @@ Distinct character artwork, event stream providers, automatic transient
 collapse animation, a personality-disable setting and physical Mac
 VoiceOver/360pt/440pt verification remain open. QA24 remains installed
 until a new signed local QA has successfully launched.
+
+## Context confidence and conservative fresh-session guidance (PC-028)
+
+The new read-only ContextHealth engine models exact/provider-reported/
+estimated/unknown confidence and refuses to invent usage when the runtime
+does not supply both a valid context-used count and actual context window.
+It uses reported occupancy thresholds (70% watch, 85% suggest a fresh
+session, 95% strongly recommend). If genuinely supplied by a future
+connector, multiple compactions, a material task change, or unusually large
+recent tool output can strengthen the recommendation. Missing signal data
+is never interpreted as a reported event.
+
+Paperclip's existing usage counts are labeled provider-reported, not
+verifiably exact. The Context Health text is available in Usage and the
+agent's session monitor. It does not calculate context from cumulative run
+tokens, project budgets or elapsed time. There is deliberately **no New
+Chat / Handoff action** until a backend authorizes the operation and a
+real ChatBackend supports session creation. Spec-parity #58 remains open for
+a full authenticated server-produced handoff, richer provider data, and
+real Mac accessibility acceptance.

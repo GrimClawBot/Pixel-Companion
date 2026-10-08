@@ -139,6 +139,10 @@ struct AgentUsageCard: View {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption2.weight(.medium)).foregroundStyle(.orange)
                 }
+                ContextHealthSummaryView(
+                    reportedUsed: session.contextUsedTokens,
+                    reportedWindow: session.contextWindowTokens
+                )
             }
         }
         .companionCard()
