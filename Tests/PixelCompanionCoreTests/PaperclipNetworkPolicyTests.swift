@@ -124,7 +124,7 @@ final class PaperclipNetworkPolicyTests: XCTestCase {
         )
         for id in [
             "a/b", "a//b", "../admin", "x/agents", ".", "..", "",
-            "id?token=test", "id#fragment", "a%2Fb", "bad\id"
+            "id?token=test", "id#fragment", "a%2Fb", "bad\\id"
         ] {
             XCTAssertNil(
                 PaperclipNetworkPolicy.companyPath(id, resource: "agents"),
