@@ -70,6 +70,8 @@ struct DetailContent: View {
     var feedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
     var publicGitHubState: GitHubPublicState = .off
+    var focusTimerEnabled = false
+    var focusTimer: FocusTimerController?
     @Binding var selectedTab: CompanionDetailTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
@@ -153,6 +155,9 @@ struct DetailContent: View {
                     navigate(to: .agents)
                 }
             )
+            if focusTimerEnabled, let focusTimer {
+                FocusTimerView(controller: focusTimer)
+            }
             SnapshotContent(
                 snapshot: snapshot, mood: mood, approvalLimit: 2,
                 feedFreshness: feedFreshness, lastSuccessfulSync: lastSuccessfulSync,

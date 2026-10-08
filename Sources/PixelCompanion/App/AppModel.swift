@@ -19,6 +19,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var notificationStatus = ""
     @Published private(set) var notificationTestStatus: String?
     @Published private(set) var publicGitHubState: GitHubPublicState = .off
+    let focusTimer = FocusTimerController()
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
@@ -219,6 +220,7 @@ final class AppModel: ObservableObject {
     /// Rewinds the mock script to its first step. Local only; nothing outside the app changes.
     /// Called by macOS on wake; only requests existing read-only connector state.
     func didWake() {
+        focusTimer.refresh()
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }
     }
@@ -298,6 +300,16 @@ final class AppModel: ObservableObject {
 }
 
 extension AppModel {
+    var focusTimerEnabled: Bool {
+        get { settings.focusTimerEnabled }
+        set {
+            guard newValue != settings.focusTimerEnabled else { return }
+            objectWillChange.send()
+            settings.focusTimerEnabled = newValue
+            if !newValue { focusTimer.stop() }
+        }
+    }
+
     fileprivate func scheduleStepTimer() {
         stepTimer?.invalidate()
         let interval = CompanionRefreshCadence.interval(
