@@ -72,6 +72,7 @@ struct DetailContent: View {
     @Binding var selectedTab: CompanionDetailTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
+    @State private var selectedAgentID: String?
 
     private func navigate(to tab: CompanionDetailTab) {
         withAnimation(CompanionMotion.tabTransition(reduceMotion: reduceMotion)) {
@@ -179,10 +180,27 @@ struct DetailContent: View {
                 Placeholder(text: "Live agent information is unavailable until Paperclip reconnects.")
             } else if liveSessions.isEmpty {
                 Placeholder(text: "No agents reported by this connector.")
+            } else if let selected = AgentInspectorSelection.resolve(
+                agentID: selectedAgentID, sessions: liveSessions, isLive: canShowLive
+            ) {
+                AgentInspectorView(session: selected) { selectedAgentID = nil }
             } else {
                 ForEach(liveSessions) { session in
-                    AgentSessionRow(session: session)
+                    Button {
+                        selectedAgentID = session.agentID
+                    } label: {
+                        AgentSessionRow(session: session)
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Inspect " + session.agentName)
+                    .accessibilityIdentifier("companion.agent.select." + session.agentID)
                 }
+            }
+        }
+        .onChange(of: liveSessions.map(\.agentID)) { _, currentIDs in
+            if let selectedAgentID, !currentIDs.contains(selectedAgentID) {
+                self.selectedAgentID = nil
             }
         }
     }
