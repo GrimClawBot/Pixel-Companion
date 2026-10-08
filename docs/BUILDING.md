@@ -995,3 +995,20 @@ sessions; validate that provider behavior separately. Nothing in the
 verification UI creates synthetic agent events, reads private transcripts,
 configures Codex/Claude, edits a hook, launches an agent command, changes
 permissions or contacts Paperclip. The verification state is RAM-only.
+
+## Isolated hook acceptance and diagnostics (PC-049)
+
+Run /usr/bin/python3 scripts/quality/integration/verify_agent_hook_bridges.py
+to exercise the exact optional bridge executables in disposable private
+folders. It does not modify Codex/Claude settings, send model requests,
+access credentials, or create fake markers in any actual agent folder.
+It explicitly marks real-provider delivery NOT_TESTED. The recorded
+results and separate manual-provider acceptance checklist are in
+docs/PC049_HOOK_ACCEPTANCE.md.
+
+Settings -> Connections -> Verify hook delivery now includes passive
+diagnostics for OFF, unconnected, missing/invalid marker, historical
+marker, recent unverified marker, waiting for new change, local marker
+changed, and timeout. These use only existing read-only monitors and
+never execute a provider command. A marker change cannot authenticate
+its writer or establish task success.
