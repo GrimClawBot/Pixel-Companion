@@ -49,4 +49,13 @@ extension AppModel {
             fileShelf.configure(enabled: newValue)
         }
     }
+    var clipboardHistoryEnabled: Bool {
+        get { settings.clipboardHistoryEnabled }
+        set {
+            guard newValue != settings.clipboardHistoryEnabled else { return }
+            objectWillChange.send()
+            settings.clipboardHistoryEnabled = newValue
+            clipboardHistory.configure(enabled: newValue)
+        }
+    }
 }

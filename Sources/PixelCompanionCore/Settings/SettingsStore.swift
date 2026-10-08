@@ -33,6 +33,7 @@ public final class SettingsStore {
         case displayBrightnessHUDEnabled = "pixelCompanion.displayBrightnessHUDEnabled"
         case downloadHUDEnabled = "pixelCompanion.downloadHUDEnabled"
         case fileShelfEnabled = "pixelCompanion.fileShelfEnabled"
+        case clipboardHistoryEnabled = "pixelCompanion.clipboardHistoryEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -154,6 +155,12 @@ public final class SettingsStore {
     public var fileShelfEnabled: Bool {
         get { (defaults.object(forKey: Key.fileShelfEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.fileShelfEnabled.rawValue) }
+    }
+
+    /// Manual RAM-only clipboard history; never auto-captures.
+    public var clipboardHistoryEnabled: Bool {
+        get { (defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.clipboardHistoryEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.
