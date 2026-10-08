@@ -16,6 +16,7 @@ public final class PaperclipConnector:
         var connectionState: ConnectionState
         var lastError: String?
         var lastSuccessfulRefreshAt: Date?
+        var lastSuccessfulSessionRefreshAt: Date?
         var companyName: String?
         var companyID: String?
         var companies: [PaperclipCompany] = []
@@ -32,6 +33,9 @@ public final class PaperclipConnector:
     private var cache: Cache
     private var refreshGeneration = 0
     private var publishedCoreGeneration = 0
+    private var publishedSessionGeneration = 0
+    /// Successful core publications whose slower session fetches may complete later.
+    private var pendingSessions: [Int: (companyID: String?, coreTime: Date)] = [:]
 
     /// Called on the main queue after cached state changes.
     public var onChange: (() -> Void)?
@@ -56,6 +60,10 @@ public final class PaperclipConnector:
     public var lastError: String? { locked { cache.lastError } }
     /// Client-side time of the most recent successful core refresh; not server activity time.
     public var lastSuccessfulRefreshAt: Date? { locked { cache.lastSuccessfulRefreshAt } }
+    /// Separate session evidence; a healthy core poll never refreshes stale agent telemetry.
+    public var lastSuccessfulSessionRefreshAt: Date? {
+        locked { cache.lastSuccessfulSessionRefreshAt }
+    }
     public var auth: (any AuthProvider)? { self }
     public var activity: (any ActivitySource)? { self }
     public var approvals: (any ApprovalProvider)? { self }
@@ -145,14 +153,28 @@ public final class PaperclipConnector:
             value.inFlight = false
             switch result {
             case let .success(state):
+                let companyChanged = value.companyID != state.companyID
                 applyCore(state, to: &value)
+                if companyChanged {
+                    value.lastSuccessfulSessionRefreshAt = nil
+                    publishedSessionGeneration = 0
+                    pendingSessions.removeAll()
+                }
                 publishedCoreGeneration = generation
+                if let coreTime = value.lastSuccessfulRefreshAt {
+                    pendingSessions[generation] = (state.companyID, coreTime)
+                }
+                // A bounded number of unresolved older queries may still return.
+                pendingSessions = pendingSessions.filter { generation - $0.key < 32 }
             case let .failure(error):
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 value.agentSessions = []
+                value.lastSuccessfulSessionRefreshAt = nil
                 value.tasks = []
                 publishedCoreGeneration = 0
+                publishedSessionGeneration = 0
+                pendingSessions.removeAll()
             }
         }
     }
@@ -162,12 +184,23 @@ public final class PaperclipConnector:
         generation: Int
     ) {
         update { value in
-            guard generation == publishedCoreGeneration else { return }
+            // Core refresh may advance independently while session fetch runs.
+            // Accept the newest completed session evidence for this SAME company,
+            // without allowing an older response to replace a newer session result.
+            guard let pending = pendingSessions.removeValue(forKey: generation),
+                  value.connectionState == .connected,
+                  pending.companyID == value.companyID,
+                  generation > publishedSessionGeneration else { return }
+            publishedSessionGeneration = generation
             switch result {
             case let .success(sessions):
                 value.agentSessions = sessions
+                // Date of the associated core fetch, not the later callback time:
+                // a slow response cannot make old telemetry appear newly fresh.
+                value.lastSuccessfulSessionRefreshAt = pending.coreTime
             case .failure:
                 value.agentSessions = []
+                value.lastSuccessfulSessionRefreshAt = nil
             }
         }
     }

@@ -51,8 +51,13 @@ struct SnapshotContent: View {
     let mood: CharacterMood
     var approvalLimit: Int? = 2
     var feedFreshness: FeedFreshness = .notApplicable
+    var agentFeedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
     var showsHeader = true
+
+    private var verifiedSessions: [AgentSessionSnapshot] {
+        agentFeedFreshness.canPresentAsLive ? snapshot.agentSessions : []
+    }
 
     private var visibleApprovals: [ApprovalRequest] {
         ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
@@ -71,6 +76,13 @@ struct SnapshotContent: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if feedFreshness.canPresentAsLive,
+                   let warning = agentFeedFreshness.warning {
+                    Text("Agent telemetry: " + warning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             if feedFreshness.canPresentAsLive {
                 liveContent
@@ -82,7 +94,7 @@ struct SnapshotContent: View {
         VStack(alignment: .leading, spacing: 10) {
             switch AgentSessionPresentation.snapshotPrimary(
                 activity: snapshot.currentActivity,
-                sessions: snapshot.agentSessions
+                sessions: verifiedSessions
             ) {
             case let .activity(activity):
                 SectionTitle(text: "Now")
