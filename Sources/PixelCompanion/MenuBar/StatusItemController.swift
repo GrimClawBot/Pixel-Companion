@@ -82,6 +82,8 @@ struct MenuBarPopoverView: View {
             outputVolumeMonitor: model.outputVolumeMonitor,
             displayBrightnessHUDEnabled: model.displayBrightnessHUDEnabled,
             displayBrightnessMonitor: model.displayBrightnessMonitor,
+            downloadHUDEnabled: model.downloadHUDEnabled,
+            downloadMonitor: model.downloadMonitor,
             calendarWidgetEnabled: model.calendarWidgetEnabled,
             calendarShowTitles: model.calendarShowTitles,
             calendarMonitor: model.calendarMonitor,

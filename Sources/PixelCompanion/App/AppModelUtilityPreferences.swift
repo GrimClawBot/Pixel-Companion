@@ -30,4 +30,14 @@ extension AppModel {
             displayBrightnessMonitor.configure(enabled: newValue)
         }
     }
+
+    var downloadHUDEnabled: Bool {
+        get { settings.downloadHUDEnabled }
+        set {
+            guard newValue != settings.downloadHUDEnabled else { return }
+            objectWillChange.send()
+            settings.downloadHUDEnabled = newValue
+            downloadMonitor.configure(enabled: newValue)
+        }
+    }
 }

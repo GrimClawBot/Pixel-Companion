@@ -268,6 +268,8 @@ extension SettingsView {
                 .accessibilityIdentifier("companion.settings.output-volume-hud")
             Toggle("Enable Display brightness HUD", isOn: $model.displayBrightnessHUDEnabled)
                 .accessibilityIdentifier("companion.settings.display-brightness-hud")
+            Toggle("Show connected download progress", isOn: $model.downloadHUDEnabled)
+                .accessibilityIdentifier("companion.settings.download-hud")
             MusicSettingsControls(model: model)
             Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
                 .accessibilityIdentifier("companion.settings.calendar-widget")

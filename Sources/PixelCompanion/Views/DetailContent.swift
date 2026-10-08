@@ -78,6 +78,8 @@ struct DetailContent: View {
     var outputVolumeMonitor: OutputVolumeMonitor?
     var displayBrightnessHUDEnabled = false
     var displayBrightnessMonitor: DisplayBrightnessMonitor?
+    var downloadHUDEnabled = false
+    var downloadMonitor: DownloadProgressMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -293,6 +295,9 @@ extension DetailContent {
             }
             if displayBrightnessHUDEnabled, let displayBrightnessMonitor {
                 DisplayBrightnessView(monitor: displayBrightnessMonitor)
+            }
+            if downloadHUDEnabled, let downloadMonitor {
+                DownloadProgressView(monitor: downloadMonitor)
             }
             if calendarWidgetEnabled, let calendarMonitor {
                 CalendarNextEventView(
