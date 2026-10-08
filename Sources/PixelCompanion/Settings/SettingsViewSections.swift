@@ -207,11 +207,13 @@ extension SettingsView {
                 .accessibilityIdentifier("companion.settings.download-hud")
             Toggle("File shelf", isOn: $model.fileShelfEnabled)
                 .accessibilityIdentifier("companion.settings.file-shelf")
+            Toggle("Clipboard (manual capture)", isOn: $model.clipboardHistoryEnabled)
+                .accessibilityIdentifier("companion.settings.clipboard-history")
         } header: {
             Text("Productivity")
         } footer: {
-            Text("Focus is a local timer. Downloads needs a connected provider. " +
-                 "File shelf keeps user-chosen references only, until disabled or quit.")
+            Text("Focus is local; Downloads needs a provider. File shelf and " +
+                 "Clipboard keep only user-chosen RAM state until disabled or quit.")
         }
 
         Section {

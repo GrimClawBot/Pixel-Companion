@@ -82,6 +82,8 @@ struct DetailContent: View {
     var downloadMonitor: DownloadProgressMonitor?
     var fileShelfEnabled = false
     var fileShelf: TransientFileShelf?
+    var clipboardHistoryEnabled = false
+    var clipboardHistory: TransientClipboardHistory?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -303,6 +305,9 @@ extension DetailContent {
             }
             if fileShelfEnabled, let fileShelf {
                 TransientFileShelfView(shelf: fileShelf)
+            }
+            if clipboardHistoryEnabled, let clipboardHistory {
+                TransientClipboardHistoryView(history: clipboardHistory)
             }
             if calendarWidgetEnabled, let calendarMonitor {
                 CalendarNextEventView(

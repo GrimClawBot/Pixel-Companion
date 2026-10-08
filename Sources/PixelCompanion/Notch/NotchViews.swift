@@ -103,6 +103,8 @@ struct NotchRootView: View {
                 downloadMonitor: model.downloadMonitor,
                 fileShelfEnabled: model.fileShelfEnabled,
                 fileShelf: model.fileShelf,
+                clipboardHistoryEnabled: model.clipboardHistoryEnabled,
+                clipboardHistory: model.clipboardHistory,
                 calendarWidgetEnabled: model.calendarWidgetEnabled,
                 calendarShowTitles: model.calendarShowTitles,
                 calendarMonitor: model.calendarMonitor,

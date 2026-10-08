@@ -25,6 +25,7 @@ final class AppModel: ObservableObject {
     let displayBrightnessMonitor = DisplayBrightnessMonitor()
     let downloadMonitor = DownloadProgressMonitor()
     let fileShelf = TransientFileShelf()
+    let clipboardHistory = TransientClipboardHistory()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -290,6 +291,7 @@ extension AppModel {
         displayBrightnessMonitor.configure(enabled: settings.displayBrightnessHUDEnabled)
         downloadMonitor.configure(enabled: settings.downloadHUDEnabled)
         fileShelf.configure(enabled: settings.fileShelfEnabled)
+        clipboardHistory.configure(enabled: settings.clipboardHistoryEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
