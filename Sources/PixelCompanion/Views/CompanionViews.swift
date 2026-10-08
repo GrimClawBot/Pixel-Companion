@@ -35,6 +35,7 @@ struct SnapshotContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
     var approvalLimit: Int? = 2
+    var showsHeader = true
 
     private var visibleApprovals: [ApprovalRequest] {
         ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
@@ -42,7 +43,9 @@ struct SnapshotContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SummaryHeader(snapshot: snapshot, mood: mood)
+            if showsHeader {
+                SummaryHeader(snapshot: snapshot, mood: mood)
+            }
             switch AgentSessionPresentation.snapshotPrimary(
                 activity: snapshot.currentActivity,
                 sessions: snapshot.agentSessions

@@ -49,10 +49,14 @@ struct NotchRootView: View {
                 CompactBar(snapshot: model.snapshot, mood: model.mood)
                     .frame(height: NotchLayout.compactBarHeight)
                     .padding(.horizontal, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
             } else {
                 CompactBar(snapshot: model.snapshot, mood: model.mood)
                     .frame(height: state.notchSize.height)
                     .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
                 expandedContent
             }
         }
@@ -61,8 +65,6 @@ struct NotchRootView: View {
             UnevenRoundedRectangle(bottomLeadingRadius: cornerRadius, bottomTrailingRadius: cornerRadius)
                 .fill(Color.black)
         )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onClick)
     }
 
     @ViewBuilder private var expandedContent: some View {
@@ -73,6 +75,8 @@ struct NotchRootView: View {
             SnapshotContent(snapshot: model.snapshot, mood: model.mood)
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onClick)
         case .detail:
             DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
                 .padding([.horizontal, .bottom], 16)
