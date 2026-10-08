@@ -119,6 +119,10 @@ struct AgentSessionMonitorView: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            ContextHealthSummaryView(
+                reportedUsed: session.contextUsedTokens,
+                reportedWindow: session.contextWindowTokens
+            )
             Text("Read-only report · No run-completion percentage available")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
