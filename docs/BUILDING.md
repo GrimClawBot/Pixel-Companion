@@ -169,3 +169,22 @@ feed cannot expose cached agents as current. No server requests, permissions
 or public API changes were added. Manual QA should check keyboard typing and
 clear, All/Active filtering, inspector/back, active run updates, and 360-point
 menu-bar vs 440-point notch behavior before merging.
+
+## Read-only Activity timeline (PC-017)
+
+Activity keeps all existing read-only pending approvals and messages, but shows
+recent events in a chronological timeline. Search matches the received event
+title/detail locally and a compact event-kind menu filters All, Running,
+Completed, Failed and Notes. Results are newest-first, with stable order for
+identical timestamps. Day headings distinguish Today, Yesterday, dated
+earlier history and Date not reported; missing timestamps are never displayed
+as current. During a stale/disconnected feed, events are visibly labeled as
+**Cached history**, not live results. An empty feed and a search with no matches
+have distinct messages.
+
+The source event contract does **not** include guaranteed agent identity for
+all events. The timeline therefore does not claim accurate per-agent event
+history based on matching text alone. No extra Paperclip endpoints, writes,
+data persistence, privileges or third-party dependencies are added.
+Human macOS QA must test Search and filter together, changing dates, cached
+history, approvals/messages, and both 440pt notch and 360pt menu bar.
