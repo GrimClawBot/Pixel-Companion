@@ -86,3 +86,17 @@ the button stays disabled. The app never fires the test automatically on launch 
 
 Check Notification Center if the banner is not immediately visible (Focus modes may suppress
 banners). Record whether the alert appears; a successful build alone does not verify display.
+
+### Simulated Paperclip notification checks (numbered QA bundles only)
+
+A numbered QA bundle (identified by the optional \`PCQAUpdateNumber\` Info.plist
+value) displays **Simulate new approval**, **Simulate run completed**, and
+**Simulate run failed** in Settings → Notifications. These controls require
+notification opt-in and macOS permission. Each uses a separate in-memory
+\`CompanionNoticeDetector\` with synthetic events and requests a generic macOS
+banner through the normal notification center adapter; it does not issue HTTP
+requests, change Paperclip, or alter the live event baseline. Production bundles
+without the QA update metadata hide and disable these controls.
+
+The simulator validates local event detection and delivery only. It cannot
+substitute for separately observing a genuine new Paperclip approval/run event.

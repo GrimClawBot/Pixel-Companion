@@ -163,6 +163,36 @@ final class CompanionNotificationManagerTests: XCTestCase {
         XCTAssertFalse(manager.canSendTest)
     }
 
+    func testQASimulationUsesDetectorWithoutPaperclipAndHonorsOptIn() async {
+        let center = FakeCenter()
+        let manager = makeManager(center: center, qaBuild: true)
+        manager.simulateQAEvent(.newApproval)
+        XCTAssertTrue(center.delivered.isEmpty)
+        manager.setEnabled(true)
+        await drain()
+        center.answer(true)
+        await drain()
+        XCTAssertTrue(manager.canSimulateQAEvent)
+        for scenario in CompanionQAScenario.allCases {
+            manager.simulateQAEvent(scenario)
+        }
+        XCTAssertEqual(center.delivered, [.approvals(1), .completedRuns(1), .failedRuns(1)])
+        XCTAssertTrue(manager.testStatus?.contains("No Paperclip changes") == true)
+        manager.setEnabled(false)
+        manager.simulateQAEvent(.newApproval)
+        XCTAssertEqual(center.delivered.count, 3)
+
+        let productionCenter = FakeCenter()
+        let production = makeManager(center: productionCenter)
+        production.setEnabled(true)
+        await drain()
+        productionCenter.answer(true)
+        await drain()
+        production.simulateQAEvent(.newApproval)
+        XCTAssertFalse(production.canSimulateQAEvent)
+        XCTAssertTrue(productionCenter.delivered.isEmpty)
+    }
+
     func testOffByDefaultAndUnbundledCannotRequestOrDeliver() async {
         let center = FakeCenter()
         let manager = makeManager(center: center, bundled: false)
@@ -208,10 +238,13 @@ final class CompanionNotificationManagerTests: XCTestCase {
 
     private func makeManager(
         center: FakeCenter,
-        bundled: Bool = true
+        bundled: Bool = true,
+        qaBuild: Bool = false
     ) -> CompanionNotificationManager {
         let defaults = UserDefaults(suiteName: "PixelCompanionNotifyTests.\(UUID().uuidString)")!
-        return CompanionNotificationManager(defaults: defaults, center: center, isBundled: bundled)
+        return CompanionNotificationManager(
+            defaults: defaults, center: center, isBundled: bundled, isQABuild: qaBuild
+        )
     }
 
     private func snapshot(_ approvalIDs: [String]) -> ConnectorSnapshot {

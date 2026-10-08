@@ -195,6 +195,7 @@ final class CompanionNotificationManager {
     private let defaults: UserDefaults
     private let center: any CompanionNoticeCenter
     private let isBundled: Bool
+    private let isQABuild: Bool
     private var detector = CompanionNoticeDetector()
     private var pending: [CompanionNotice] = []
     private var authorizationGeneration = 0
@@ -208,11 +209,13 @@ final class CompanionNotificationManager {
     init(
         defaults: UserDefaults = .standard,
         center: (any CompanionNoticeCenter)? = nil,
-        isBundled: Bool = Bundle.main.bundleURL.pathExtension.lowercased() == "app"
+        isBundled: Bool = Bundle.main.bundleURL.pathExtension.lowercased() == "app",
+        isQABuild: Bool = CompanionBuildInfo.qaUpdate != nil
     ) {
         self.defaults = defaults
         self.center = center ?? SystemCompanionNoticeCenter()
         self.isBundled = isBundled
+        self.isQABuild = isQABuild
         enabled = defaults.bool(forKey: Self.preferenceKey)
     }
 
@@ -321,6 +324,18 @@ final class CompanionNotificationManager {
         guard generation == testGeneration && enabled && permission == .ready else { return }
         testStatus = result
         submittingTest = false
+        onChange?()
+    }
+
+    var canSimulateQAEvent: Bool {
+        isQABuild && canSendTest
+    }
+
+    func simulateQAEvent(_ scenario: CompanionQAScenario) {
+        guard canSimulateQAEvent else { return }
+        // Isolated detector: never mutates the live Paperclip notification baseline.
+        scenario.notices().forEach { center.deliver($0) }
+        testStatus = "Requested local simulated \(scenario.label) alert. No Paperclip changes."
         onChange?()
     }
 

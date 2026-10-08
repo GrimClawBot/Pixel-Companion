@@ -114,6 +114,14 @@ final class AppModel: ObservableObject {
         await notificationManager.sendTestNotification()
     }
 
+    var canSimulateQAEvent: Bool {
+        notificationManager.canSimulateQAEvent
+    }
+
+    func simulateQAEvent(_ scenario: CompanionQAScenario) {
+        notificationManager.simulateQAEvent(scenario)
+    }
+
     func refreshNotificationPermission() {
         notificationManager.refreshPermission()
     }

@@ -154,6 +154,17 @@ struct SettingsView: View {
                 Task { await model.sendTestNotification() }
             }
             .disabled(!model.canSendTestNotification)
+            if CompanionBuildInfo.qaUpdate != nil {
+                Button("Simulate new approval (local QA)") { model.simulateQAEvent(.newApproval) }
+                    .disabled(!model.canSimulateQAEvent)
+                Button("Simulate run completed (local QA)") { model.simulateQAEvent(.runCompleted) }
+                    .disabled(!model.canSimulateQAEvent)
+                Button("Simulate run failed (local QA)") { model.simulateQAEvent(.runFailed) }
+                    .disabled(!model.canSimulateQAEvent)
+                Text("QA-only simulated events. No data is sent to Paperclip.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if let status = model.notificationTestStatus {
                 Text(status)
                     .font(.caption)
