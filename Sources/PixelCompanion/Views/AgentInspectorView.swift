@@ -58,6 +58,8 @@ struct AgentInspectorView: View {
             }
             .companionCard()
 
+            AgentSessionMonitorView(session: session)
+
             VStack(alignment: .leading, spacing: 7) {
                 Text("Latest reported session")
                     .font(.callout.weight(.semibold))
@@ -80,7 +82,7 @@ struct AgentInspectorView: View {
 
             Text("Reported usage")
                 .font(.callout.weight(.semibold))
-            AgentUsageCard(session: session)
+            AgentUsageCard(session: session, showsContext: false)
             AgentRunHistoryView(runs: session.recentRuns)
             Text("Read-only · Fields not supplied by the runtime remain unavailable")
                 .font(.caption2)
