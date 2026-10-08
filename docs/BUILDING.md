@@ -1043,3 +1043,26 @@ Codex or Claude configuration; turning OFF the app display does not
 remove externally configured hooks. Real provider delivery still requires
 a genuine supported Codex or Claude lifecycle event and is not proven by
 isolated hook script tests. Codex IDE and CLI behavior can differ.
+
+## Mac production-view acceptance (PC-051)
+
+The app's Codex turn and Claude lifecycle cards now recalculate recent vs
+historical labels every 15 seconds, even when the existing marker has not
+changed. Overview local attention also updates its historical wording every
+30 seconds, and stops displaying entries older than the 30-minute RAM
+retention window. An old marker cannot be mislabeled live indefinitely.
+
+Native screenshot fixture tests render the actual production Agents and
+Activity DetailContent views at both supported 360pt menu-bar and 440pt
+notch-detail widths in dark and light appearances. Screenshots contain
+only synthetic event type/timestamps and are written solely when the
+PIXEL_QA_CAPTURE_DIR test environment variable is set. They never capture
+the user's desktop, prompts, messages, local paths, credentials, provider
+session identifiers or real Paperclip data. They cannot replace human
+VoiceOver, interactive tab/navigation, or live window UI acceptance.
+
+The connected Mac currently refuses automated System Events accessibility
+scripting (error -25211). This build does not request new Accessibility
+or screen control grants. Report interactive live UI acceptance as PENDING,
+while production-view screenshot rendering and the prior genuine local
+provider hook delivery tests are marked as passed.

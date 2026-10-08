@@ -14,29 +14,22 @@ struct LocalAgentAttentionView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            if attention.latest.isEmpty {
-                Text("No recent Codex or Claude Code completion signals.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(attention.latest) { event in
-                    HStack(spacing: 8) {
-                        Image(systemName: "bell.badge")
-                            .foregroundStyle(.secondary)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(LocalAgentAlert.from(event)?.title ?? event.source.label)
-                                .font(.caption.weight(.medium))
-                            Text(LocalAgentAlert.from(event)?.detail ?? "Status not verified")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                let visible = attention.latest.filter {
+                    LocalAgentEventPresentation.attentionIsVisible(
+                        $0.timestamp, at: context.date
+                    )
+                }
+                if visible.isEmpty {
+                    Text("No local Codex or Claude Code completion signals in this session.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(visible) { event in
+                            attentionRow(event, now: context.date)
                         }
-                        Spacer(minLength: 0)
-                        Text(event.timestamp, style: .relative)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
                     }
-                    .accessibilityElement(children: .combine)
                 }
             }
             Button("View local activity", action: openActivity)
@@ -46,5 +39,32 @@ struct LocalAgentAttentionView: View {
         }
         .companionCard()
         .accessibilityIdentifier("companion.overview.local-attention")
+    }
+
+    private func attentionRow(_ event: LocalAgentActivityEvent, now: Date) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bell.badge")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(LocalAgentAlert.from(event)?.title ?? event.source.label)
+                    .font(.caption.weight(.medium))
+                Text(LocalAgentAlert.from(event)?.detail ?? "Status not verified")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(
+                    LocalAgentEventPresentation.attentionTimingLabel(
+                        event.timestamp, at: now
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+            Text(event.timestamp, style: .relative)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
