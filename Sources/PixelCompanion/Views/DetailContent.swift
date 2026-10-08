@@ -142,6 +142,14 @@ struct DetailContent: View {
                 },
                 onShowApprovals: { navigate(to: .activity) }
             )
+            OperationalAttentionView(
+                sessions: liveSessions,
+                isLive: canShowLive,
+                onSelectAgent: { agentID in
+                    selectedAgentID = agentID
+                    navigate(to: .agents)
+                }
+            )
             SnapshotContent(
                 snapshot: snapshot, mood: mood, approvalLimit: 2,
                 feedFreshness: feedFreshness, lastSuccessfulSync: lastSuccessfulSync,
