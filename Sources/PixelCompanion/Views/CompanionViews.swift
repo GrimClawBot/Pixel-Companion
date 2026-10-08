@@ -130,6 +130,11 @@ struct DetailContent: View {
                             AgentSessionRow(session: session)
                         }
                         Divider()
+                        SectionTitle(text: "Agent usage · latest reported run")
+                        ForEach(snapshot.agentSessions) { session in
+                            AgentUsageCard(session: session)
+                            Divider()
+                        }
                     }
                     if feedFreshness.canPresentAsLive && !snapshot.pendingApprovals.isEmpty {
                         HStack {
