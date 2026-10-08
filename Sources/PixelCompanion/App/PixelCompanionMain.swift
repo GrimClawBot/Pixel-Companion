@@ -23,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
     private var coordinator: PresentationCoordinator?
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model?.refreshNotificationPermission()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let model = AppModel(settings: SettingsStore())
         let settingsWindow = SettingsWindowController(model: model)

@@ -51,3 +51,52 @@ defaults delete PixelCompanion   # domain name of an unbundled SwiftPM executabl
 
 `PixelCompanionCore` uses Foundation only and contains all of the logic, but the package also
 contains the AppKit app, so building it needs macOS.
+
+## macOS notifications (PC-005)
+
+System notifications are **off by default**. In Settings, enable them deliberately and
+approve the macOS permission prompt. If macOS has denied notifications, change permission in
+System Settings instead. Disable the toggle to stop future delivery.
+
+Only **new** Paperclip approval requests and observed agent run transitions from queued/running
+to completed/failed generate notifications. Notices use generic text; they do not contain task
+names, approval contents, agent names, session IDs, endpoints, logs or secrets. The app never
+acts on requests or runs on your behalf. It only watches while Pixel Companion is running.
+
+macOS Notification Center requires a properly installed app bundle with a stable bundle ID.
+The development-only \`swift run PixelCompanion\` executable is not an app bundle and therefore
+disables notification delivery safely. The notch, menu bar, Paperclip connector and other app
+features still work in development mode. A distributable, signed \`.app\` bundle is a separate
+release requirement; do not treat command-line tests as proof of system banner delivery.
+
+Manual macOS QA for a bundled build: check permission allow/deny, enabling after connecting,
+existing approvals not triggering, one new approval producing one notice, run completion/failure,
+repeated polls not producing duplicates, changing companies/reconnecting not replaying existing
+events, and disabling notifications. Verify the Notification Center content contains no private
+data. Do not change Paperclip production to manufacture test events.
+
+### Notification smoke test (PC-005)
+
+With a locally packaged .app open, select Settings → Notifications and explicitly enable
+system notifications. Grant the macOS permission prompt if one appears. After the status reads
+"Enabled for new Paperclip events", click **Send test notification** to request a harmless
+local banner: **Pixel Companion test — This is a local test notification.** No Paperclip
+instance, credentials or network connection is required. If macOS permission is denied,
+the button stays disabled. The app never fires the test automatically on launch or enable.
+
+Check Notification Center if the banner is not immediately visible (Focus modes may suppress
+banners). Record whether the alert appears; a successful build alone does not verify display.
+
+### Simulated Paperclip notification checks (numbered QA bundles only)
+
+A numbered QA bundle (identified by the optional \`PCQAUpdateNumber\` Info.plist
+value) displays **Simulate new approval**, **Simulate run completed**, and
+**Simulate run failed** in Settings → Notifications. These controls require
+notification opt-in and macOS permission. Each uses a separate in-memory
+\`CompanionNoticeDetector\` with synthetic events and requests a generic macOS
+banner through the normal notification center adapter; it does not issue HTTP
+requests, change Paperclip, or alter the live event baseline. Production bundles
+without the QA update metadata hide and disable these controls.
+
+The simulator validates local event detection and delivery only. It cannot
+substitute for separately observing a genuine new Paperclip approval/run event.
