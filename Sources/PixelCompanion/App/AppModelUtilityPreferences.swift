@@ -67,4 +67,13 @@ extension AppModel {
             localAgentFeed.configure(enabled: newValue)
         }
     }
+    var codexPresenceEnabled: Bool {
+        get { settings.codexPresenceEnabled }
+        set {
+            guard newValue != settings.codexPresenceEnabled else { return }
+            objectWillChange.send()
+            settings.codexPresenceEnabled = newValue
+            codexProcessMonitor.configure(enabled: newValue)
+        }
+    }
 }
