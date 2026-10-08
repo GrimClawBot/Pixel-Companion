@@ -305,7 +305,7 @@ extension AppModel {
         codexProcessMonitor.configure(enabled: settings.codexPresenceEnabled)
         codexTurnMonitor.configure(enabled: settings.codexTurnEventsEnabled)
         claudeHookMonitor.configure(enabled: settings.claudeHookEventsEnabled)
-        // Baseline existing local markers before allowing any alert deliveries.
+        reconnectManagedAgentHooksIfEnabled()
         localAgentAttention.configureNotifications(enabled: settings.localAgentAlertsEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)

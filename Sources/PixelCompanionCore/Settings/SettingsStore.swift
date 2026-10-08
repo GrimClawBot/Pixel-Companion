@@ -38,6 +38,7 @@ public final class SettingsStore {
         case codexPresenceEnabled = "pixelCompanion.codexPresenceEnabled"
         case codexTurnEventsEnabled = "pixelCompanion.codexTurnEventsEnabled"
         case claudeHookEventsEnabled = "pixelCompanion.claudeHookEventsEnabled"
+        case managedAgentHookAutoConnectEnabled = "pixelCompanion.managedAgentHookAutoConnectEnabled"
         case localAgentAlertsEnabled = "pixelCompanion.localAgentAlertsEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
@@ -196,6 +197,15 @@ public final class SettingsStore {
     public var localAgentAlertsEnabled: Bool {
         get { (defaults.object(forKey: Key.localAgentAlertsEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.localAgentAlertsEnabled.rawValue) }
+    }
+
+    /// Opt in to reconnect ONLY verified owner-private app-support folders at launch.
+    public var managedAgentHookAutoConnectEnabled: Bool {
+        get {
+            (defaults.object(forKey: Key.managedAgentHookAutoConnectEnabled.rawValue) as? Bool)
+                ?? false
+        }
+        set { defaults.set(newValue, forKey: Key.managedAgentHookAutoConnectEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.

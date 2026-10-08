@@ -1012,3 +1012,34 @@ marker, recent unverified marker, waiting for new change, local marker
 changed, and timeout. These use only existing read-only monitors and
 never execute a provider command. A marker change cannot authenticate
 its writer or establish task success.
+
+## Approved local Codex/Claude hook connection (PC-050)
+
+The optional setup script scripts/ops/connect_pixel_agent_hooks.py is
+NOT run when installing the app. A separate explicit --apply command on
+an authorized Mac backs up the exact prior provider configurations in
+private 0600 files before modifying either provider. It preserves the
+existing Codex notify argv and installs a fan-out dispatcher so the old
+handler continues receiving exactly the same raw Codex JSON payload as
+before. Only the additional Pixel Companion marker stores a minimal
+event type and UTC timestamp. The original notifier is never removed.
+
+Claude settings are merged with five supported lifecycle command hooks,
+preserving existing keys and handlers. The installer writes atomically,
+rolls back original config files on post-write failure, and prevents
+recursive rewrapping of the Codex fanout. Owner-only 0700 event folders
+are created in the Pixel Companion Application Support directory. Private
+0600 backup configs may contain sensitive pre-existing values and must
+never be committed, transmitted, or disclosed.
+
+Guided local agent setup now has a separate OFF-by-default preference
+to reconnect already-existing owner-private application-support folders
+at launch. This only connects when the corresponding local hook monitor
+is also enabled. It cannot connect arbitrary paths, auto-create folders,
+install a hook, enable other services or read private transcripts.
+
+External provider hooks continue writing until separately disabled in
+Codex or Claude configuration; turning OFF the app display does not
+remove externally configured hooks. Real provider delivery still requires
+a genuine supported Codex or Claude lifecycle event and is not proven by
+isolated hook script tests. Codex IDE and CLI behavior can differ.

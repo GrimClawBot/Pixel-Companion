@@ -1,4 +1,5 @@
 import Combine
+import Foundation
 import PixelCompanionCore
 
 /// Small nonsecret standalone utility preferences isolated from connector code.
@@ -111,5 +112,24 @@ extension AppModel {
             settings.localAgentAlertsEnabled = newValue
             localAgentAttention.configureNotifications(enabled: newValue)
         }
+    }
+    var managedAgentHookAutoConnectEnabled: Bool {
+        get { settings.managedAgentHookAutoConnectEnabled }
+        set {
+            guard newValue != settings.managedAgentHookAutoConnectEnabled else { return }
+            objectWillChange.send()
+            settings.managedAgentHookAutoConnectEnabled = newValue
+            if newValue { reconnectManagedAgentHooksIfEnabled() }
+        }
+    }
+
+    func reconnectManagedAgentHooksIfEnabled() {
+        guard let root = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first else { return }
+        ManagedAgentHookConnection.connect(
+            settings: settings, codex: codexTurnMonitor,
+            claude: claudeHookMonitor, applicationSupportRoot: root
+        )
     }
 }

@@ -12,6 +12,15 @@ struct AgentHookGuidedSetupView: View {
             Text("Connect Codex and Claude Code without changing their configuration automatically.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Toggle(
+                "Reconnect my private Codex and Claude event folders at launch",
+                isOn: $model.managedAgentHookAutoConnectEnabled
+            )
+            .accessibilityIdentifier("companion.setup.managed-auto-connect")
+            Text("Only your verified private Pixel Companion Application Support folders. " +
+                 "Custom folder selections remain session-only.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             AgentHookSetupSteps(provider: .codex, model: model)
             AgentHookSetupSteps(provider: .claudeCode, model: model)
         } header: {
