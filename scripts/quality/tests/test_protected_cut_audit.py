@@ -32,12 +32,20 @@ PROTECTION = {
         "require_last_push_approval": True,
     },
     "required_status_checks": {
-        "strict": True, "checks": [{"context": "native-checks"}],
+        "strict": True, "checks": [{"context": "native-checks", "app_id": 15368}],
     },
     "enforce_admins": {"enabled": True},
     "allow_force_pushes": {"enabled": False},
     "allow_deletions": {"enabled": False},
 }
+
+
+def audit_default_check_run():
+    return {
+        "name": "native-checks", "head_sha": "a" * 40,
+        "status": "completed", "conclusion": "success",
+        "app": {"id": 15368},
+    }
 
 
 def audit(item=None, policy=PROTECTION, **overrides):
@@ -50,6 +58,11 @@ def audit(item=None, policy=PROTECTION, **overrides):
         "git_base_sha": "b" * 40,
         "live_base_sha": "b" * 40,
         "reviews": HUMAN_REVIEW,
+        "check_runs": [{
+            "name": "native-checks", "head_sha": "a" * 40,
+            "status": "completed", "conclusion": "success",
+            "app": {"id": 15368},
+        }],
     }
     defaults.update(overrides)
     return evaluate_cut(item or pr(), policy, **defaults)
@@ -117,6 +130,39 @@ class ProtectedCutAuditTests(unittest.TestCase):
         policy = {**PROTECTION, "required_status_checks": None}
         self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
 
+    def test_wrong_app_with_correct_name_is_not_trusted(self):
+        fake = [{
+            "name": "native-checks", "head_sha": "a" * 40,
+            "status": "completed", "conclusion": "success",
+            "app": {"id": 99999},
+        }]
+        report = audit(check_runs=fake)
+        self.assertFalse(report["required_ci_producer_apps_verified"])
+        self.assertFalse(report["ready_for_explicit_human_merge_decision"])
+
+    def test_missing_producer_metadata_is_blocking(self):
+        self.assertFalse(audit(check_runs=[])["ready_for_explicit_human_merge_decision"])
+
+    def test_wrong_app_pinned_in_protection_is_blocking(self):
+        policy = {**PROTECTION, "required_status_checks": {
+            "strict": True, "checks": [{"context": "native-checks", "app_id": 42}],
+        }}
+        self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
+    def test_wrong_commit_check_run_is_blocking(self):
+        run = {**audit_default_check_run(), "head_sha": "c" * 40}
+        self.assertFalse(audit(check_runs=[run])["ready_for_explicit_human_merge_decision"])
+
+    def test_comment_after_approval_preserves_approval(self):
+        comment = {**HUMAN_REVIEW[0], "state": "COMMENTED"}
+        self.assertEqual(
+            independent_approvals([HUMAN_REVIEW[0], comment], "a" * 40, "GrimClawBot"),
+            ["independentreviewer"],
+        )
+        self.assertTrue(audit(reviews=[HUMAN_REVIEW[0], comment])[
+            "ready_for_explicit_human_merge_decision"
+        ])
+
     def test_green_unrelated_job_is_not_a_required_native_job(self):
         item = pr(statusCheckRollup=[{"name": "CodeRabbit", "conclusion": "SUCCESS"}])
         result = audit(item)
@@ -143,6 +189,10 @@ class ProtectedCutAuditTests(unittest.TestCase):
     def test_multiple_required_names_must_all_pass(self):
         policy = {**PROTECTION, "required_status_checks": {
             "strict": True, "contexts": ["native-checks", "integration-check"],
+            "checks": [
+                {"context": "native-checks", "app_id": 15368},
+                {"context": "integration-check", "app_id": 15368},
+            ],
         }}
         item = pr(statusCheckRollup=[{"name": "native-checks", "conclusion": "SUCCESS"}])
         result = audit(item, policy=policy)
