@@ -63,7 +63,10 @@ struct MenuBarPopoverView: View {
     let openSettings: () -> Void
 
     var body: some View {
-        DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
+        DetailContent(
+            snapshot: model.snapshot, mood: model.mood,
+            openSettings: openSettings, selectedTab: $model.selectedDetailTab
+        )
             .padding(16)
             .frame(width: 360, height: 440, alignment: .top)
     }
