@@ -86,6 +86,7 @@ struct DetailContent: View {
     var clipboardHistory: TransientClipboardHistory?
     var localAgentFeed: LocalAgentFeedMonitor?
     var codexProcessMonitor: CodexProcessMonitor?
+    var codexTurnMonitor: CodexTurnMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -171,6 +172,9 @@ struct DetailContent: View {
         VStack(alignment: .leading, spacing: 10) {
             if let codexProcessMonitor, codexProcessMonitor.enabled {
                 CodexProcessView(monitor: codexProcessMonitor)
+            }
+            if let codexTurnMonitor, codexTurnMonitor.enabled {
+                CodexTurnView(monitor: codexTurnMonitor)
             }
             if let localAgentFeed, localAgentFeed.enabled {
                 LocalAgentSessionsView(monitor: localAgentFeed)

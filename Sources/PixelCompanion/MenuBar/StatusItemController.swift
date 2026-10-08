@@ -90,6 +90,7 @@ struct MenuBarPopoverView: View {
             clipboardHistory: model.clipboardHistory,
             localAgentFeed: model.localAgentFeed,
             codexProcessMonitor: model.codexProcessMonitor,
+            codexTurnMonitor: model.codexTurnMonitor,
             calendarWidgetEnabled: model.calendarWidgetEnabled,
             calendarShowTitles: model.calendarShowTitles,
             calendarMonitor: model.calendarMonitor,

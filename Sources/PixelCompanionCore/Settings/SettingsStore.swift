@@ -36,6 +36,7 @@ public final class SettingsStore {
         case clipboardHistoryEnabled = "pixelCompanion.clipboardHistoryEnabled"
         case localAgentFeedEnabled = "pixelCompanion.localAgentFeedEnabled"
         case codexPresenceEnabled = "pixelCompanion.codexPresenceEnabled"
+        case codexTurnEventsEnabled = "pixelCompanion.codexTurnEventsEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -175,6 +176,12 @@ public final class SettingsStore {
     public var codexPresenceEnabled: Bool {
         get { (defaults.object(forKey: Key.codexPresenceEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.codexPresenceEnabled.rawValue) }
+    }
+
+    /// Explicit Codex notify-hook status file; location never persisted.
+    public var codexTurnEventsEnabled: Bool {
+        get { (defaults.object(forKey: Key.codexTurnEventsEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.codexTurnEventsEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.

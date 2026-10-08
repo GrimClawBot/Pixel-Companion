@@ -132,6 +132,7 @@ struct SettingsView: View {
                         LocalAgentFeedSettingsControls(
                             model: model, monitor: model.localAgentFeed
                         )
+                        CodexTurnSettingsControls(model: model, monitor: model.codexTurnMonitor)
                         if model.isMockConnector {
                             mockSection
                         }
