@@ -169,35 +169,11 @@ struct DetailContent: View {
     }
 
     private var agentsContent: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            SectionTitle(text: AgentSessionPresentation.sectionTitle(liveSessions))
-            if !canShowLive {
-                Placeholder(text: "Live agent information is unavailable until Paperclip reconnects.")
-            } else if liveSessions.isEmpty {
-                Placeholder(text: "No agents reported by this connector.")
-            } else if let selected = AgentInspectorSelection.resolve(
-                agentID: selectedAgentID, sessions: liveSessions, isLive: canShowLive
-            ) {
-                AgentInspectorView(session: selected) { selectedAgentID = nil }
-            } else {
-                ForEach(liveSessions) { session in
-                    Button {
-                        selectedAgentID = session.agentID
-                    } label: {
-                        AgentSessionRow(session: session)
-                            .contentShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Inspect " + session.agentName)
-                    .accessibilityIdentifier("companion.agent.select." + session.agentID)
-                }
-            }
-        }
-        .onChange(of: liveSessions.map(\.agentID)) { _, currentIDs in
-            if let selectedAgentID, !currentIDs.contains(selectedAgentID) {
-                self.selectedAgentID = nil
-            }
-        }
+        AgentsDirectoryView(
+            sessions: liveSessions,
+            isLive: canShowLive,
+            selectedAgentID: $selectedAgentID
+        )
     }
 
     private var usageContent: some View {

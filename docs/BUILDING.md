@@ -153,3 +153,19 @@ Mac visual QA: test mouse/keyboard selection on notch and menu-bar, use Back,
 inspect different agents, change tabs while selected, test connector failure
 and recovery, long task/model names, and both known/unknown telemetry fields.
 No public binary distribution is allowed yet.
+
+## Searchable Agents directory (PC-016, local QA)
+
+The Agents tab now has a local Search field and **All / Active** segmented
+filter. Search checks the already-reported name, title, task, provider, model
+and status, case/diacritic-insensitively. The search is purely in memory and
+never sends typed text to Paperclip or another provider. The existing
+inspect-an-agent and All agents back behavior is preserved; filters apply to
+the directory list, not the selected inspector's live session identity.
+
+The UI reports the filtered count and differentiates no agents, no active
+agents, no search matches, and disconnected/stale data. Disconnected or stale
+feed cannot expose cached agents as current. No server requests, permissions
+or public API changes were added. Manual QA should check keyboard typing and
+clear, All/Active filtering, inspector/back, active run updates, and 360-point
+menu-bar vs 440-point notch behavior before merging.
