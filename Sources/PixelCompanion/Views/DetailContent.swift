@@ -76,6 +76,8 @@ struct DetailContent: View {
     var batteryMonitor: BatteryPowerMonitor?
     var outputVolumeHUDEnabled = false
     var outputVolumeMonitor: OutputVolumeMonitor?
+    var displayBrightnessHUDEnabled = false
+    var displayBrightnessMonitor: DisplayBrightnessMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -132,74 +134,6 @@ struct DetailContent: View {
         case .agents: agentsContent
         case .usage: usageContent
         case .activity: activityContent
-        }
-    }
-
-    private var overviewContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                metric(value: canShowLive ? "\(snapshot.agentSessions.count)" : "—",
-                       label: "Agents", shortcut: .agents)
-                metric(value: canShowLive ? "\(liveSessions.filter(\.isActive).count)" : "—",
-                       label: "Active", shortcut: .active)
-                metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
-                       label: "Approvals", shortcut: .approvals)
-            }
-            LiveActivityDigestView(snapshot: snapshot, isLive: canShowLive)
-            PublicGitHubPulseView(state: publicGitHubState)
-            LiveOperationsPulseView(
-                sessions: liveSessions,
-                pendingApprovalCount: snapshot.pendingApprovals.count,
-                isLive: canShowLive,
-                onSelectAgent: { agentID in
-                    selectedAgentID = agentID
-                    navigate(to: .agents)
-                },
-                onShowApprovals: { navigate(to: .activity) }
-            )
-            OperationalAttentionView(
-                sessions: liveSessions,
-                isLive: canShowLive,
-                onSelectAgent: { agentID in
-                    selectedAgentID = agentID
-                    navigate(to: .agents)
-                }
-            )
-            if focusTimerEnabled, let focusTimer {
-                FocusTimerView(controller: focusTimer)
-            }
-            if batteryHUDEnabled, let batteryMonitor {
-                BatteryPowerView(monitor: batteryMonitor)
-            }
-            if outputVolumeHUDEnabled, let outputVolumeMonitor {
-                OutputVolumeView(monitor: outputVolumeMonitor)
-            }
-            if calendarWidgetEnabled, let calendarMonitor {
-                CalendarNextEventView(
-                    monitor: calendarMonitor, showTitles: calendarShowTitles
-                )
-            }
-            if musicWidgetEnabled, let musicMonitor {
-                MusicNowPlayingView(
-                    monitor: musicMonitor, showDetails: musicShowTrackDetails
-                )
-            }
-            SnapshotContent(
-                snapshot: snapshot, mood: mood, approvalLimit: 2,
-                feedFreshness: feedFreshness, lastSuccessfulSync: lastSuccessfulSync,
-                showsHeader: false
-            )
-            Button("View usage details") { navigate(to: .usage) }
-                .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-                .accessibilityIdentifier("companion.overview.usage")
-            if canShowLive && snapshot.pendingApprovals.count > 2 {
-                Button("View all approvals in Activity") { navigate(to: .activity) }
-                    .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
-            }
         }
     }
 
@@ -318,6 +252,77 @@ struct DetailContent: View {
 }
 
 extension DetailContent {
+    private var overviewContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                metric(value: canShowLive ? "\(snapshot.agentSessions.count)" : "—",
+                       label: "Agents", shortcut: .agents)
+                metric(value: canShowLive ? "\(liveSessions.filter(\.isActive).count)" : "—",
+                       label: "Active", shortcut: .active)
+                metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
+                       label: "Approvals", shortcut: .approvals)
+            }
+            LiveActivityDigestView(snapshot: snapshot, isLive: canShowLive)
+            PublicGitHubPulseView(state: publicGitHubState)
+            LiveOperationsPulseView(
+                sessions: liveSessions,
+                pendingApprovalCount: snapshot.pendingApprovals.count,
+                isLive: canShowLive,
+                onSelectAgent: { agentID in
+                    selectedAgentID = agentID
+                    navigate(to: .agents)
+                },
+                onShowApprovals: { navigate(to: .activity) }
+            )
+            OperationalAttentionView(
+                sessions: liveSessions,
+                isLive: canShowLive,
+                onSelectAgent: { agentID in
+                    selectedAgentID = agentID
+                    navigate(to: .agents)
+                }
+            )
+            if focusTimerEnabled, let focusTimer {
+                FocusTimerView(controller: focusTimer)
+            }
+            if batteryHUDEnabled, let batteryMonitor {
+                BatteryPowerView(monitor: batteryMonitor)
+            }
+            if outputVolumeHUDEnabled, let outputVolumeMonitor {
+                OutputVolumeView(monitor: outputVolumeMonitor)
+            }
+            if displayBrightnessHUDEnabled, let displayBrightnessMonitor {
+                DisplayBrightnessView(monitor: displayBrightnessMonitor)
+            }
+            if calendarWidgetEnabled, let calendarMonitor {
+                CalendarNextEventView(
+                    monitor: calendarMonitor, showTitles: calendarShowTitles
+                )
+            }
+            if musicWidgetEnabled, let musicMonitor {
+                MusicNowPlayingView(
+                    monitor: musicMonitor, showDetails: musicShowTrackDetails
+                )
+            }
+            SnapshotContent(
+                snapshot: snapshot, mood: mood, approvalLimit: 2,
+                feedFreshness: feedFreshness, lastSuccessfulSync: lastSuccessfulSync,
+                showsHeader: false
+            )
+            Button("View usage details") { navigate(to: .usage) }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .accessibilityIdentifier("companion.overview.usage")
+            if canShowLive && snapshot.pendingApprovals.count > 2 {
+                Button("View all approvals in Activity") { navigate(to: .activity) }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+            }
+        }
+    }
+
     private var footer: some View {
         HStack {
             Label("Read-only", systemImage: "eye")

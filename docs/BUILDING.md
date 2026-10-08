@@ -657,3 +657,17 @@ missing mute-state reports remain unknown. The feature does not capture audio, a
 microphone access, change system sound, or persist any volume/device history. It polls
 periodically every 10 seconds, stops and clears on disable, and refreshes after wake.
 Human QA of physical output types and both layouts remains a separate release gate.
+
+## Read-only display brightness HUD (PC-034 draft)
+
+Settings → Standalone utilities → **Enable Display brightness HUD** is OFF by default.
+This reports only a validated scalar read from the public IOKit display-brightness
+property when exactly one display service is identified. It intentionally does
+not use private DisplayServices/CoreDisplay APIs or claim to support all modern
+internal/external displays. If there are multiple candidate services, no
+readable brightness parameter, or an invalid scalar, the Overview card clearly
+reports **unavailable**. It never sets display brightness, accesses screen
+pixels, requests capture/Accessibility permissions or writes history. One
+local poll every 15 seconds only while enabled; state cleared immediately
+on disable, and refreshed on wake. Physical multi-display and VoiceOver QA
+remains outstanding.

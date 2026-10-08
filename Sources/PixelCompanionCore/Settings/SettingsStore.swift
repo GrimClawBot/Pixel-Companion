@@ -30,6 +30,7 @@ public final class SettingsStore {
         case focusTimerEnabled = "pixelCompanion.focusTimerEnabled"
         case batteryHUDEnabled = "pixelCompanion.batteryHUDEnabled"
         case outputVolumeHUDEnabled = "pixelCompanion.outputVolumeHUDEnabled"
+        case displayBrightnessHUDEnabled = "pixelCompanion.displayBrightnessHUDEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -133,6 +134,12 @@ public final class SettingsStore {
     public var outputVolumeHUDEnabled: Bool {
         get { (defaults.object(forKey: Key.outputVolumeHUDEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.outputVolumeHUDEnabled.rawValue) }
+    }
+
+    /// Public IOKit display brightness read-only HUD, disabled by default.
+    public var displayBrightnessHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.displayBrightnessHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.displayBrightnessHUDEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.
