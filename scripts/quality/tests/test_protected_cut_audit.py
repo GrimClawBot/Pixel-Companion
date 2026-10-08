@@ -18,8 +18,17 @@ def pr(**overrides):
 
 
 PROTECTION = {
-    "required_pull_request_reviews": {"required_approving_review_count": 1},
-    "required_status_checks": {"checks": [{"context": "native-checks"}]},
+    "required_pull_request_reviews": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews": True,
+        "require_last_push_approval": True,
+    },
+    "required_status_checks": {
+        "strict": True, "checks": [{"context": "native-checks"}],
+    },
+    "enforce_admins": {"enabled": True},
+    "allow_force_pushes": {"enabled": False},
+    "allow_deletions": {"enabled": False},
 }
 
 
@@ -49,14 +58,81 @@ class ProtectedCutAuditTests(unittest.TestCase):
         self.assertFalse(report["branch_requires_ci"])
         self.assertFalse(report["ready_for_explicit_human_merge_decision"])
 
+    def test_missing_or_null_policy_components_fail_closed(self):
+        for key in ("enforce_admins", "allow_force_pushes", "allow_deletions"):
+            with self.subTest(key=key):
+                policy = {**PROTECTION, key: None}
+                self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
     def test_no_review_requirement_refuses_promotion(self):
-        policy = {"required_pull_request_reviews": None,
-                  "required_status_checks": {"contexts": ["native-checks"]}}
+        policy = {**PROTECTION, "required_pull_request_reviews": None}
         self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
 
     def test_no_required_ci_refuses_promotion(self):
-        policy = {"required_pull_request_reviews": {"required_approving_review_count": 1},
-                  "required_status_checks": None}
+        policy = {**PROTECTION, "required_status_checks": None}
+        self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
+    def test_green_unrelated_job_is_not_a_required_native_job(self):
+        item = pr(statusCheckRollup=[{"name": "CodeRabbit", "conclusion": "SUCCESS"}])
+        result = audit(item)
+        self.assertEqual(result["missing_required_check_names"], ["native-checks"])
+        self.assertFalse(result["ci_complete_and_successful"])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_required_check_cannot_be_neutral_or_skipped(self):
+        for status in ("NEUTRAL", "SKIPPED", "CANCELLED", ""):
+            with self.subTest(status=status):
+                item = pr(statusCheckRollup=[
+                    {"name": "native-checks", "conclusion": status},
+                    {"name": "CodeRabbit", "conclusion": "SUCCESS"},
+                ])
+                self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
+
+    def test_duplicate_required_context_is_not_trusted(self):
+        item = pr(statusCheckRollup=[
+            {"name": "native-checks", "conclusion": "SUCCESS"},
+            {"name": "native-checks", "conclusion": "FAILURE"},
+        ])
+        self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
+
+    def test_multiple_required_names_must_all_pass(self):
+        policy = {**PROTECTION, "required_status_checks": {
+            "strict": True, "contexts": ["native-checks", "integration-check"],
+        }}
+        item = pr(statusCheckRollup=[{"name": "native-checks", "conclusion": "SUCCESS"}])
+        result = audit(item, policy=policy)
+        self.assertEqual(result["missing_required_check_names"], ["integration-check"])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_protection_admin_bypass_is_a_blocker(self):
+        policy = {**PROTECTION, "enforce_admins": {"enabled": False}}
+        self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
+    def test_force_push_or_deletion_are_blockers(self):
+        for field in ("allow_force_pushes", "allow_deletions"):
+            with self.subTest(field=field):
+                policy = {**PROTECTION, field: {"enabled": True}}
+                self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
+    def test_stale_or_self_push_approval_allowed_is_blocker(self):
+        for field in ("dismiss_stale_reviews", "require_last_push_approval"):
+            with self.subTest(field=field):
+                policy = {**PROTECTION, "required_pull_request_reviews": {
+                    **PROTECTION["required_pull_request_reviews"], field: False,
+                }}
+                self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
+    def test_required_checks_must_be_strict(self):
+        policy = {**PROTECTION, "required_status_checks": {
+            "strict": False, "contexts": ["native-checks"],
+        }}
+        self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
+
+    def test_true_boolean_review_count_is_not_an_integer_approval(self):
+        policy = {**PROTECTION, "required_pull_request_reviews": {
+            **PROTECTION["required_pull_request_reviews"],
+            "required_approving_review_count": True,
+        }}
         self.assertFalse(audit(policy=policy)["ready_for_explicit_human_merge_decision"])
 
     def test_draft_and_bot_comment_only_are_not_approvals(self):

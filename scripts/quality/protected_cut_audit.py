@@ -12,7 +12,6 @@ from pathlib import Path
 import re
 import subprocess
 
-GOOD_CHECKS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 REPO_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 
 
@@ -38,27 +37,70 @@ def evaluate_cut(
         check for check in (pr.get("statusCheckRollup") or [])
         if isinstance(check, dict) and check.get("name")
     ]
-    pending = any(check.get("conclusion") in (None, "") for check in checks)
-    failure = any(
-        check.get("conclusion") not in GOOD_CHECKS
-        and check.get("conclusion") not in (None, "")
-        for check in checks
+    check_names = {check["name"] for check in checks}
+    # A passed CodeRabbit check is not a substitute for native-checks.
+    # Requiring any random successful check is a fail-open release gate.
+    results_by_name: dict[str, list[str | None]] = {}
+    for check in checks:
+        results_by_name.setdefault(check["name"], []).append(check.get("conclusion"))
+    statuses_all_successful = bool(checks) and all(
+        check.get("conclusion") == "SUCCESS" for check in checks
     )
-    checks_successful = bool(checks) and not pending and not failure
     review_rule = (
         (protection or {}).get("required_pull_request_reviews") or {}
     )
+    if not isinstance(review_rule, dict):
+        review_rule = {}
     required_count = review_rule.get("required_approving_review_count")
     checks_rule = (protection or {}).get("required_status_checks") or {}
-    required_names = checks_rule.get("contexts") or [
-        check.get("context") for check in (checks_rule.get("checks") or [])
-    ]
-    protected_review = isinstance(required_count, int) and required_count >= 1
-    protected_checks = bool(required_names)
+    if not isinstance(checks_rule, dict):
+        checks_rule = {}
+    protected_review = (
+        type(required_count) is int and required_count >= 1
+    )
+    protected_checks = bool(checks_rule.get("contexts") or checks_rule.get("checks"))
+    required_contexts = set(checks_rule.get("contexts") or [])
+    required_contexts.update(
+        check["context"] for check in (checks_rule.get("checks") or [])
+        if isinstance(check, dict) and isinstance(check.get("context"), str)
+    )
+    # A context is genuinely required only when it is a nonempty name
+    # whose exact GitHub check has a successful conclusion on this PR.
+    required_names = {
+        context for context in required_contexts
+        if isinstance(context, str) and context.strip()
+    }
+    protected_checks = protected_checks and bool(required_names)
+    missing_required = sorted(required_names - check_names)
+    passing_required = all(
+        len(results_by_name.get(name, [])) == 1
+        and results_by_name[name][0] == "SUCCESS"
+        for name in required_names
+    )
+    checks_successful = statuses_all_successful and passing_required
+    admin_policy = (protection or {}).get("enforce_admins") or {}
+    force_policy = (protection or {}).get("allow_force_pushes") or {}
+    delete_policy = (protection or {}).get("allow_deletions") or {}
+    admin_enforced = isinstance(admin_policy, dict) and admin_policy.get("enabled") is True
+    strict_ci = checks_rule.get("strict") is True
+    dismiss_stale = review_rule.get("dismiss_stale_reviews") is True
+    last_push_review = review_rule.get("require_last_push_approval") is True
+    no_force_push = isinstance(force_policy, dict) and force_policy.get("enabled") is False
+    no_deletion = isinstance(delete_policy, dict) and delete_policy.get("enabled") is False
     if not protected_review:
         blockers.append("main lacks enforced approving PR review requirement")
     if not protected_checks:
         blockers.append("main lacks required CI status checks")
+    if missing_required or not passing_required:
+        blockers.append("a required named CI check is absent, repeated or unsuccessful")
+    if not admin_enforced:
+        blockers.append("main protection is not enforced for administrators")
+    if not strict_ci:
+        blockers.append("main required checks do not enforce current base")
+    if not dismiss_stale or not last_push_review:
+        blockers.append("main can reuse stale or self-push approvals")
+    if not no_force_push or not no_deletion:
+        blockers.append("main permits force pushes or deletion")
     if pr.get("isDraft") is not False:
         blockers.append("PR is still draft")
     if pr.get("reviewDecision") != "APPROVED":
@@ -87,6 +129,13 @@ def evaluate_cut(
         "github_head_matches_local_git": head_sha == git_head,
         "branch_requires_approval": protected_review,
         "branch_requires_ci": protected_checks,
+        "required_check_names": sorted(required_names),
+        "missing_required_check_names": missing_required,
+        "required_ci_checks_all_successful": passing_required,
+        "main_enforces_admins": admin_enforced,
+        "main_requires_fresh_base": strict_ci,
+        "main_requires_fresh_independent_review": dismiss_stale and last_push_review,
+        "main_blocks_force_pushes_and_deletion": no_force_push and no_deletion,
         "required_approving_review_count": required_count if protected_review else 0,
         "pr_approved": pr.get("reviewDecision") == "APPROVED",
         "pr_draft": pr.get("isDraft") is True,
