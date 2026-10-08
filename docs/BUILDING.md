@@ -470,3 +470,20 @@ No background privileged agent, additional endpoint, Mac file logging,
 or production Paperclip mutation is introduced. Human testing on an actual
 battery-powered Mac with Low Power Mode transitions, suspend/resume, both
 presentation modes and notifications is still required before merge.
+
+## Verified role groups in Agents (PC-026)
+
+Agents adds List / By role layout switching, in addition to the existing
+local search, All/Active filter and read-only inspector. Grouping is only by
+the optional structured agent.role reported in Paperclip's already-retrieved
+agent response. Role spelling/case is normalized for grouping; the original
+role is preserved in the inspector as Reported role. Missing role data
+is labeled Role not reported and is never assigned a department inferred
+from names or titles. Switching grouping does not requery the network or
+change agent IDs/sessions, and the existing fresh-feed guard suppresses
+unverified live groups.
+
+Role is not department. Company/department hierarchy navigation remains a
+separate feature until Paperclip or another reviewed connector exposes
+structured department IDs. This public model field is subject to independent
+PC-000 review before merge; Mac visual/VoiceOver acceptance is still needed.

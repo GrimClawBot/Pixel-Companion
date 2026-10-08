@@ -10,7 +10,7 @@ Pixel Companion is an independent native macOS 14+ notch and menu-bar companion 
 - Four tabs: Overview, Agents, Usage, Activity. Command-1/2/3/4 navigation, shared tab state and Reduce Motion support.
 - Optional read-only Paperclip GET connector: health, company selection, agents, issues/tasks, approvals, bounded recent runs and usage.
 - Live Operations and Attention overview for confirmed running/queued/failed latest runs, company-wide approvals and reported monthly budget/context warnings.
-- Agent search and Active filter, inspector with real model/provider/tokens/context, recent agent-ID-linked run history and structured assigned tasks.
+- Agent search, Active filter and optional grouping by reported role (not inferred department); inspector with real model/provider/tokens/context, recent agent-ID-linked run history and structured assigned tasks.
 - Collapsible read-only company tasks with local search and a searchable/dated Activity timeline with cached/stale labels.
 - Optional credential-free **public GitHub CI panel** for up to three recent Actions workflow runs and open PRs. It is disabled until explicitly configured and does not affect Paperclip monitoring.
 - Opt-in privacy-safe macOS notifications for newly observed approval or run-completion/failure transitions; in-app attention cards do not generate another push notification.

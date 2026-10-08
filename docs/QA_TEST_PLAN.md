@@ -13,7 +13,7 @@ This file is a **test plan, not proof that testing occurred**. Record exact sour
 
 - Launch and Quit, no unexpected Dock icon, Esc/click-outside dismiss, hover flicker and character moods.
 - Overview counts, Running/Queued/Failed latest run views, approval ownership clearly company-wide, Attention signals and tap-through to inspector.
-- Agents search/filter, long names, session state, real/unknown model/provider, run history cap, reported token and context/budget warnings, Back navigation.
+- Agents search/filter and List/By role grouping, missing roles visibly unreported, no fabricated departments; long names, session state, real/unknown model/provider, run history cap, reported token and context/budget warnings, Back navigation.
 - Activity search/date/type filters, pending approvals/messages, expand Company Tasks and search; only authoritative assigneeAgentId gets inspector routing.
 - Optional public GitHub input is blank by default; verify valid owner/repo shows reported workflow/PR statuses, invalid/private/missing repositories fail safely, no credentials are requested, no Paperclip disruption or misleading cached green CI.
 - Test no agents, no tasks, missing metrics/timestamps, stale/disconnected Paperclip, recover after reconnect, no old data shown as live.

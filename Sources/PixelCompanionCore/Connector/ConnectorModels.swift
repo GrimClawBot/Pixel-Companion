@@ -131,6 +131,8 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     public let agentID: String
     public let agentName: String
     public let agentTitle: String?
+    /// Optional role exactly reported by the source; never an inferred department.
+    public let agentRole: String?
     public let agentStatus: String
     public let runID: String?
     public let runState: RunState
@@ -158,6 +160,7 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         agentID: String,
         agentName: String,
         agentTitle: String? = nil,
+        agentRole: String? = nil,
         agentStatus: String,
         runID: String? = nil,
         runState: RunState,
@@ -181,6 +184,7 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         self.agentID = agentID
         self.agentName = agentName
         self.agentTitle = agentTitle
+        self.agentRole = agentRole
         self.agentStatus = agentStatus
         self.runID = runID
         self.runState = runState
