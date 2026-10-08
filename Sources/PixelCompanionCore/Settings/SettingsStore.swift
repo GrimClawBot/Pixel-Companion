@@ -28,6 +28,7 @@ public final class SettingsStore {
         case githubPublicRepository = "pixelCompanion.githubPublicRepository"
         case conserveEnergy = "pixelCompanion.conserveEnergy"
         case focusTimerEnabled = "pixelCompanion.focusTimerEnabled"
+        case batteryHUDEnabled = "pixelCompanion.batteryHUDEnabled"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -115,6 +116,12 @@ public final class SettingsStore {
     public var focusTimerEnabled: Bool {
         get { (defaults.object(forKey: Key.focusTimerEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.focusTimerEnabled.rawValue) }
+    }
+
+    /// Purely local power-source indicator. Disabled unless explicitly enabled.
+    public var batteryHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.batteryHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.batteryHUDEnabled.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.

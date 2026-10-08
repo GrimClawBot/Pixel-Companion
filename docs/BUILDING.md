@@ -557,3 +557,29 @@ This is the first native-utility slice of [#62](https://github.com/GrimClawBot/P
 Now Playing, calendar, system HUDs and other optional modules remain open.
 Real 360pt/440pt notch/menu bar keyboard, VoiceOver and sleep/wake tests
 remain human acceptance gates; this draft must not be publicly released.
+
+## Optional Battery & Power HUD (PC-030)
+
+Settings → Standalone utilities → Enable Battery & Power HUD adds a
+compact read-only Overview indicator on any Mac, independent of
+Pixel HQ/Paperclip and the Focus timer. The widget is OFF by default.
+While enabled, the app uses Apple's public IOKit Power Sources APIs to
+read internal battery level (if present and valid), whether charging is
+explicitly reported, adapter versus battery power when reported, and
+ProcessInfo's Low Power Mode status. No additional entitlement, login,
+credentials, network requests, OS notifications, private APIs or helper
+is required.
+
+The monitor runs one 30-second refresh timer only while enabled, refreshes
+on macOS wake and Low Power Mode changes, and stops/clears in-memory
+readings when the user disables the module. It never saves a history,
+serial number or device identity. An absent battery, malformed percentage,
+unknown charging state or unavailable power source remains unavailable
+rather than fabricated. Current Mac settings for Paperclip, GitHub, Focus,
+notifications and the Power conservation cadence are not changed.
+
+This is the battery *panel* slice of spec-parity issue #62; global volume
+or brightness overlays, system Now Playing and calendar integrations remain
+separate open tasks. Before release, physically test actual Mac battery/
+adapter transitions, Low Power Mode changes, both 360pt/440pt layouts,
+keyboard and VoiceOver, and an external Mac without a battery.

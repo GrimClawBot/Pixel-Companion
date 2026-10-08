@@ -215,8 +215,14 @@ struct SettingsView: View {
         Section("Standalone utilities") {
             Toggle("Enable Focus timer", isOn: $model.focusTimerEnabled)
                 .accessibilityIdentifier("companion.settings.focus-timer")
+            Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
+                .accessibilityIdentifier("companion.settings.battery-hud")
             Text("A local 25/5/15-minute focus and break timer in Overview. " +
                  "No account, new permissions, notifications, or timer data stored on disk.")
+            Text("Battery & Power uses public macOS power information only. " +
+                 "No permission, device history, or personal data is collected.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

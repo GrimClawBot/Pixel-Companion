@@ -93,6 +93,8 @@ struct NotchRootView: View {
                 publicGitHubState: model.publicGitHubState,
                 focusTimerEnabled: model.focusTimerEnabled,
                 focusTimer: model.focusTimer,
+                batteryHUDEnabled: model.batteryHUDEnabled,
+                batteryMonitor: model.batteryMonitor,
                 selectedTab: $model.selectedDetailTab
             )
                 .padding([.horizontal, .bottom], 16)
