@@ -4,7 +4,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     private let client: PaperclipHTTPClient
     private let telemetry: PaperclipTelemetryFetcher
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = PaperclipNetworkPolicy.makeSession()) {
         let client = PaperclipHTTPClient(session: session)
         self.client = client
         telemetry = PaperclipTelemetryFetcher(client: client)
