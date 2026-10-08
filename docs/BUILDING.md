@@ -433,3 +433,22 @@ departments are not assumed from unsupported Paperclip fields. A future
 separately reviewed connector can add richer task detail without replacing
 these read-only capabilities. TaskSource/ConnectorSnapshot public API changes
 require independent PC-000 security review before any merge/release.
+
+## Optional public GitHub CI pulse (PC-024)
+
+Settings offers a blank-by-default Public GitHub repository field. Only a
+validated **owner/repo** is accepted. When explicitly configured, Overview
+shows at most three latest public GitHub Actions workflow runs and three
+open PRs, from fixed api.github.com HTTPS GET URLs. A separate 180-second
+refresh timer limits consumption to approximately 40 unauthenticated
+requests per hour (when healthy); there are no tokens, auth cookies, arbitrary
+URLs, account logins, private repository data, PR changes or workflow
+dispatches. A 403/404 or outage removes any cached green indicator rather
+than masquerading as live success, and rate limits show an explicit warning.
+GitHub status is optional and never blocks Paperclip monitoring.
+
+This is only a public-repository read-only monitor. Private repos, reviews,
+merges, authenticated CI and GitHub app permissions require a separately
+approved optional connector and credential-handling architecture. Human QA
+should test manual input, invalid names, rate-limited/unavailable states,
+long run names/PR titles and 360pt notch/menu-bar widths.

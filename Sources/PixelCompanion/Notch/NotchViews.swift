@@ -90,6 +90,7 @@ struct NotchRootView: View {
                 snapshot: model.snapshot, mood: model.mood,
                 openSettings: openSettings, feedFreshness: model.feedFreshness,
                 lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+                publicGitHubState: model.publicGitHubState,
                 selectedTab: $model.selectedDetailTab
             )
                 .padding([.horizontal, .bottom], 16)

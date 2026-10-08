@@ -34,16 +34,19 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @StateObject private var loginItem = LaunchAtLoginController()
     @State private var paperclipBaseURLDraft: String
+    @State private var githubPublicRepositoryDraft: String
 
     init(model: AppModel) {
         self.model = model
         _paperclipBaseURLDraft = State(initialValue: model.paperclipBaseURL)
+        _githubPublicRepositoryDraft = State(initialValue: model.githubPublicRepository)
     }
 
     var body: some View {
         Form {
             connectorSection
             paperclipSection
+            githubPublicSection
             mockSection
             presentationSection
             startupSection
@@ -113,6 +116,28 @@ struct SettingsView: View {
                 Text("Read-only. Pixel Companion sends GET requests only and stores no Paperclip credentials.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var githubPublicSection: some View {
+        Section("GitHub · public repositories only") {
+            TextField("owner/repo (optional)", text: $githubPublicRepositoryDraft)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { model.applyGitHubPublicRepository(githubPublicRepositoryDraft) }
+                .accessibilityIdentifier("companion.github.repository")
+            Button("Apply public repository") {
+                model.applyGitHubPublicRepository(githubPublicRepositoryDraft)
+            }
+            .disabled(githubPublicRepositoryDraft == model.githubPublicRepository)
+            Text("Optional. Reads public workflow runs and open PRs using GitHub GET requests. " +
+                 "No login, private repository access, credentials or GitHub actions.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let error = model.publicGitHubState.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
     }

@@ -25,6 +25,7 @@ public final class SettingsStore {
         case mockStepInterval = "pixelCompanion.mockStepInterval"
         case paperclipBaseURL = "pixelCompanion.paperclipBaseURL"
         case paperclipCompanyID = "pixelCompanion.paperclipCompanyID"
+        case githubPublicRepository = "pixelCompanion.githubPublicRepository"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -88,6 +89,17 @@ public final class SettingsStore {
         set {
             let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             defaults.set(value, forKey: Key.paperclipCompanyID.rawValue)
+        }
+    }
+
+    /// Optional public GitHub owner/repo; nonsecret and disconnected by default.
+    public var githubPublicRepository: String {
+        get { defaults.string(forKey: Key.githubPublicRepository.rawValue) ?? "" }
+        set {
+            defaults.set(
+                newValue.trimmingCharacters(in: .whitespacesAndNewlines),
+                forKey: Key.githubPublicRepository.rawValue
+            )
         }
     }
 

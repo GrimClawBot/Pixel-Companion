@@ -18,23 +18,31 @@ final class AppModel: ObservableObject {
     @Published private(set) var paperclipCompanies: [PaperclipCompany] = []
     @Published private(set) var notificationStatus = ""
     @Published private(set) var notificationTestStatus: String?
+    @Published private(set) var publicGitHubState: GitHubPublicState = .off
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
 
     private let settings: SettingsStore
     private let notificationManager: CompanionNotificationManager
+    private let publicGitHubMonitor: PublicGitHubMonitor
+    private var publicGitHubSubscription: AnyCancellable?
     private var connector: (any Connector)?
     private var stateMachine = CharacterStateMachine()
     private var stepTimer: Timer?
 
     init(
         settings: SettingsStore,
-        notificationManager: CompanionNotificationManager? = nil
+        notificationManager: CompanionNotificationManager? = nil,
+        publicGitHubMonitor: PublicGitHubMonitor? = nil
     ) {
         self.settings = settings
         self.notificationManager = notificationManager ?? CompanionNotificationManager()
+        self.publicGitHubMonitor = publicGitHubMonitor ?? PublicGitHubMonitor()
         notificationStatus = self.notificationManager.statusText
+        publicGitHubSubscription = self.publicGitHubMonitor.$state.sink { [weak self] next in
+            self?.publicGitHubState = next
+        }
         self.notificationManager.onChange = { [weak self] in
             guard let self else { return }
             self.notificationStatus = self.notificationManager.statusText
@@ -131,6 +139,15 @@ final class AppModel: ObservableObject {
         notificationManager.refreshPermission()
     }
 
+    var githubPublicRepository: String { settings.githubPublicRepository }
+
+    func applyGitHubPublicRepository(_ value: String) {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized != settings.githubPublicRepository else { return }
+        settings.githubPublicRepository = normalized
+        publicGitHubMonitor.configure(normalized)
+    }
+
     var paperclipBaseURL: String { settings.paperclipBaseURL }
 
     func applyPaperclipBaseURL(_ newValue: String) {
@@ -172,6 +189,7 @@ final class AppModel: ObservableObject {
 
     func start() {
         notificationManager.start()
+        publicGitHubMonitor.configure(settings.githubPublicRepository)
         rebuildConnector()
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }

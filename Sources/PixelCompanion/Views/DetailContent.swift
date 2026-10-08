@@ -69,6 +69,7 @@ struct DetailContent: View {
     let openSettings: () -> Void
     var feedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
+    var publicGitHubState: GitHubPublicState = .off
     @Binding var selectedTab: CompanionDetailTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
@@ -132,6 +133,7 @@ struct DetailContent: View {
                 metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
                        label: "Approvals", shortcut: .approvals)
             }
+            PublicGitHubPulseView(state: publicGitHubState)
             LiveOperationsPulseView(
                 sessions: liveSessions,
                 pendingApprovalCount: snapshot.pendingApprovals.count,

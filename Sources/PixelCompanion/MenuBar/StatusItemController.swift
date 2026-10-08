@@ -73,6 +73,7 @@ struct MenuBarPopoverView: View {
             snapshot: model.snapshot, mood: model.mood,
             openSettings: openSettings, feedFreshness: model.feedFreshness,
             lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+            publicGitHubState: model.publicGitHubState,
             selectedTab: $model.selectedDetailTab
         )
             .padding(16)
