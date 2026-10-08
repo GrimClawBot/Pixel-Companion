@@ -43,8 +43,9 @@ struct LocalAgentActivityTimelineView: View {
                                         .font(.caption)
                                         .fixedSize(horizontal: false, vertical: true)
                                     Text(
-                                        context.date.timeIntervalSince(event.timestamp) <= 120
-                                            ? "Recently observed" : "Earlier event, not live"
+                                        LocalAgentEventPresentation.timelineTimingLabel(
+                                            event.timestamp, at: context.date
+                                        )
                                     )
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
