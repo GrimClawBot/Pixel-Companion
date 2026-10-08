@@ -396,3 +396,21 @@ unchanged, avoiding duplicate push alerts. There are no backend requests,
 new privileges or persistence. QA needs both notch and menu-bar visual checks,
 keyboard/VoiceOver tests, agent tap-through and stale/recovery trials before
 this draft can merge; public distribution remains blocked.
+
+## Launch at Login and private connector transport (PC-022)
+
+In the Startup section, Launch at Login is an explicit macOS
+ServiceManagement.SMAppService.mainApp opt-in, never a custom launch agent.
+The UI reads actual OS registration state; the app never auto-registers.
+When System Settings approval is required, the settings explain it.
+Swift run and temporary numbered QA bundles intentionally cannot register
+a disposable path as a persistent login item. Test the OS toggle in a
+final installed signed candidate, not the temporary QA bundle.
+
+Paperclip URLs now require HTTPS outside loopback. An SSH-forwarded
+http://127.0.0.1:3100, http://localhost:3100 or [::1] continues working.
+Unencrypted HTTP to remote LAN/VPN hosts is rejected; use HTTPS with a
+valid certificate and private VPN. Credentialed URLs and query/fragment
+secrets remain forbidden. Pixel Companion does not acquire auth tokens,
+install certificates or change Paperclip itself. These transport edits
+require security approval per PC-000 before merge.

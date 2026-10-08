@@ -32,6 +32,7 @@ final class SettingsWindowController {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @StateObject private var loginItem = LaunchAtLoginController()
     @State private var paperclipBaseURLDraft: String
 
     init(model: AppModel) {
@@ -45,6 +46,7 @@ struct SettingsView: View {
             paperclipSection
             mockSection
             presentationSection
+            startupSection
             notificationSection
             aboutSection
         }
@@ -134,6 +136,24 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .disabled(!model.isMockConnector)
+    }
+
+    private var startupSection: some View {
+        Section("Startup") {
+            Toggle("Launch at Login", isOn: Binding(
+                get: { loginItem.enabled },
+                set: { loginItem.setEnabled($0) }
+            ))
+            .disabled(!loginItem.canChange)
+            .accessibilityIdentifier("companion.settings.launch-at-login")
+            Text(loginItem.statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if loginItem.canChange {
+                Button("Refresh login status") { loginItem.refresh() }
+                    .controlSize(.small)
+            }
+        }
     }
 
     private var presentationSection: some View {
