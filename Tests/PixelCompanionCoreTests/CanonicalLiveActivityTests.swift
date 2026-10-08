@@ -146,6 +146,23 @@ final class CanonicalLiveActivityTests: XCTestCase {
         }
     }
 
+    func testExpiredBackendTaskFailureDoesNotLeaveCharacterStuckInError() {
+        let sample = snapshot(current: event(
+            "old", kind: .failed, signal: .failure,
+            timestamp: now.addingTimeInterval(-180)
+        ))
+        XCTAssertNil(CompanionLiveActivityResolver.primary(
+            for: sample, isLive: true, now: now
+        ))
+        XCTAssertEqual(CharacterStateMachine.mood(for: sample, now: now), .idle)
+        // A current, explicit agent-error state remains visible by design.
+        let agent = snapshot(current: event(
+            "failed-agent", kind: .failed, signal: .agentFailure,
+            timestamp: now.addingTimeInterval(-180)
+        ))
+        XCTAssertEqual(CharacterStateMachine.mood(for: agent, now: now), .error)
+    }
+
     func testTerminalFutureEventIsNotTreatedAsSuccess() {
         let sample = snapshot(
             current: event("future", kind: .completed, signal: .success,

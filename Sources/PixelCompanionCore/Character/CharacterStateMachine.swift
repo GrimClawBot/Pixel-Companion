@@ -104,6 +104,11 @@ public struct CharacterStateMachine: Equatable, Sendable {
         if !snapshot.pendingApprovals.isEmpty {
             return .waitingForApproval
         }
+        // A real expired terminal signal must not fall through to the legacy
+        // unstructured failure kind and reappear as a permanent alert.
+        if snapshot.currentActivity?.signal?.isTransient == true {
+            return .idle
+        }
         switch snapshot.currentActivity?.kind {
         case .failed: return .error
         case .running: return .working
