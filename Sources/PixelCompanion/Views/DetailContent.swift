@@ -261,7 +261,7 @@ struct DetailContent: View {
             }
             CompanyTasksView(
                 tasks: canShowLive ? snapshot.tasks : [],
-                agents: liveSessions, isLive: canShowAgentsLive,
+                agents: liveSessions, isLive: canShowLive,
                 onSelectAgent: { agentID in
                     selectedAgentID = agentID
                     navigate(to: .agents)

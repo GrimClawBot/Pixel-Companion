@@ -104,6 +104,32 @@ public final class PaperclipConnector:
         locked { Array(cache.tasks.prefix(max(limit, 0))) }
     }
 
+    /// Capture all presentation fields and both refresh timestamps under ONE lock.
+    /// Multiple ConnectorSnapshot(capturing:) and timestamp accessor calls can
+    /// otherwise pair older agent rows with the timestamp of newer telemetry.
+    public func capturePresentation(
+        sessionLimit: Int = Int.max
+    ) -> PaperclipPresentationCapture {
+        locked {
+            let snapshot = ConnectorSnapshot(
+                connectorName: cache.companyName.map { "Paperclip · \($0)" } ?? "Paperclip",
+                connectionState: cache.connectionState,
+                lastError: cache.connectionState == .error ? cache.lastError : nil,
+                currentActivity: cache.activity.first,
+                recentActivity: Array(cache.activity.prefix(8)),
+                pendingApprovals: cache.approvals,
+                usage: cache.usage,
+                agentSessions: Array(cache.agentSessions.prefix(max(sessionLimit, 0))),
+                tasks: Array(cache.tasks.prefix(64))
+            )
+            return PaperclipPresentationCapture(
+                snapshot: snapshot,
+                coreAt: cache.lastSuccessfulRefreshAt,
+                sessionsAt: cache.lastSuccessfulSessionRefreshAt
+            )
+        }
+    }
+
     public func refresh() {
         guard let generation = beginRefresh() else { return }
         service.fetch(

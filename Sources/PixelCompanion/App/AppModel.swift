@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
     let settings: SettingsStore
     private let notificationManager: CompanionNotificationManager
     private let publicGitHubMonitor: PublicGitHubMonitor
+    private let injectedPaperclipConnector: PaperclipConnector?
     private var publicGitHubSubscription: AnyCancellable?
     private var connector: (any Connector)?
     private var stateMachine = CharacterStateMachine()
@@ -51,11 +52,13 @@ final class AppModel: ObservableObject {
     init(
         settings: SettingsStore,
         notificationManager: CompanionNotificationManager? = nil,
-        publicGitHubMonitor: PublicGitHubMonitor? = nil
+        publicGitHubMonitor: PublicGitHubMonitor? = nil,
+        injectedPaperclipConnector: PaperclipConnector? = nil
     ) {
         self.settings = settings
         self.notificationManager = notificationManager ?? CompanionNotificationManager()
         self.publicGitHubMonitor = publicGitHubMonitor ?? PublicGitHubMonitor()
+        self.injectedPaperclipConnector = injectedPaperclipConnector
         notificationStatus = self.notificationManager.statusText
         localActivityTimeline.bind(codex: codexTurnMonitor, claude: claudeHookMonitor)
         localAgentAttention.bind(timeline: localActivityTimeline) { [weak self] alert in
@@ -127,14 +130,8 @@ final class AppModel: ObservableObject {
             guard newValue != notificationManager.enabled else { return }
             objectWillChange.send()
             notificationManager.setEnabled(newValue)
-            var verifiedSnapshot = ConnectorSnapshot(
-                capturing: connector, sessionLimit: Int.max
-            )
-            if isPaperclipConnector, !agentFeedFreshness.canPresentAsLive {
-                verifiedSnapshot.agentSessions = []
-            }
             notificationManager.observe(
-                verifiedSnapshot, isPaperclip: isPaperclipConnector
+                snapshot, isPaperclip: isPaperclipConnector
             )
         }
     }
@@ -247,11 +244,15 @@ final class AppModel: ObservableObject {
             baseURLString: settings.paperclipBaseURL,
             companyID: settings.paperclipCompanyID
         )
-        connector = ConnectorRegistry.makeConnector(
-            id: settings.connectorID,
-            connectionState: state,
-            paperclipConfiguration: configuration
-        )
+        if settings.connectorID == .paperclip, let injectedPaperclipConnector {
+            connector = injectedPaperclipConnector
+        } else {
+            connector = ConnectorRegistry.makeConnector(
+                id: settings.connectorID,
+                connectionState: state,
+                paperclipConfiguration: configuration
+            )
+        }
         if let paperclipConnector {
             paperclipCompanies = previousPaperclipCompanies
             paperclipConnector.onChange = { [weak self, weak paperclipConnector] in
@@ -280,9 +281,12 @@ final class AppModel: ObservableObject {
 
 extension AppModel {
     private func capture() {
-        let next = ConnectorSnapshot(capturing: connector, sessionLimit: Int.max)
-        if next != snapshot { snapshot = next }
-        let syncDate = paperclipConnector?.lastSuccessfulRefreshAt
+        // A Paperclip capture MUST bind session rows to their own timestamp.
+        // Read both once under its lock; never recapture notifications separately.
+        let paperclipCapture = paperclipConnector?.capturePresentation()
+        var next = paperclipCapture?.snapshot
+            ?? ConnectorSnapshot(capturing: connector, sessionLimit: Int.max)
+        let syncDate = paperclipCapture?.coreAt
         if lastSuccessfulPaperclipSync != syncDate { lastSuccessfulPaperclipSync = syncDate }
         let health = FeedFreshness.evaluate(
             isPaperclip: isPaperclipConnector,
@@ -293,22 +297,17 @@ extension AppModel {
         let agentHealth = FeedFreshness.evaluate(
             isPaperclip: isPaperclipConnector,
             state: next.connectionState,
-            lastSuccess: paperclipConnector?.lastSuccessfulSessionRefreshAt
+            lastSuccess: paperclipCapture?.sessionsAt
         )
         if agentFeedFreshness != agentHealth { agentFeedFreshness = agentHealth }
+        // Never publish unverified agent rows to any UI or notification consumer.
+        if !agentHealth.canPresentAsLive { next.agentSessions = [] }
+        if next != snapshot { snapshot = next }
         _ = stateMachine.update(with: next)
         // A delayed Paperclip poll must not leave a misleading "working" mood.
         let nextMood: CharacterMood = health == .stale ? .offline : stateMachine.mood
         if mood != nextMood { mood = nextMood }
-        let notificationSnapshot = notificationsEnabled && isPaperclipConnector
-            ? ConnectorSnapshot(capturing: connector, sessionLimit: Int.max) : next
-        var verifiedNotificationSnapshot = notificationSnapshot
-        if !agentHealth.canPresentAsLive {
-            verifiedNotificationSnapshot.agentSessions = []
-        }
-        notificationManager.observe(
-            verifiedNotificationSnapshot, isPaperclip: isPaperclipConnector
-        )
+        notificationManager.observe(next, isPaperclip: isPaperclipConnector)
     }
 }
 
