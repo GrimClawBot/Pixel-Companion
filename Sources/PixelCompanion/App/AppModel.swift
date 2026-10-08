@@ -23,6 +23,7 @@ final class AppModel: ObservableObject {
     let batteryMonitor = BatteryPowerMonitor()
     let outputVolumeMonitor = OutputVolumeMonitor()
     let displayBrightnessMonitor = DisplayBrightnessMonitor()
+    let downloadMonitor = DownloadProgressMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -286,6 +287,7 @@ extension AppModel {
         batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
         outputVolumeMonitor.configure(enabled: settings.outputVolumeHUDEnabled)
         displayBrightnessMonitor.configure(enabled: settings.displayBrightnessHUDEnabled)
+        downloadMonitor.configure(enabled: settings.downloadHUDEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
@@ -309,6 +311,7 @@ extension AppModel {
         batteryMonitor.refresh()
         outputVolumeMonitor.refresh()
         displayBrightnessMonitor.refresh()
+        downloadMonitor.refresh()
         calendarMonitor.refresh()
         musicMonitor.refresh()
         scheduleStepTimer()

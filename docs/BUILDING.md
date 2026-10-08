@@ -671,3 +671,15 @@ pixels, requests capture/Accessibility permissions or writes history. One
 local poll every 15 seconds only while enabled; state cleared immediately
 on disable, and refreshed on wake. Physical multi-display and VoiceOver QA
 remains outstanding.
+
+## Download progress contract (PC-035, provider integration pending)
+
+The optional Downloads Overview card is OFF by default. It intentionally does not
+scan browser histories, Safari, ~/Downloads, the filesystem, or the network. macOS
+offers no public universal progress feed for third-party downloads. The app defines
+a small opt-in DownloadProgressSource adapter interface for a future reviewed
+integration to report validated bytes received and total. Until a source is
+registered, the card reads No download integration connected. If the source
+doesn't report a total, no percentage is invented. Only counters reach this UI:
+filenames, URLs and tokens are neither read nor retained. This is a source
+contract and HUD, not a claim that system-wide downloads are already tracked.
