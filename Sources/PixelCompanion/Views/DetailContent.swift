@@ -88,6 +88,7 @@ struct DetailContent: View {
     var codexProcessMonitor: CodexProcessMonitor?
     var codexTurnMonitor: CodexTurnMonitor?
     var claudeHookMonitor: ClaudeHookMonitor?
+    var localActivityTimeline: LocalAgentActivityTimeline?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -236,6 +237,10 @@ struct DetailContent: View {
 
     private var activityContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let localActivityTimeline,
+               codexTurnMonitor?.enabled == true || claudeHookMonitor?.enabled == true {
+                LocalAgentActivityTimelineView(timeline: localActivityTimeline)
+            }
             CompanyTasksView(
                 tasks: canShowLive ? snapshot.tasks : [],
                 agents: liveSessions, isLive: canShowLive,

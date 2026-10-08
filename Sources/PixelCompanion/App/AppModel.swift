@@ -30,6 +30,7 @@ final class AppModel: ObservableObject {
     let codexProcessMonitor = CodexProcessMonitor()
     let codexTurnMonitor = CodexTurnMonitor()
     let claudeHookMonitor = ClaudeHookMonitor()
+    let localActivityTimeline = LocalAgentActivityTimeline()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -54,6 +55,7 @@ final class AppModel: ObservableObject {
         self.notificationManager = notificationManager ?? CompanionNotificationManager()
         self.publicGitHubMonitor = publicGitHubMonitor ?? PublicGitHubMonitor()
         notificationStatus = self.notificationManager.statusText
+        localActivityTimeline.bind(codex: codexTurnMonitor, claude: claudeHookMonitor)
         publicGitHubSubscription = self.publicGitHubMonitor.$state.sink { [weak self] next in
             self?.publicGitHubState = next
         }
