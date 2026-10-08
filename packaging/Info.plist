@@ -16,4 +16,5 @@
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 <key>NSCalendarsFullAccessUsageDescription</key><string>Pixel Companion can show your next calendar event when you explicitly enable Calendar and grant read access. Events are not saved or shared.</string>
+<key>NSAppleEventsUsageDescription</key><string>When you press Connect to Apple Music, Pixel Companion can read the current song and playback status from the Music app. It never changes playback or saves listening history.</string>
 </dict></plist>

@@ -19,6 +19,7 @@ Pixel Companion is an independent native macOS 14+ notch and menu-bar companion 
 - Optional, off-by-default local Focus timer with 25-minute focus, 5/15-minute breaks and pause/resume/reset; no account or stored session history.
 - Optional, off-by-default read-only Battery & Power panel with actual macOS-reported charge/power state and no stored hardware identifiers.
 - Optional, off-by-default next Calendar event card with an explicit macOS EventKit permission button and separately disabled-by-default event titles; no event records stored.
+- Optional Apple Music-only Now Playing status, with an explicit Automation Connect button, hidden track details, and no playback mutations or private macOS media interfaces.
 
 Missing data is never guessed: unknown costs/context/assignees, run progress and complete run history are labeled unavailable. Live information is suppressed when the Paperclip feed is stale.
 
