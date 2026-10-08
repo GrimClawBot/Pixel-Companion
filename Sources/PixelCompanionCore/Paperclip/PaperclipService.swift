@@ -4,7 +4,7 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     private let client: PaperclipHTTPClient
     private let telemetry: PaperclipTelemetryFetcher
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = PaperclipNetworkPolicy.makeSession()) {
         let client = PaperclipHTTPClient(session: session)
         self.client = client
         telemetry = PaperclipTelemetryFetcher(client: client)
@@ -242,6 +242,8 @@ final class URLSessionPaperclipService: PaperclipServiceProtocol {
     }
 
     private func companyPath(_ companyID: String, resource: String) -> String {
-        "api/companies/\(companyID)/\(resource)"
+        // An empty path is rejected by PaperclipHTTPClient.request.
+        // Never interpolate untrusted IDs before validating their segments.
+        PaperclipNetworkPolicy.companyPath(companyID, resource: resource) ?? ""
     }
 }
