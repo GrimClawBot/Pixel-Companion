@@ -68,3 +68,51 @@ final class AgentUsageDashboardTests: XCTestCase {
         XCTAssertNil(AgentUsagePresentation.contextFraction(sample))
     }
 }
+
+extension AgentUsageDashboardTests {
+    func testActiveFilterPreservesSessionOrderAndAllItems() {
+        let idle = AgentSessionSnapshot(
+            id: "idle", agentID: "a", agentName: "Idle",
+            agentStatus: "idle", runState: .idle
+        )
+        let running = AgentSessionSnapshot(
+            id: "running", agentID: "b", agentName: "Working",
+            agentStatus: "running", runState: .running
+        )
+        let queued = AgentSessionSnapshot(
+            id: "queued", agentID: "c", agentName: "Queued",
+            agentStatus: "queued", runState: .queued
+        )
+        let all = [idle, running, queued]
+        XCTAssertEqual(AgentUsageScope.all.sessions(all).map(\.id), ["idle", "running", "queued"])
+        XCTAssertEqual(AgentUsageScope.active.sessions(all).map(\.id), ["running", "queued"])
+        XCTAssertTrue(AgentUsageScope.active.sessions([idle]).isEmpty)
+    }
+
+    func testMonthlyBudgetProgressUsesOnlyRealMonthlyNumbers() {
+        XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture()))
+        XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture(spend: 500)))
+        XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture(budget: 1000)))
+        XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture(spend: 500, budget: 0)))
+        XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture(spend: -1, budget: 1000)))
+        XCTAssertEqual(AgentUsagePresentation.monthlyBudgetFraction(fixture(spend: 200, budget: 1000)), 0.2)
+        XCTAssertEqual(AgentUsagePresentation.monthlyBudgetFraction(fixture(spend: 1200, budget: 1000)), 1.2)
+    }
+
+    func testMonthlyBudgetWarningThresholdsStaySeparateFromContext() {
+        XCTAssertNil(AgentUsagePresentation.monthlyBudgetWarning(fixture(spend: 799, budget: 1000)))
+        XCTAssertTrue(
+            AgentUsagePresentation.monthlyBudgetWarning(fixture(spend: 800, budget: 1000))?.contains("80%") == true
+        )
+        XCTAssertTrue(
+            AgentUsagePresentation.monthlyBudgetWarning(fixture(spend: 900, budget: 1000))?.contains("90%") == true
+        )
+        XCTAssertTrue(
+            AgentUsagePresentation.monthlyBudgetWarning(fixture(spend: 1000, budget: 1000))?.contains("reached") == true
+        )
+        XCTAssertTrue(
+            AgentUsagePresentation.monthlyBudgetWarning(fixture(spend: 1200, budget: 1000))?.contains("reached") == true
+        )
+        XCTAssertNil(AgentUsagePresentation.contextWarning(fixture(spend: 1200, budget: 1000)))
+    }
+}
