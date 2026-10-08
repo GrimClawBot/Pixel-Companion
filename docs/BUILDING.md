@@ -351,3 +351,24 @@ and does not change the existing connector polling schedule. Mac interaction
 QA is still required for running/idle/stale states, Reduce Motion and
 VoiceOver at the 440pt notch and 360pt menu-bar widths. No public binary
 release is authorized.
+
+## Live Operations pulse (PC-020)
+
+Overview adds a compact read-only pulse for the latest confirmed reported
+run states: Running, Queued and **Failed latest run**. It shows three counts
+and up to two agents per category, preserving connector order. Clicking an
+agent opens its existing live inspector under Agents, with the existing
+stable-agent-ID and fresh-feed guards intact. No progress percentage,
+pending-approval ownership or unreported state is inferred. Approval counts
+are **company-wide**, with a separate shortcut to Activity instead of
+pretending they belong to specific agents.
+
+With a disconnected or stale feed, the pulse displays **unavailable** and
+never presents cached counts, agents or approvals as live. Idle, completed,
+cancelled and unconfirmed agents never inflate the running/queued/failed
+counters. The app's four tabs, keyboard shortcuts, usage, recent runs,
+session monitor and separate notifications remain unchanged. No new endpoint,
+permission, persistent state or Paperclip mutation was introduced.
+Human QA: inspect counts in both notch and menu-bar widths, tap each agent
+shortcut, verify Back, approvals shortcut, empty state, stale feed/recovery,
+and keyboard/VoiceOver access before accepting the UI.
