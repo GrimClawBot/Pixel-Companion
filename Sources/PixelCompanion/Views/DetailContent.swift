@@ -195,6 +195,7 @@ struct DetailContent: View {
         AgentsDirectoryView(
             sessions: liveSessions,
             isLive: canShowLive,
+            tasks: canShowLive ? snapshot.tasks : [],
             selectedAgentID: $selectedAgentID
         )
     }
@@ -243,6 +244,14 @@ struct DetailContent: View {
 
     private var activityContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            CompanyTasksView(
+                tasks: canShowLive ? snapshot.tasks : [],
+                agents: liveSessions, isLive: canShowLive,
+                onSelectAgent: { agentID in
+                    selectedAgentID = agentID
+                    navigate(to: .agents)
+                }
+            )
             if canShowLive && !snapshot.pendingApprovals.isEmpty {
                 HStack {
                     SectionTitle(text: "Pending approvals · read-only")

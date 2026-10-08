@@ -9,7 +9,8 @@ enum PaperclipMapper {
             activity: activity(input),
             approvals: approvals(input.approvals),
             usage: usage(input.dashboard),
-            agentSessions: agentSessions(input)
+            agentSessions: agentSessions(input),
+            tasks: tasks(input.issues)
         )
     }
 
@@ -56,6 +57,22 @@ enum PaperclipMapper {
             detail: agent.title,
             timestamp: date(agent.updatedAt) ?? date(agent.lastHeartbeatAt) ?? .distantPast
         )
+    }
+
+    private static func tasks(_ issues: [PaperclipIssueResponse]) -> [TaskSnapshot] {
+        issues.map { issue in
+            TaskSnapshot(
+                id: issue.id, identifier: issue.identifier, title: issue.title,
+                status: issue.status, assigneeAgentID: issue.assigneeAgentId,
+                updatedAt: date(issue.lastActivityAt) ?? date(issue.updatedAt)
+                    ?? date(issue.createdAt)
+            )
+        }
+        .sorted { lhs, rhs in
+            let left = lhs.updatedAt ?? .distantPast
+            let right = rhs.updatedAt ?? .distantPast
+            return left == right ? lhs.id < rhs.id : left > right
+        }
     }
 
     private static func agentSessions(_ input: PaperclipMappingInput) -> [AgentSessionSnapshot] {

@@ -414,3 +414,22 @@ valid certificate and private VPN. Credentialed URLs and query/fragment
 secrets remain forbidden. Pixel Companion does not acquire auth tokens,
 install certificates or change Paperclip itself. These transport edits
 require security approval per PC-000 before merge.
+
+## Structured task drilldown (PC-023)
+
+Pixel Companion now maps the existing Paperclip issues GET response into
+bounded read-only TaskSnapshot records (stable issue ID, public identifier,
+title, status, structured assigneeAgentId and last reported timestamp).
+A collapsible Company tasks section appears in Activity; expand it to search
+by identifier/title/status. The task preview is capped at 12 and never makes
+additional network calls. Clicking a task only opens an Agent inspector if
+its authoritative assigneeAgentId matches a currently reported agent.
+Unassigned or unknown agents are not guessed from text.
+
+Each agent inspector also shows at most five explicitly assigned recent
+tasks and a total count. Both screens require a fresh connector feed;
+unknown or stale assignments cannot appear as live. Full logs and
+departments are not assumed from unsupported Paperclip fields. A future
+separately reviewed connector can add richer task detail without replacing
+these read-only capabilities. TaskSource/ConnectorSnapshot public API changes
+require independent PC-000 security review before any merge/release.
