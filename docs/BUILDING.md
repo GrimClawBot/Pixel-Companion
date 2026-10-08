@@ -135,3 +135,21 @@ surfaces. macOS Reduce Motion continues to disable navigation animations.
 Mac manual QA is needed for tab keyboard focus and actual VoiceOver
 announcement in both the notch and menu-bar popover; unit tests verify
 shortcut/destination logic but cannot replace interactive verification.
+
+## Agent inspector (PC-015, local QA only)
+
+In **Agents**, click an existing agent card to inspect the most recently
+reported state, task, provider/model, shortened session/run identifier,
+timestamps, run tokens, monthly agent budget/spend, and optional context
+usage. A **Back to all agents** button returns to the list. The detail view
+uses the current connector snapshot by *stable agent ID* on every refresh,
+rather than retaining stale per-run data. It automatically returns to the
+list when that agent disappears or the feed is unavailable. Missing model,
+runtime and context metrics are visibly unavailable; no amounts are guessed.
+All cards remain read-only: selection never starts, stops, approves or edits
+an agent.
+
+Mac visual QA: test mouse/keyboard selection on notch and menu-bar, use Back,
+inspect different agents, change tabs while selected, test connector failure
+and recovery, long task/model names, and both known/unknown telemetry fields.
+No public binary distribution is allowed yet.
