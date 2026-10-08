@@ -1,7 +1,11 @@
 """Integration merge protection gate must fail closed on missing evidence."""
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from scripts.quality.protected_cut_audit import evaluate_cut, independent_approvals
+from scripts.quality.protected_cut_audit import (
+    evaluate_cut, finalize_base_readback, independent_approvals, main, read_live_base_sha,
+)
 
 
 def pr(**overrides):
@@ -81,6 +85,96 @@ class ProtectedCutAuditTests(unittest.TestCase):
         self.assertFalse(report["branch_requires_approval"])
         self.assertFalse(report["branch_requires_ci"])
         self.assertFalse(report["ready_for_explicit_human_merge_decision"])
+
+    def test_final_live_base_readback_can_be_review_ready_only_if_unchanged(self):
+        result = finalize_base_readback(
+            audit(), pinned_base_sha="b" * 40, latest_base_sha="b" * 40
+        )
+        self.assertTrue(result["live_base_stable_at_final_readback"])
+        self.assertTrue(result["ready_for_explicit_human_merge_decision"])
+        self.assertFalse(result["merge_authorized_by_this_report"])
+
+    def test_main_advancing_after_first_read_refuses_ready(self):
+        # All initial GitHub/local/PR commits match. The final read differs.
+        result = finalize_base_readback(
+            audit(), pinned_base_sha="b" * 40, latest_base_sha="c" * 40
+        )
+        self.assertTrue(result["github_base_matches_live_and_local_git"])
+        self.assertFalse(result["live_base_stable_at_final_readback"])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_final_base_lookup_failure_refuses_ready(self):
+        result = finalize_base_readback(
+            audit(), pinned_base_sha="b" * 40, latest_base_sha=None
+        )
+        self.assertFalse(result["final_base_check_available"])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_first_base_mismatch_cannot_be_rescued_by_final_matching_ref(self):
+        report = audit(live_base_sha="c" * 40)
+        result = finalize_base_readback(
+            report, pinned_base_sha="b" * 40, latest_base_sha="b" * 40
+        )
+        self.assertFalse(result["live_base_stable_at_final_readback"])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    @patch("scripts.quality.protected_cut_audit.checked_json")
+    def test_live_base_read_handles_unavailable_and_bad_metadata(self, mock_json):
+        for response in (None, {}, {"commit": None}, {"commit": {"sha": "bad"}}):
+            with self.subTest(response=response):
+                mock_json.return_value = response
+                self.assertIsNone(read_live_base_sha("Owner/Repo", "main"))
+        mock_json.return_value = {"commit": {"sha": "b" * 40}}
+        self.assertEqual(read_live_base_sha("Owner/Repo", "main"), "b" * 40)
+
+    def test_end_to_end_main_checks_pinned_base_and_rechecks_live_sha(self):
+        # All early metadata and reviews are green. A concurrent update to
+        # main between those reads and the final API call must block.
+        initial = {"commit": {"sha": "b" * 40}}
+        shifted = {"commit": {"sha": "c" * 40}}
+        producer = {"check_runs": [audit_default_check_run()], "total_count": 1}
+        git_results = [
+            SimpleNamespace(returncode=0, stdout="b" * 40 + "\n"),
+            SimpleNamespace(returncode=0, stdout="a" * 40 + "\n"),
+            SimpleNamespace(returncode=0, stdout=""),
+            SimpleNamespace(returncode=0, stdout=""),
+        ]
+        with patch("scripts.quality.protected_cut_audit.checked_json") as read_json, (
+            patch("scripts.quality.protected_cut_audit.checked_reviews", return_value=HUMAN_REVIEW)
+        ), patch("scripts.quality.protected_cut_audit.run_command", side_effect=git_results) as git, (
+            patch("sys.argv", [
+                "protected_cut_audit", "--pr", "51",
+                "--head", "integration/pixel-companion-readonly-alpha",
+            ])
+        ):
+            read_json.side_effect = [pr(), PROTECTION, initial, producer, shifted]
+            self.assertEqual(main(), 3)
+            self.assertEqual(read_json.call_count, 5)
+            commands = [item.args[0] for item in git.call_args_list]
+            self.assertIn(["git", "merge-base", "--is-ancestor", "b" * 40, "a" * 40], commands)
+            self.assertIn(["git", "merge-tree", "--write-tree", "b" * 40, "a" * 40], commands)
+            self.assertNotIn("origin/main", commands[2])
+            self.assertNotIn("origin/main", commands[3])
+
+    def test_end_to_end_missing_final_base_read_fails_closed(self):
+        initial = {"commit": {"sha": "b" * 40}}
+        producer = {"check_runs": [audit_default_check_run()], "total_count": 1}
+        git_results = [
+            SimpleNamespace(returncode=0, stdout="b" * 40 + "\n"),
+            SimpleNamespace(returncode=0, stdout="a" * 40 + "\n"),
+            SimpleNamespace(returncode=0, stdout=""),
+            SimpleNamespace(returncode=0, stdout=""),
+        ]
+        with patch("scripts.quality.protected_cut_audit.checked_json") as read_json, (
+            patch("scripts.quality.protected_cut_audit.checked_reviews", return_value=HUMAN_REVIEW)
+        ), patch("scripts.quality.protected_cut_audit.run_command", side_effect=git_results), (
+            patch("sys.argv", [
+                "protected_cut_audit", "--pr", "51",
+                "--head", "integration/pixel-companion-readonly-alpha",
+            ])
+        ):
+            read_json.side_effect = [pr(), PROTECTION, initial, producer, None]
+            self.assertEqual(main(), 2)
 
     def test_stale_base_sha_blocks_even_when_git_ancestry_clean(self):
         result = audit(live_base_sha="c" * 40)
