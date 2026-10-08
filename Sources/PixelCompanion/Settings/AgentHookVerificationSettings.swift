@@ -62,6 +62,14 @@ struct AgentHookVerificationSettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("companion.verify." + source.rawValue + ".status")
+            let diagnostic = diagnostic(for: source, check: state, now: Date())
+            Text(diagnostic.summary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("companion.verify." + source.rawValue + ".diagnostic")
+            Text(diagnostic.nextStep)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             HStack(spacing: 8) {
                 Button("Start check") { start(source) }
                     .disabled(!connected)
@@ -90,6 +98,19 @@ struct AgentHookVerificationSettings: View {
         switch source {
         case .codex: codex.refresh()
         case .claude: claude.refresh()
+        }
+    }
+
+    private func diagnostic(
+        for source: AgentHookCheckSource,
+        check: AgentHookCheckState,
+        now: Date
+    ) -> AgentHookDiagnostic {
+        switch source {
+        case .codex:
+            return AgentHookDiagnosticGuide.codex(status: codex.status, check: check, now: now)
+        case .claude:
+            return AgentHookDiagnosticGuide.claude(status: claude.status, check: check, now: now)
         }
     }
 
