@@ -22,7 +22,7 @@ This file is a **test plan, not proof that testing occurred**. Record exact sour
 - Temporary QA Launch at Login is disabled; final installed release requires separate macOS ServiceManagement registration/unregistration and System Settings verification.
 - Remote HTTP to non-loopback rejected, HTTPS accepted, localhost SSH tunnel unchanged; packet inspection confirms GET-only/no host commands.
 - Ensure no Mac personal files/settings, Paperclip production state, secrets, source or backups were overwritten during QA replacement.
-- Observe CPU, energy, memory, connection polling and responsiveness during idle, run activity, sleep/wake.
+- Observe CPU, energy, memory, connection polling and responsiveness during idle, run activity, sleep/wake. Verify Paperclip 5-second normal vs 20-second Low Power Mode with default-on toggle, no duplicate polling after wake, mock interval unaffected and the independent GitHub 180-second cadence unchanged.
 
 ## Engineering/release gates
 

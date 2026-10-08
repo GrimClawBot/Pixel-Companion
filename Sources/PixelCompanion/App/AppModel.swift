@@ -30,6 +30,7 @@ final class AppModel: ObservableObject {
     private var connector: (any Connector)?
     private var stateMachine = CharacterStateMachine()
     private var stepTimer: Timer?
+    private var powerObserver: NSObjectProtocol?
 
     init(
         settings: SettingsStore,
@@ -52,6 +53,9 @@ final class AppModel: ObservableObject {
 
     deinit {
         stepTimer?.invalidate()
+        if let powerObserver {
+            NotificationCenter.default.removeObserver(powerObserver)
+        }
     }
 
     // MARK: Settings
@@ -139,6 +143,16 @@ final class AppModel: ObservableObject {
         notificationManager.refreshPermission()
     }
 
+    var conserveEnergy: Bool {
+        get { settings.conserveEnergy }
+        set {
+            guard newValue != settings.conserveEnergy else { return }
+            objectWillChange.send()
+            settings.conserveEnergy = newValue
+            scheduleStepTimer()
+        }
+    }
+
     var githubPublicRepository: String { settings.githubPublicRepository }
 
     func applyGitHubPublicRepository(_ value: String) {
@@ -191,11 +205,24 @@ final class AppModel: ObservableObject {
         notificationManager.start()
         publicGitHubMonitor.configure(settings.githubPublicRepository)
         rebuildConnector()
+        if powerObserver == nil {
+            powerObserver = NotificationCenter.default.addObserver(
+                forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in self?.scheduleStepTimer() }
+            }
+        }
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }
     }
 
     /// Rewinds the mock script to its first step. Local only; nothing outside the app changes.
+    /// Called by macOS on wake; only requests existing read-only connector state.
+    func didWake() {
+        scheduleStepTimer()
+        if isPaperclipConnector { refreshConnector() }
+    }
+
     func restartScript() {
         mockConnector?.reset()
         capture()
@@ -268,9 +295,18 @@ final class AppModel: ObservableObject {
         notificationManager.observe(notificationSnapshot, isPaperclip: isPaperclipConnector)
     }
 
-    private func scheduleStepTimer() {
+}
+
+extension AppModel {
+    fileprivate func scheduleStepTimer() {
         stepTimer?.invalidate()
-        let interval = isMockConnector ? settings.mockStepInterval : SettingsStore.paperclipRefreshInterval
+        let interval = CompanionRefreshCadence.interval(
+            isMock: isMockConnector,
+            mockInterval: settings.mockStepInterval,
+            paperclipInterval: SettingsStore.paperclipRefreshInterval,
+            conserveEnergy: settings.conserveEnergy,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled
+        )
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             // Scheduled on the main run loop below, so this always runs on the main thread.
             MainActor.assumeIsolated { self?.step() }

@@ -26,6 +26,7 @@ public final class SettingsStore {
         case paperclipBaseURL = "pixelCompanion.paperclipBaseURL"
         case paperclipCompanyID = "pixelCompanion.paperclipCompanyID"
         case githubPublicRepository = "pixelCompanion.githubPublicRepository"
+        case conserveEnergy = "pixelCompanion.conserveEnergy"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -101,6 +102,12 @@ public final class SettingsStore {
                 forKey: Key.githubPublicRepository.rawValue
             )
         }
+    }
+
+    /// Default on: follow macOS Low Power Mode to reduce Paperclip polling.
+    public var conserveEnergy: Bool {
+        get { (defaults.object(forKey: Key.conserveEnergy.rawValue) as? Bool) ?? true }
+        set { defaults.set(newValue, forKey: Key.conserveEnergy.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.

@@ -15,6 +15,7 @@ Pixel Companion is an independent native macOS 14+ notch and menu-bar companion 
 - Optional credential-free **public GitHub CI panel** for up to three recent Actions workflow runs and open PRs. It is disabled until explicitly configured and does not affect Paperclip monitoring.
 - Opt-in privacy-safe macOS notifications for newly observed approval or run-completion/failure transitions; in-app attention cards do not generate another push notification.
 - Mac Settings for connector, company, presentation, notifications, and explicit Launch at Login in a final installed non-QA release. Temporary QA builds cannot register persistent login items.
+- Optional energy conservation slows read-only Paperclip checks to 20 seconds in macOS Low Power Mode, with an ordinary refresh after wake.
 
 Missing data is never guessed: unknown costs/context/assignees, run progress and complete run history are labeled unavailable. Live information is suppressed when the Paperclip feed is stale.
 

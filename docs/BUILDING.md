@@ -452,3 +452,21 @@ merges, authenticated CI and GitHub app permissions require a separately
 approved optional connector and credential-handling architecture. Human QA
 should test manual input, invalid names, rate-limited/unavailable states,
 long run names/PR titles and 360pt notch/menu-bar widths.
+
+## Energy-aware Paperclip refresh and wake (PC-025)
+
+Settings has a default-on **Conserve energy in Low Power Mode** toggle.
+When macOS Low Power Mode is enabled, Paperclip's read-only refresh cadence
+drops from 5 seconds to 20 seconds. With the toggle off, or with normal
+power mode, the 5-second cadence remains. Changing the macOS power state
+automatically recomputes the timer without spinning up a second one. Mock
+script speed remains exactly user configured and the optional public GitHub
+CI source still uses its independent 180-second cadence.
+
+On NSWorkspace wake, the app rechecks the selected presentation/refresh
+cadence and requests one ordinary coalesced Paperclip GET refresh. The
+connector's existing in-flight guard prevents overlapping requests.
+No background privileged agent, additional endpoint, Mac file logging,
+or production Paperclip mutation is introduced. Human testing on an actual
+battery-powered Mac with Low Power Mode transitions, suspend/resume, both
+presentation modes and notifications is still required before merge.
