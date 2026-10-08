@@ -30,6 +30,11 @@ struct TransientFileShelfView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer(minLength: 0)
+                    ShareLink(item: item.url) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Share \(item.displayName) with macOS")
                     Button("Reveal") {
                         NSWorkspace.shared.activateFileViewerSelecting([item.url])
                     }
@@ -60,6 +65,12 @@ struct TransientFileShelfView: View {
                 .foregroundStyle(.tertiary)
         }
         .companionCard()
+        .dropDestination(for: URL.self) { urls, _ in
+            guard shelf.enabled else { return false }
+            let previous = shelf.items.count
+            shelf.add(urls)
+            return shelf.items.count > previous
+        }
         .accessibilityIdentifier("companion.utility.file-shelf")
     }
 

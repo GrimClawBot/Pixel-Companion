@@ -32,6 +32,21 @@ final class TransientFileShelfTests: XCTestCase {
     }
 
     @MainActor
+    func testDirectoryWithoutTrailingSlashRejectedUsingMetadata() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PixelShelfDirectory-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let shelf = TransientFileShelf()
+        shelf.configure(enabled: true)
+        // Intentionally construct a file-shaped URL, despite a real directory on disk.
+        let url = URL(fileURLWithPath: root.path, isDirectory: false)
+        XCTAssertFalse(url.hasDirectoryPath)
+        shelf.add([url])
+        XCTAssertTrue(shelf.items.isEmpty)
+    }
+
+    @MainActor
     func testEightItemMaximumAndRemove() {
         let shelf = TransientFileShelf()
         shelf.configure(enabled: true)
