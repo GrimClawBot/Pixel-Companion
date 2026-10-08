@@ -930,3 +930,39 @@ session, and a recent hook report is not evidence of successful work.
 Local session names, IDs, paths, private messages and tokens are never
 displayed in this health overview. All previously accepted settings,
 agents cards, activity and notifications remain.
+
+## Guided Codex / Claude Code setup (PC-047)
+
+In Settings -> Connections -> Guided local agent setup, expand Codex CLI
+or Claude Code. This is a user-controlled draft builder, not an installer.
+
+1. Choose the exact scripts/codex_notify_bridge.py or
+   scripts/claude_hook_bridge.py file from a trusted copy of the Pixel
+   Companion repository. The file is not executed or read by the app.
+2. Press Create private event folder to explicitly create a user-owned
+   private 0700 folder in macOS Application Support, or choose an
+   already-existing private folder. The wizard rejects insecure
+   permissions, invalid paths, symlinks and mismatched script names.
+3. Review the generated TOML notify array (Codex) or JSON hooks fragment
+   (Claude Code). Press Copy config draft only when ready. MERGE the
+   fragment manually into existing user config, never overwrite existing
+   settings. Codex supports one notify command; existing notify
+   requires explicit composition with a dispatcher. For Claude Code,
+   merge hook arrays without replacing unrelated handlers.
+4. Press Connect read-only display in Pixel Companion to enable the
+   corresponding existing monitor and link the chosen local folder.
+   This changes only the user-approved in-app settings, NOT Codex or
+   Claude config, permissions, hooks, processes or network behavior.
+
+Only real compatible external hook events can populate these views.
+The generated snippets use structured quotes for TOML and safe literal
+POSIX shell quoting inside Claude JSON. Paths are never evaluated as
+commands by Pixel Companion. Chosen paths and drafts remain RAM-only;
+a created empty private folder persists in Application Support.
+External hooks and marker files remain until separately removed, even
+when the in-app display is switched off. Incoming hook data can carry
+private input, so only select a trusted bridge script. Codex CLI notify
+cannot be assumed to work for the VS Code Codex app-server.
+
+References: https://developers.openai.com/codex/config-reference
+and https://code.claude.com/docs/en/hooks

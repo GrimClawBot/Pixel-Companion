@@ -126,6 +126,7 @@ struct SettingsView: View {
                         energySection
                         aboutSection
                     case .connections:
+                        AgentHookGuidedSetupView(model: model)
                         LocalConnectionHealthSettings(
                             process: model.codexProcessMonitor,
                             codex: model.codexTurnMonitor,
