@@ -40,4 +40,13 @@ extension AppModel {
             downloadMonitor.configure(enabled: newValue)
         }
     }
+    var fileShelfEnabled: Bool {
+        get { settings.fileShelfEnabled }
+        set {
+            guard newValue != settings.fileShelfEnabled else { return }
+            objectWillChange.send()
+            settings.fileShelfEnabled = newValue
+            fileShelf.configure(enabled: newValue)
+        }
+    }
 }

@@ -205,11 +205,13 @@ extension SettingsView {
                 .accessibilityIdentifier("companion.settings.focus-timer")
             Toggle("Downloads", isOn: $model.downloadHUDEnabled)
                 .accessibilityIdentifier("companion.settings.download-hud")
+            Toggle("File shelf", isOn: $model.fileShelfEnabled)
+                .accessibilityIdentifier("companion.settings.file-shelf")
         } header: {
             Text("Productivity")
         } footer: {
-            Text("Focus uses a local timer. Downloads only displays progress from a " +
-                 "separately connected provider; no browser or file scanning.")
+            Text("Focus is a local timer. Downloads needs a connected provider. " +
+                 "File shelf keeps user-chosen references only, until disabled or quit.")
         }
 
         Section {

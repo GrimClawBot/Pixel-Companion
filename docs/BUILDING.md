@@ -694,3 +694,7 @@ Personal instead of one long fixed-height form. The notch/menu bar shares the
 same accessible tabs and semantic system card surfaces. The UI respects Light/
 Dark Mode, Reduce Transparency and Reduce Motion; final VoiceOver, large text
 and real-window visual QA are still required before release.
+
+## Transient file shelf (PC-037 draft)
+
+Settings → Utilities → File shelf is OFF by default. Once enabled, Overview allows an explicit macOS file picker. Only up to eight unique local file URLs and sanitized short display names are held **in RAM**, for use with optional Reveal in Finder. The app does not copy, read, index, upload, bookmark or persist these files or send them to Paperclip/Pixel. Disable or quit to clear them. Drag/drop and AirDrop are not connected yet; evaluate only after separate privacy review. Manual narrow-layout, NSOpenPanel and VoiceOver tests remain necessary.

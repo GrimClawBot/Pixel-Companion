@@ -80,6 +80,8 @@ struct DetailContent: View {
     var displayBrightnessMonitor: DisplayBrightnessMonitor?
     var downloadHUDEnabled = false
     var downloadMonitor: DownloadProgressMonitor?
+    var fileShelfEnabled = false
+    var fileShelf: TransientFileShelf?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -298,6 +300,9 @@ extension DetailContent {
             }
             if downloadHUDEnabled, let downloadMonitor {
                 DownloadProgressView(monitor: downloadMonitor)
+            }
+            if fileShelfEnabled, let fileShelf {
+                TransientFileShelfView(shelf: fileShelf)
             }
             if calendarWidgetEnabled, let calendarMonitor {
                 CalendarNextEventView(
