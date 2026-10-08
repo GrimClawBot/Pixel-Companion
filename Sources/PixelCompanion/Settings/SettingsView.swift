@@ -50,6 +50,7 @@ struct SettingsView: View {
             mockSection
             presentationSection
             startupSection
+            energySection
             notificationSection
             aboutSection
         }
@@ -195,6 +196,17 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var energySection: some View {
+        Section("Energy") {
+            Toggle("Conserve energy in Low Power Mode", isOn: $model.conserveEnergy)
+                .accessibilityIdentifier("companion.settings.conserve-energy")
+            Text("When macOS Low Power Mode is on, Paperclip checks slow from " +
+                 "5 seconds to 20 seconds. Mock mode and GitHub refresh are unchanged.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
