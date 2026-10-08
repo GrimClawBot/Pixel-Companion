@@ -24,6 +24,13 @@ final class CompanionNotificationManagerTests: XCTestCase {
             delivered.append(notice)
         }
 
+        var testFailure: Error?
+
+        func submitTest() async throws {
+            if let testFailure { throw testFailure }
+            delivered.append(.test)
+        }
+
         func answer(_ value: Bool) {
             permissionContinuation?.resume(returning: value)
             permissionContinuation = nil
@@ -87,24 +94,40 @@ final class CompanionNotificationManagerTests: XCTestCase {
         let center = FakeCenter()
         let manager = makeManager(center: center)
         XCTAssertFalse(manager.canSendTest)
-        manager.sendTestNotification()
+        await manager.sendTestNotification()
         XCTAssertTrue(center.delivered.isEmpty)
 
         manager.setEnabled(true)
         await drain()
         XCTAssertFalse(manager.canSendTest)
-        manager.sendTestNotification()
+        await manager.sendTestNotification()
         XCTAssertTrue(center.delivered.isEmpty)
 
         center.answer(true)
         await drain()
         XCTAssertTrue(manager.canSendTest)
-        manager.sendTestNotification()
+        await manager.sendTestNotification()
         XCTAssertEqual(center.delivered, [.test])
+        XCTAssertTrue(manager.testStatus?.contains("macOS accepted") == true)
 
         manager.setEnabled(false)
-        manager.sendTestNotification()
+        await manager.sendTestNotification()
         XCTAssertEqual(center.delivered, [.test])
+    }
+
+    func testFailedMacOSSubmissionIsShownInsteadOfSilentlyIgnored() async {
+        let center = FakeCenter()
+        let manager = makeManager(center: center)
+        manager.setEnabled(true)
+        await drain()
+        center.answer(true)
+        await drain()
+
+        center.testFailure = NSError(domain: "CompanionTest", code: 4)
+        await manager.sendTestNotification()
+        XCTAssertTrue(manager.testStatus?.contains("macOS rejected") == true)
+        XCTAssertTrue(center.delivered.isEmpty)
+        XCTAssertTrue(manager.canSendTest)
     }
 
     func testOffByDefaultAndUnbundledCannotRequestOrDeliver() async {

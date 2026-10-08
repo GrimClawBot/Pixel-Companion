@@ -12,6 +12,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var notchAvailable = false
     @Published private(set) var paperclipCompanies: [PaperclipCompany] = []
     @Published private(set) var notificationStatus = ""
+    @Published private(set) var notificationTestStatus: String?
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
@@ -32,6 +33,7 @@ final class AppModel: ObservableObject {
         self.notificationManager.onChange = { [weak self] in
             guard let self else { return }
             self.notificationStatus = self.notificationManager.statusText
+            self.notificationTestStatus = self.notificationManager.testStatus
         }
     }
 
@@ -108,8 +110,8 @@ final class AppModel: ObservableObject {
         notificationManager.canSendTest
     }
 
-    func sendTestNotification() {
-        notificationManager.sendTestNotification()
+    func sendTestNotification() async {
+        await notificationManager.sendTestNotification()
     }
 
     func refreshNotificationPermission() {

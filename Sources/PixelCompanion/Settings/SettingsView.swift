@@ -150,8 +150,15 @@ struct SettingsView: View {
             if model.notificationPermissionNeedsRequest {
                 Button("Grant permission…") { model.requestNotificationPermission() }
             }
-            Button("Send test notification") { model.sendTestNotification() }
-                .disabled(!model.canSendTestNotification)
+            Button("Send test notification") {
+                Task { await model.sendTestNotification() }
+            }
+            .disabled(!model.canSendTestNotification)
+            if let status = model.notificationTestStatus {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         } header: {
             Text("Notifications")
         } footer: {

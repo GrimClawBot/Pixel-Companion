@@ -124,10 +124,26 @@ protocol CompanionNoticeCenter: AnyObject {
     func authorization() async -> CompanionAuthorization
     func requestPermission() async -> Bool
     func deliver(_ notice: CompanionNotice)
+    func submitTest() async throws
 }
 
 @MainActor
-final class SystemCompanionNoticeCenter: CompanionNoticeCenter {
+final class SystemCompanionNoticeCenter: NSObject, CompanionNoticeCenter, UNUserNotificationCenterDelegate {
+    override init() {
+        super.init()
+        // SwiftPM/XCTest processes have no app bundle and cannot register with Notification Center.
+        guard Bundle.main.bundleURL.pathExtension.lowercased() == "app" else { return }
+        // macOS otherwise suppresses banners while the app is foreground/active.
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
     func authorization() async -> CompanionAuthorization {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         switch settings.authorizationStatus {
@@ -143,14 +159,24 @@ final class SystemCompanionNoticeCenter: CompanionNoticeCenter {
             .requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
-    func deliver(_ notice: CompanionNotice) {
+    private func request(for notice: CompanionNotice) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = notice.title
         content.body = notice.body
         content.sound = .default
-        UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        )
+        return UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+    }
+
+    func deliver(_ notice: CompanionNotice) {
+        UNUserNotificationCenter.current().add(request(for: notice)) { error in
+            if let error {
+                NSLog("Pixel Companion: macOS notification submission failed: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    func submitTest() async throws {
+        try await UNUserNotificationCenter.current().add(request(for: .test))
     }
 }
 
@@ -174,6 +200,8 @@ final class CompanionNotificationManager {
     private var authorizationGeneration = 0
     private(set) var enabled: Bool
     private(set) var permission: PermissionState = .off
+    private(set) var testStatus: String?
+    private var submittingTest = false
     var onChange: (() -> Void)?
 
     init(
@@ -207,6 +235,7 @@ final class CompanionNotificationManager {
         enabled = value
         defaults.set(value, forKey: Self.preferenceKey)
         resetBaseline()
+        testStatus = nil
         if value {
             requestPermission()
         } else {
@@ -269,12 +298,22 @@ final class CompanionNotificationManager {
 
     /// Explicit local QA action; works without Paperclip and never sends runtime commands.
     var canSendTest: Bool {
-        enabled && isBundled && permission == .ready
+        enabled && isBundled && permission == .ready && !submittingTest
     }
 
-    func sendTestNotification() {
+    func sendTestNotification() async {
         guard canSendTest else { return }
-        center.deliver(.test)
+        submittingTest = true
+        testStatus = "Submitting local test notification…"
+        onChange?()
+        do {
+            try await center.submitTest()
+            testStatus = "macOS accepted the test. If no banner appears, check Notification Center and Focus."
+        } catch {
+            testStatus = "macOS rejected the notification: \(error.localizedDescription)"
+        }
+        submittingTest = false
+        onChange?()
     }
 
     func resetBaseline() {
@@ -283,6 +322,7 @@ final class CompanionNotificationManager {
     }
 
     private func setPermission(_ value: PermissionState) {
+        if value != .ready { testStatus = nil }
         let wasReady = permission == .ready
         permission = value
         if value == .ready && !wasReady {
