@@ -75,7 +75,9 @@ def analyze(prs: list[dict], tip: str, base: str = "main") -> dict:
             check for check in (pr.get("statusCheckRollup") or [])
             if isinstance(check, dict) and check.get("name")
         ]
-        results = [check.get("conclusion") for check in checks]
+        # GitHub's CLI can report an in-progress check conclusion as
+        # either null or an empty string. Neither is a failed check.
+        results = [check.get("conclusion") or None for check in checks]
         if any(result not in (None, *VALID_CHECKS) for result in results):
             ci_failing.append(pr["number"])
         elif not checks or any(result is None for result in results):

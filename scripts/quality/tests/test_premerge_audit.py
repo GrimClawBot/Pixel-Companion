@@ -114,6 +114,15 @@ class PremergeAuditTests(unittest.TestCase):
         self.assertEqual(result["unresolved_git_ref"], [2])
         self.assertEqual(result["already_in_candidate"], [])
 
+    def test_empty_conclusion_during_in_progress_ci_is_pending(self):
+        item = pr(1, "a", "main")
+        item["statusCheckRollup"] = [
+            {"name": "native-checks", "conclusion": "", "status": "IN_PROGRESS"}
+        ]
+        report = analyze([item], "a")
+        self.assertEqual(report["pending_ci_pr_numbers"], [1])
+        self.assertEqual(report["failing_ci_pr_numbers"], [])
+
     def test_unknown_status_check_rollup_never_counts_as_pass(self):
         item = pr(1, "a", "main")
         item["statusCheckRollup"] = [{"name": "native-checks", "conclusion": None}]
