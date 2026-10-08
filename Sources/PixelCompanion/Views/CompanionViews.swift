@@ -114,6 +114,7 @@ struct DetailContent: View {
     let openSettings: () -> Void
     var feedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
+    @State private var agentUsageScope: AgentUsageScope = .all
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -130,8 +131,27 @@ struct DetailContent: View {
                             AgentSessionRow(session: session)
                         }
                         Divider()
-                        SectionTitle(text: "Agent usage · latest reported run")
-                        ForEach(snapshot.agentSessions) { session in
+                        HStack {
+                            SectionTitle(text: "Agent usage · latest reported run")
+                            Spacer(minLength: 0)
+                            Text(
+                                "\(snapshot.agentSessions.filter(\.isActive).count) active / " +
+                                    "\(snapshot.agentSessions.count)"
+                            )
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        Picker("Agent usage filter", selection: $agentUsageScope) {
+                            ForEach(AgentUsageScope.allCases, id: \.self) { scope in
+                                Text(scope.label).tag(scope)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .controlSize(.mini)
+                        if agentUsageScope.sessions(snapshot.agentSessions).isEmpty {
+                            Placeholder(text: "No active agents. Select All to see recent usage.")
+                        }
+                        ForEach(agentUsageScope.sessions(snapshot.agentSessions)) { session in
                             AgentUsageCard(session: session)
                             Divider()
                         }
