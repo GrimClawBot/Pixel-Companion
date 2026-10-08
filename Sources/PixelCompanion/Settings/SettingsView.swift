@@ -86,6 +86,18 @@ struct SettingsView: View {
                     Spacer()
                     Button("Refresh") { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
                 }
+                if let lastSync = model.lastSuccessfulPaperclipSync {
+                    LabeledContent("Last successful sync") {
+                        Text(lastSync, style: .relative)
+                    }
+                } else {
+                    LabeledContent("Last successful sync", value: "Not yet")
+                }
+                if let warning = model.feedFreshness.warning {
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 if let error = model.snapshot.lastError {
                     Text(error)
                         .font(.caption)

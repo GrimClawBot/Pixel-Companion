@@ -6,6 +6,8 @@ import SwiftUI
 struct SummaryHeader: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
+    var feedFreshness: FeedFreshness = .notApplicable
+    var lastSuccessfulSync: Date?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -17,12 +19,25 @@ struct SummaryHeader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let lastSuccessfulSync {
+                    HStack(spacing: 3) {
+                        Text("Last synced")
+                        Text(lastSuccessfulSync, style: .relative)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                }
             }
             Spacer(minLength: 0)
         }
     }
 
     private var statusLine: String {
+        switch feedFreshness {
+        case .stale: return "Paperclip · Updates delayed"
+        case .unavailable: return "Paperclip · Connection unavailable"
+        case .connecting, .current, .notApplicable: break
+        }
         if let error = snapshot.lastError {
             return "\(snapshot.connectorName) · \(error)"
         }
@@ -35,6 +50,8 @@ struct SnapshotContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
     var approvalLimit: Int? = 2
+    var feedFreshness: FeedFreshness = .notApplicable
+    var lastSuccessfulSync: Date?
 
     private var visibleApprovals: [ApprovalRequest] {
         ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
@@ -42,7 +59,24 @@ struct SnapshotContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SummaryHeader(snapshot: snapshot, mood: mood)
+            SummaryHeader(
+                snapshot: snapshot, mood: mood, feedFreshness: feedFreshness,
+                lastSuccessfulSync: lastSuccessfulSync
+            )
+            if let warning = feedFreshness.warning {
+                Text(warning)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if feedFreshness.canPresentAsLive {
+                liveContent
+            }
+        }
+    }
+
+    private var liveContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
             switch AgentSessionPresentation.snapshotPrimary(
                 activity: snapshot.currentActivity,
                 sessions: snapshot.agentSessions
@@ -78,21 +112,26 @@ struct DetailContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
     let openSettings: () -> Void
+    var feedFreshness: FeedFreshness = .notApplicable
+    var lastSuccessfulSync: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SnapshotContent(snapshot: snapshot, mood: mood, approvalLimit: 0)
+            SnapshotContent(
+                snapshot: snapshot, mood: mood, approvalLimit: 0,
+                feedFreshness: feedFreshness, lastSuccessfulSync: lastSuccessfulSync
+            )
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    if !snapshot.agentSessions.isEmpty {
+                    if feedFreshness.canPresentAsLive && !snapshot.agentSessions.isEmpty {
                         SectionTitle(text: AgentSessionPresentation.sectionTitle(snapshot.agentSessions))
                         ForEach(snapshot.agentSessions) { session in
                             AgentSessionRow(session: session)
                         }
                         Divider()
                     }
-                    if !snapshot.pendingApprovals.isEmpty {
+                    if feedFreshness.canPresentAsLive && !snapshot.pendingApprovals.isEmpty {
                         HStack {
                             SectionTitle(text: "Pending approvals")
                             Spacer()
@@ -103,7 +142,7 @@ struct DetailContent: View {
                         }
                         Divider()
                     }
-                    SectionTitle(text: "Recent activity")
+                    SectionTitle(text: feedFreshness.canPresentAsLive ? "Recent activity" : "Cached history")
                     let history = ActivityPresentation.history(
                         snapshot.recentActivity,
                         currentActivity: AgentSessionPresentation.highlightedActivity(

@@ -46,11 +46,15 @@ struct NotchRootView: View {
             if state.surface == .compact {
                 Color.clear
                     .frame(height: state.notchSize.height)
-                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                CompactBar(
+                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                )
                     .frame(height: NotchLayout.compactBarHeight)
                     .padding(.horizontal, 8)
             } else {
-                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                CompactBar(
+                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                )
                     .frame(height: state.notchSize.height)
                     .padding(.horizontal, 12)
                 expandedContent
@@ -70,11 +74,19 @@ struct NotchRootView: View {
         case .compact:
             EmptyView()
         case .snapshot:
-            SnapshotContent(snapshot: model.snapshot, mood: model.mood)
+            SnapshotContent(
+                snapshot: model.snapshot, mood: model.mood,
+                feedFreshness: model.feedFreshness,
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+            )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
         case .detail:
-            DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
+            DetailContent(
+                snapshot: model.snapshot, mood: model.mood,
+                openSettings: openSettings, feedFreshness: model.feedFreshness,
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+            )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
         }
@@ -85,6 +97,7 @@ struct NotchRootView: View {
 struct CompactBar: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
+    var feedFreshness: FeedFreshness = .notApplicable
 
     var body: some View {
         HStack {
@@ -95,7 +108,7 @@ struct CompactBar: View {
     }
 
     @ViewBuilder private var trailingIndicator: some View {
-        if !snapshot.pendingApprovals.isEmpty {
+        if feedFreshness.canPresentAsLive && !snapshot.pendingApprovals.isEmpty {
             Text("\(snapshot.pendingApprovals.count)")
                 .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(.black)

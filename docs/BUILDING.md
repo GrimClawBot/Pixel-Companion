@@ -51,3 +51,22 @@ defaults delete PixelCompanion   # domain name of an unbundled SwiftPM executabl
 
 `PixelCompanionCore` uses Foundation only and contains all of the logic, but the package also
 contains the AppKit app, so building it needs macOS.
+
+
+## Feed freshness (PC-008 local development)
+
+For the read-only Paperclip connector, the app stores **only in memory** the local
+wall-clock time of the last successful *core* API poll. It does not equate a
+refresh attempt, partial telemetry response, or cached agent row with a new
+successful sync. The notch, menu-bar detail view and Settings show when data is
+delayed or unavailable; active rows and pending approval counts are suppressed
+when the feed is stale or disconnected. A fresh successful poll restores them.
+
+With the default five-second Paperclip interval, the feed is stale after
+20 seconds without a successful core refresh. The mock/disabled connectors are
+unchanged. A previous sync timestamp is cleared when switching to a new
+connector instance or company; it never persists across app launches. This
+does not infer whether any agent is actually online or running; it only
+reflects freshness of the data fetch.
+
+No access tokens, Paperclip writes, or public distribution are involved.
