@@ -22,13 +22,14 @@ final class AppModel: ObservableObject {
     let focusTimer = FocusTimerController()
     let batteryMonitor = BatteryPowerMonitor()
     let outputVolumeMonitor = OutputVolumeMonitor()
+    let displayBrightnessMonitor = DisplayBrightnessMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
 
-    private let settings: SettingsStore
+    let settings: SettingsStore
     private let notificationManager: CompanionNotificationManager
     private let publicGitHubMonitor: PublicGitHubMonitor
     private var publicGitHubSubscription: AnyCancellable?
@@ -284,6 +285,7 @@ extension AppModel {
         publicGitHubMonitor.configure(settings.githubPublicRepository)
         batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
         outputVolumeMonitor.configure(enabled: settings.outputVolumeHUDEnabled)
+        displayBrightnessMonitor.configure(enabled: settings.displayBrightnessHUDEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
@@ -306,6 +308,7 @@ extension AppModel {
         focusTimer.refresh()
         batteryMonitor.refresh()
         outputVolumeMonitor.refresh()
+        displayBrightnessMonitor.refresh()
         calendarMonitor.refresh()
         musicMonitor.refresh()
         scheduleStepTimer()
@@ -322,15 +325,6 @@ extension AppModel {
         }
     }
 
-    var musicShowTrackDetails: Bool {
-        get { settings.musicShowTrackDetails }
-        set {
-            guard newValue != settings.musicShowTrackDetails else { return }
-            objectWillChange.send()
-            settings.musicShowTrackDetails = newValue
-        }
-    }
-
     var calendarWidgetEnabled: Bool {
         get { settings.calendarWidgetEnabled }
         set {
@@ -338,15 +332,6 @@ extension AppModel {
             objectWillChange.send()
             settings.calendarWidgetEnabled = newValue
             calendarMonitor.configure(enabled: newValue)
-        }
-    }
-
-    var calendarShowTitles: Bool {
-        get { settings.calendarShowTitles }
-        set {
-            guard newValue != settings.calendarShowTitles else { return }
-            objectWillChange.send()
-            settings.calendarShowTitles = newValue
         }
     }
 

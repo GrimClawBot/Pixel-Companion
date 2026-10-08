@@ -211,40 +211,6 @@ struct SettingsView: View {
         }
     }
 
-    private var focusTimerSection: some View {
-        Section("Standalone utilities") {
-            Toggle("Enable Focus timer", isOn: $model.focusTimerEnabled)
-                .accessibilityIdentifier("companion.settings.focus-timer")
-            Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
-                .accessibilityIdentifier("companion.settings.battery-hud")
-            Toggle("Enable Output volume HUD", isOn: $model.outputVolumeHUDEnabled)
-                .accessibilityIdentifier("companion.settings.output-volume-hud")
-            MusicSettingsControls(model: model)
-            Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
-                .accessibilityIdentifier("companion.settings.calendar-widget")
-            if model.calendarWidgetEnabled {
-                Toggle("Show event titles", isOn: $model.calendarShowTitles)
-                    .accessibilityIdentifier("companion.settings.calendar-show-titles")
-                Text("Calendar is read-only. Grant access explicitly in the widget. " +
-                     "Event titles are hidden by default; no event details are saved.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Text("A local 25/5/15-minute focus and break timer in Overview. " +
-                 "No account, new permissions, notifications, or timer data stored on disk.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Output volume reads the default macOS sound output only. " +
-                 "No changes to volume, audio capture, or device history.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Battery & Power uses public macOS power information only. " +
-                 "No permission, device history, or personal data is collected.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var notificationSection: some View {
         Section {
             Toggle("System notifications", isOn: $model.notificationsEnabled)
@@ -292,6 +258,46 @@ struct SettingsView: View {
 }
 
 extension SettingsView {
+    private var focusTimerSection: some View {
+        Section("Standalone utilities") {
+            Toggle("Enable Focus timer", isOn: $model.focusTimerEnabled)
+                .accessibilityIdentifier("companion.settings.focus-timer")
+            Toggle("Enable Battery & Power HUD", isOn: $model.batteryHUDEnabled)
+                .accessibilityIdentifier("companion.settings.battery-hud")
+            Toggle("Enable Output volume HUD", isOn: $model.outputVolumeHUDEnabled)
+                .accessibilityIdentifier("companion.settings.output-volume-hud")
+            Toggle("Enable Display brightness HUD", isOn: $model.displayBrightnessHUDEnabled)
+                .accessibilityIdentifier("companion.settings.display-brightness-hud")
+            MusicSettingsControls(model: model)
+            Toggle("Enable Calendar widget", isOn: $model.calendarWidgetEnabled)
+                .accessibilityIdentifier("companion.settings.calendar-widget")
+            if model.calendarWidgetEnabled {
+                Toggle("Show event titles", isOn: $model.calendarShowTitles)
+                    .accessibilityIdentifier("companion.settings.calendar-show-titles")
+                Text("Calendar is read-only. Grant access explicitly in the widget. " +
+                     "Event titles are hidden by default; no event details are saved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text("A local 25/5/15-minute focus and break timer in Overview. " +
+                 "No account, new permissions, notifications, or timer data stored on disk.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Display brightness reads a public macOS display property when available. " +
+                 "No access to screen content, brightness changes, or history.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Output volume reads the default macOS sound output only. " +
+                 "No changes to volume, audio capture, or device history.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Battery & Power uses public macOS power information only. " +
+                 "No permission, device history, or personal data is collected.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     private var aboutSection: some View {
         Section("About") {
             LabeledContent("Version", value: CompanionBuildInfo.version)
