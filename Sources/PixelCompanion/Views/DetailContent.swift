@@ -84,6 +84,7 @@ struct DetailContent: View {
     var fileShelf: TransientFileShelf?
     var clipboardHistoryEnabled = false
     var clipboardHistory: TransientClipboardHistory?
+    var localAgentFeed: LocalAgentFeedMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -166,12 +167,17 @@ struct DetailContent: View {
     }
 
     private var agentsContent: some View {
-        AgentsDirectoryView(
-            sessions: liveSessions,
-            isLive: canShowLive,
-            tasks: canShowLive ? snapshot.tasks : [],
-            selectedAgentID: $selectedAgentID
-        )
+        VStack(alignment: .leading, spacing: 10) {
+            if let localAgentFeed, localAgentFeed.enabled {
+                LocalAgentSessionsView(monitor: localAgentFeed)
+            }
+            AgentsDirectoryView(
+                sessions: liveSessions,
+                isLive: canShowLive,
+                tasks: canShowLive ? snapshot.tasks : [],
+                selectedAgentID: $selectedAgentID
+            )
+        }
     }
 
     private var usageContent: some View {

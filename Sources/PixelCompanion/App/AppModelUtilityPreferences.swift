@@ -58,4 +58,13 @@ extension AppModel {
             clipboardHistory.configure(enabled: newValue)
         }
     }
+    var localAgentFeedEnabled: Bool {
+        get { settings.localAgentFeedEnabled }
+        set {
+            guard newValue != settings.localAgentFeedEnabled else { return }
+            objectWillChange.send()
+            settings.localAgentFeedEnabled = newValue
+            localAgentFeed.configure(enabled: newValue)
+        }
+    }
 }
