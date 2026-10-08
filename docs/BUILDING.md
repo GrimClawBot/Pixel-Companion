@@ -910,3 +910,23 @@ The existing Paperclip approvals/agent-run notification detector, private
 boundaries and QA simulation controls are unchanged. Hook sources still
 require separate explicit configuration outside the app; no hook is
 automatically installed. App never writes to Codex/Claude configs.
+
+## Local agent connection health dashboard (PC-046)
+
+Settings → Connections starts with four read-only status rows: Codex process
+presence, Codex notify turn events, Claude Code lifecycle events, and the
+manually supplied local-agent status JSON feed (which can support Hermes).
+All are OFF by default. The screen distinguishes setup needed, process
+seen, process absent, valid empty report, recent event/report, historical
+data, and unavailable/invalid markers.
+
+Health information comes ONLY from the existing optional monitors and a
+lightweight time-based UI refresh; no new background observer or file scan.
+The Refresh enabled sources control invokes their already-guarded read-only
+refresh methods. It does not invoke Codex/Claude, select a file, request
+permissions, access credentials, change hook configurations or contact
+Paperclip. Presence of a Codex-named process is never proof of a live
+session, and a recent hook report is not evidence of successful work.
+Local session names, IDs, paths, private messages and tokens are never
+displayed in this health overview. All previously accepted settings,
+agents cards, activity and notifications remain.

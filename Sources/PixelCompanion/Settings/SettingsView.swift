@@ -126,6 +126,12 @@ struct SettingsView: View {
                         energySection
                         aboutSection
                     case .connections:
+                        LocalConnectionHealthSettings(
+                            process: model.codexProcessMonitor,
+                            codex: model.codexTurnMonitor,
+                            claude: model.claudeHookMonitor,
+                            feed: model.localAgentFeed
+                        )
                         connectorSection
                         paperclipSection
                         githubPublicSection
