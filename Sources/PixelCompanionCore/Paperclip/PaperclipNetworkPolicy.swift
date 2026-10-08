@@ -20,15 +20,27 @@ enum PaperclipNetworkPolicy {
 
     /// Server-returned identifiers must remain a single unreserved path
     /// segment, not become query, fragment, percent encoding or traversal.
+    static func validPathComponent(_ component: String) -> Bool {
+        !component.isEmpty && component != "." && component != ".."
+            && component.utf8.allSatisfy { byte in
+                (65...90).contains(byte) || (97...122).contains(byte)
+                    || (48...57).contains(byte) || byte == 45
+                    || byte == 46 || byte == 95 || byte == 126
+            }
+    }
+
+    /// Validate a dynamic ID BEFORE interpolation. Validating only the
+    /// completed path would mistake slashes within an ID for separators.
+    static func companyPath(_ companyID: String, resource: String) -> String? {
+        guard validPathComponent(companyID),
+              validPathComponent(resource) else { return nil }
+        return "api/companies/\(companyID)/\(resource)"
+    }
+
     static func validRelativePath(_ path: String) -> Bool {
         let segments = path.split(separator: "/", omittingEmptySubsequences: false)
-        return !segments.isEmpty && segments.allSatisfy { segment in
-            !segment.isEmpty && segment != "." && segment != ".."
-                && segment.utf8.allSatisfy { byte in
-                    (65...90).contains(byte) || (97...122).contains(byte)
-                        || (48...57).contains(byte) || byte == 45
-                        || byte == 46 || byte == 95 || byte == 126
-                }
+        return !segments.isEmpty && segments.allSatisfy {
+            validPathComponent(String($0))
         }
     }
 }
