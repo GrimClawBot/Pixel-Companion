@@ -805,3 +805,60 @@ To fully stop event-file writes, remove the external notify setting yourself.
 The marker file stays on disk until you remove it; it contains only the
 event type and timestamp. Private directories and explicit local consent
 remain important. No credentials are stored or transmitted by Pixel Companion.
+
+## Claude Code lifecycle hook bridge (PC-043 draft)
+
+Claude Code supports user-defined command hooks in a settings JSON file
+and sends event payload JSON over standard input. This feature is an
+**optional, privacy-scrubbed lifecycle signal**, not a transcript reader
+or full Claude Code API connector.
+
+Supported observed milestones are SessionStart (begins or resumes),
+UserPromptSubmit (prompt was submitted, NOT verified processing),
+Stop (Claude finished responding, NOT task success), StopFailure (the
+turn ended due to an API error), and SessionEnd (session terminated).
+Only event type and local UTC observed time are retained. Prompt text,
+tool inputs, cwd, session_id, transcript_path, responses and errors
+are never retained, written, sent or printed.
+
+To opt in, create an existing private folder yourself (chmod 700).
+Then, in your own ~/.claude/settings.json or a single project's
+.claude/settings.local.json, ADD hook groups to the existing hooks map.
+The following is a configuration example, not something Pixel
+Companion automatically installs. Substitute the absolute script and
+folder paths. Keep any existing hook settings and review with Claude
+Code's /hooks menu. The example uses command hooks without matchers:
+
+    {
+      "hooks": {
+        "SessionStart": [{"hooks": [{"type": "command", "command": "python3 /ABSOLUTE/PATH/TO/Pixel-Companion/scripts/claude_hook_bridge.py --directory /ABSOLUTE/PRIVATE/EVENT/FOLDER"}]}],
+        "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 /ABSOLUTE/PATH/TO/Pixel-Companion/scripts/claude_hook_bridge.py --directory /ABSOLUTE/PRIVATE/EVENT/FOLDER"}]}],
+        "Stop": [{"hooks": [{"type": "command", "command": "python3 /ABSOLUTE/PATH/TO/Pixel-Companion/scripts/claude_hook_bridge.py --directory /ABSOLUTE/PRIVATE/EVENT/FOLDER"}]}],
+        "StopFailure": [{"hooks": [{"type": "command", "command": "python3 /ABSOLUTE/PATH/TO/Pixel-Companion/scripts/claude_hook_bridge.py --directory /ABSOLUTE/PRIVATE/EVENT/FOLDER"}]}],
+        "SessionEnd": [{"hooks": [{"type": "command", "command": "python3 /ABSOLUTE/PATH/TO/Pixel-Companion/scripts/claude_hook_bridge.py --directory /ABSOLUTE/PRIVATE/EVENT/FOLDER"}]}]
+      }
+    }
+
+Do not replace existing settings or manually edit managed policy files;
+add this only where you have permission and explicitly want it. The
+hook runs with your Claude Code environment's local privileges and
+must be treated as code. The Python script reads at most 256 KiB from
+stdin, parses only hook_event_name in its allowlist, and always exits 0
+without stdout, stderr, an approval decision or permission change.
+The fixed status marker pixel-companion-claude-event.json is replaced
+atomically with file mode 0600 and holds one event type and timestamp.
+Unrecognized events cause no writes. Its contents remain on disk until
+you remove the marker or folder. As with any local non-cryptographic
+marker, another process with write access could forge it.
+
+Next enable Settings -> Connections -> Show Claude Code lifecycle
+events and choose the SAME folder via the macOS picker. The app reads
+only that fixed expected file, without directory crawling, scanning
+~/.claude, running Claude CLI, reading prompts, accessing credentials,
+or sending network traffic. It polls only while enabled and connected;
+the location stays in RAM and is forgotten on quit/disable. Events
+older than two minutes are marked historical, not live. Turning off
+the in-app toggle does not remove hooks you configured separately.
+Manual real-Claude-hook delivery, narrow/notch and VoiceOver QA and
+security review remain required before considering the integration
+fully proven.

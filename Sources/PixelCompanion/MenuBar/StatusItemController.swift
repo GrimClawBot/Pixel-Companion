@@ -91,6 +91,7 @@ struct MenuBarPopoverView: View {
             localAgentFeed: model.localAgentFeed,
             codexProcessMonitor: model.codexProcessMonitor,
             codexTurnMonitor: model.codexTurnMonitor,
+            claudeHookMonitor: model.claudeHookMonitor,
             calendarWidgetEnabled: model.calendarWidgetEnabled,
             calendarShowTitles: model.calendarShowTitles,
             calendarMonitor: model.calendarMonitor,

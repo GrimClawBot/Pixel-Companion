@@ -37,6 +37,7 @@ public final class SettingsStore {
         case localAgentFeedEnabled = "pixelCompanion.localAgentFeedEnabled"
         case codexPresenceEnabled = "pixelCompanion.codexPresenceEnabled"
         case codexTurnEventsEnabled = "pixelCompanion.codexTurnEventsEnabled"
+        case claudeHookEventsEnabled = "pixelCompanion.claudeHookEventsEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -182,6 +183,12 @@ public final class SettingsStore {
     public var codexTurnEventsEnabled: Bool {
         get { (defaults.object(forKey: Key.codexTurnEventsEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.codexTurnEventsEnabled.rawValue) }
+    }
+
+    /// Off-by-default local Claude hook status; path stored in RAM only.
+    public var claudeHookEventsEnabled: Bool {
+        get { (defaults.object(forKey: Key.claudeHookEventsEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.claudeHookEventsEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.
