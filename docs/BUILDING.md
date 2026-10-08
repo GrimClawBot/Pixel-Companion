@@ -862,3 +862,25 @@ the in-app toggle does not remove hooks you configured separately.
 Manual real-Claude-hook delivery, narrow/notch and VoiceOver QA and
 security review remain required before considering the integration
 fully proven.
+
+## Unified local AI activity (PC-044)
+
+The Activity tab also displays a separate **Local AI activity** card when
+either previously implemented, OFF-by-default Codex/Claude hook feed is
+enabled. It combines ONLY the already-scrubbed event type and local UTC
+timestamp from those two sources, sorted newest-first, with source filters.
+No Paperclip company events are mixed in or given local origin labels.
+
+This is best-effort, **not a complete or authoritative agent audit history**.
+The underlying optional hook publisher files each contain just the MOST
+RECENT event, so multiple events that occur between 15-second polls can
+be missed. The app stores up to 20 observed changes in RAM; it retains a
+30-minute window and shows recent vs historical signals distinctly.
+On repeated polls of the same timestamp+event, it suppresses duplicates.
+Events that were already older than two minutes when first observed
+are not replayed into the timeline. Events are cleared per-source on
+disable, disconnect or unavailable status, and all history disappears
+when the app exits. No local history files, prompts, transcripts,
+workspace identifiers, approvals, token usage or credentials are saved
+by Pixel Companion. Disabling the in-app display does NOT remove any
+separately configured hook (see PC-042 and PC-043 notes).

@@ -109,6 +109,7 @@ struct NotchRootView: View {
                 codexProcessMonitor: model.codexProcessMonitor,
                 codexTurnMonitor: model.codexTurnMonitor,
                 claudeHookMonitor: model.claudeHookMonitor,
+                localActivityTimeline: model.localActivityTimeline,
                 calendarWidgetEnabled: model.calendarWidgetEnabled,
                 calendarShowTitles: model.calendarShowTitles,
                 calendarMonitor: model.calendarMonitor,
