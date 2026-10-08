@@ -20,6 +20,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var notificationTestStatus: String?
     @Published private(set) var publicGitHubState: GitHubPublicState = .off
     let focusTimer = FocusTimerController()
+    let batteryMonitor = BatteryPowerMonitor()
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
@@ -205,12 +206,16 @@ final class AppModel: ObservableObject {
     func start() {
         notificationManager.start()
         publicGitHubMonitor.configure(settings.githubPublicRepository)
+        batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
         rebuildConnector()
         if powerObserver == nil {
             powerObserver = NotificationCenter.default.addObserver(
                 forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in self?.scheduleStepTimer() }
+                Task { @MainActor in
+                    self?.scheduleStepTimer()
+                    self?.batteryMonitor.refresh()
+                }
             }
         }
         scheduleStepTimer()
@@ -218,13 +223,6 @@ final class AppModel: ObservableObject {
     }
 
     /// Rewinds the mock script to its first step. Local only; nothing outside the app changes.
-    /// Called by macOS on wake; only requests existing read-only connector state.
-    func didWake() {
-        focusTimer.refresh()
-        scheduleStepTimer()
-        if isPaperclipConnector { refreshConnector() }
-    }
-
     func restartScript() {
         mockConnector?.reset()
         capture()
@@ -300,6 +298,24 @@ final class AppModel: ObservableObject {
 }
 
 extension AppModel {
+    /// Called by macOS on wake; only requests existing read-only connector state.
+    func didWake() {
+        focusTimer.refresh()
+        batteryMonitor.refresh()
+        scheduleStepTimer()
+        if isPaperclipConnector { refreshConnector() }
+    }
+
+    var batteryHUDEnabled: Bool {
+        get { settings.batteryHUDEnabled }
+        set {
+            guard newValue != settings.batteryHUDEnabled else { return }
+            objectWillChange.send()
+            settings.batteryHUDEnabled = newValue
+            batteryMonitor.configure(enabled: newValue)
+        }
+    }
+
     var focusTimerEnabled: Bool {
         get { settings.focusTimerEnabled }
         set {

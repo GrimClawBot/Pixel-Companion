@@ -72,6 +72,8 @@ struct DetailContent: View {
     var publicGitHubState: GitHubPublicState = .off
     var focusTimerEnabled = false
     var focusTimer: FocusTimerController?
+    var batteryHUDEnabled = false
+    var batteryMonitor: BatteryPowerMonitor?
     @Binding var selectedTab: CompanionDetailTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
@@ -157,6 +159,9 @@ struct DetailContent: View {
             )
             if focusTimerEnabled, let focusTimer {
                 FocusTimerView(controller: focusTimer)
+            }
+            if batteryHUDEnabled, let batteryMonitor {
+                BatteryPowerView(monitor: batteryMonitor)
             }
             SnapshotContent(
                 snapshot: snapshot, mood: mood, approvalLimit: 2,

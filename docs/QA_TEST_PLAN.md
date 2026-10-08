@@ -17,6 +17,7 @@ This file is a **test plan, not proof that testing occurred**. Record exact sour
 - Activity search/date/type filters, pending approvals/messages, expand Company Tasks and search; only authoritative assigneeAgentId gets inspector routing.
 - Optional public GitHub input is blank by default; verify valid owner/repo shows reported workflow/PR statuses, invalid/private/missing repositories fail safely, no credentials are requested, no Paperclip disruption or misleading cached green CI.
 - Focus timer OFF by default; opt in through Settings, verify 25/5/15 minute presets, Start/Pause/Resume/Reset, keyboard/VoiceOver in 360pt/440pt modes, persistence across tab/display switches, sleep/wake countdown, no auto-started session, no new OS notifications or files, and clearing on disable/quit.
+- Battery & Power widget OFF by default; verify live actual capacity/charging/adapter status, no-battery Mac state, missing/invalid capacity, Mac Low Power Mode and wake refresh, disabling clears readings, and no extra privacy permission or stored battery history. Confirm notch/menu-bar and keyboard/VoiceOver behavior.
 - Test no agents, no tasks, missing metrics/timestamps, stale/disconnected Paperclip, recover after reconnect, no old data shown as live.
 - All tabs and Command-1..4 shortcuts, scroll reset, 360pt clipping, selected accessibility state, screen reader semantics.
 - System notifications opt-in and permission, local QA simulations, no replay or duplicated events, no agent/task details in banners.

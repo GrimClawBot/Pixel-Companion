@@ -17,6 +17,7 @@ Pixel Companion is an independent native macOS 14+ notch and menu-bar companion 
 - Mac Settings for connector, company, presentation, notifications, and explicit Launch at Login in a final installed non-QA release. Temporary QA builds cannot register persistent login items.
 - Optional energy conservation slows read-only Paperclip checks to 20 seconds in macOS Low Power Mode, with an ordinary refresh after wake.
 - Optional, off-by-default local Focus timer with 25-minute focus, 5/15-minute breaks and pause/resume/reset; no account or stored session history.
+- Optional, off-by-default read-only Battery & Power panel with actual macOS-reported charge/power state and no stored hardware identifiers.
 
 Missing data is never guessed: unknown costs/context/assignees, run progress and complete run history are labeled unavailable. Live information is suppressed when the Paperclip feed is stale.
 
