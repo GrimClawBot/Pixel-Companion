@@ -47,6 +47,55 @@ Settings are stored in the app's `UserDefaults` domain. To start fresh:
 defaults delete PixelCompanion   # domain name of an unbundled SwiftPM executable
 ```
 
+## Standalone macOS app bundle (PC-006)
+
+The local packaging command builds a true `.app`, with a stable identifier, original generated
+app icon, an accessory/menu-bar app plist, and an ad-hoc signature. No credentials are required:
+
+```sh
+scripts/package_macos.sh --release
+open "dist/Pixel Companion.app"
+```
+
+Output: `dist/Pixel Companion.app` (ignored by Git). Relative `--output` paths resolve
+from the caller's working directory, not the repository root. The script validates the signature,
+stages the app on the destination filesystem, and preserves the previous default app if the
+replacement fails. It refuses to overwrite existing custom destinations and rejects concurrent
+packaging for the same output using a short, hashed sibling lock directory. If packaging is interrupted by a
+forced termination, verify that no packaging process remains before manually removing a stale
+lock. If the script reports RECOVERY REQUIRED, preserve the named Previous.app backup for
+manual inspection/recovery; do not delete its stage directory. No app is published or notarized.
+A macOS permission prompt should only appear when a feature explicitly requests it; the current
+read-only features do not request notification permission.
+
+For external distribution, a maintainer may supply a **Developer ID Application** signing
+identity already installed in the local Keychain:
+
+```sh
+scripts/package_macos.sh --release --sign-identity "Developer ID Application: YOUR TEAM"
+```
+
+The local Developer ID signing option deliberately uses `--timestamp=none` so this
+packaging script makes no network calls. A separately approved public-release procedure must
+re-sign with an Apple secure timestamp and complete notarization.
+
+**Existing settings do not automatically transfer** from the unbundled `swift run` executable
+to the packaged app. The earlier executable commonly used the `PixelCompanion` UserDefaults
+domain, while this bundle uses `io.github.grimclawbot.PixelCompanion`. After first launching
+the installed app, reselect your connector and presentation settings and re-enter your optional
+Paperclip base URL and company selection locally. This migration is manual by design; never
+commit private connection settings to the public repository.
+
+This alone is **not** a public release. A maintainer must review the signing inputs, notarize
+with Apple's notary service, staple the ticket, verify Gatekeeper acceptance, and explicitly
+approve any GitHub Release upload. Never commit signing keys, passwords or private profiles.
+
+For real macOS QA: record the commit SHA, OS version, machine/notch availability, install path,
+bundle identifier, codesign verification, launch/quit, menu bar/notch behavior, sleep/wake, and
+permission prompts. Check notification allow/deny and delivery only after the PC-005 feature is
+included in a reviewed bundled build. A successful SwiftPM test or app launch alone is not
+evidence that system notifications work.
+
 ## Linux
 
 `PixelCompanionCore` uses Foundation only and contains all of the logic, but the package also
