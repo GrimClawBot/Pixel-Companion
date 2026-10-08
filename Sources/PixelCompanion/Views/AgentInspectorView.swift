@@ -47,6 +47,12 @@ struct AgentInspectorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if let role = session.agentRole, !role.isEmpty {
+                    Text("Reported role · " + role)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let task = session.taskTitle {
                     Text(task)
                         .font(.subheadline)

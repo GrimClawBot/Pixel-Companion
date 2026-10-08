@@ -46,6 +46,7 @@ struct AgentsDirectoryView: View {
     @Binding var selectedAgentID: String?
     @State private var query = ""
     @State private var scope: AgentUsageScope = .all
+    @State private var groupByRole = false
 
     private var visible: [AgentSessionSnapshot] {
         AgentsDirectoryFilter.results(sessions, query: query, scope: scope, isLive: isLive)
@@ -105,23 +106,48 @@ struct AgentsDirectoryView: View {
             .controlSize(.small)
             .accessibilityIdentifier("companion.agents.filter")
 
+            Picker("Agent layout", selection: $groupByRole) {
+                Text("List").tag(false)
+                Text("By role").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .accessibilityIdentifier("companion.agents.group-layout")
+
             if visible.isEmpty {
                 Placeholder(text: AgentsDirectoryFilter.emptyMessage(
                     total: sessions.count, scope: scope, query: query, isLive: isLive
                 ))
+            } else if groupByRole {
+                ForEach(AgentRoleGrouping.groups(visible)) { group in
+                    HStack {
+                        SectionTitle(text: group.label)
+                        Spacer(minLength: 0)
+                        Text("\(group.sessions.count)")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(group.sessions) { session in
+                        selectableAgentRow(session)
+                    }
+                }
             } else {
                 ForEach(visible) { session in
-                    Button {
-                        selectedAgentID = session.agentID
-                    } label: {
-                        AgentSessionRow(session: session)
-                            .contentShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Inspect " + session.agentName)
-                    .accessibilityIdentifier("companion.agent.select." + session.agentID)
+                    selectableAgentRow(session)
                 }
             }
         }
+    }
+
+    private func selectableAgentRow(_ session: AgentSessionSnapshot) -> some View {
+        Button {
+            selectedAgentID = session.agentID
+        } label: {
+            AgentSessionRow(session: session)
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Inspect " + session.agentName)
+        .accessibilityIdentifier("companion.agent.select." + session.agentID)
     }
 }
