@@ -98,6 +98,83 @@ final class ManagedAgentHookConnectionTests: XCTestCase {
         codex.configure(enabled: false)
     }
 
+    func testSymlinkedAppParentDoesNotAutoConnect() throws {
+        let fixture = try fixture()
+        let (root, settings) = (fixture.root, fixture.settings)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let original = try AgentHookSetupPlan.preparePrivateDirectory(
+            provider: .codex, root: root
+        )
+        let parent = root.appendingPathComponent("Pixel Companion", isDirectory: true)
+        let redirected = root.appendingPathComponent("MovedApp", isDirectory: true)
+        try FileManager.default.moveItem(at: parent, to: redirected)
+        try FileManager.default.createSymbolicLink(
+            at: parent, withDestinationURL: redirected
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: original.path))
+        XCTAssertNil(ManagedAgentHookConnection.directory(provider: .codex, root: root))
+        settings.managedAgentHookAutoConnectEnabled = true
+        let monitor = CodexTurnMonitor(read: { _ in
+            XCTFail("Symlinked parent must never be read")
+            return nil
+        })
+        monitor.configure(enabled: true)
+        ManagedAgentHookConnection.connect(
+            settings: settings, codex: monitor,
+            claude: ClaudeHookMonitor(), applicationSupportRoot: root
+        )
+        XCTAssertFalse(monitor.isConnected)
+        monitor.configure(enabled: false)
+    }
+
+    func testSymlinkedEventsParentDoesNotAutoConnect() throws {
+        let fixture = try fixture()
+        let root = fixture.root
+        defer { try? FileManager.default.removeItem(at: root) }
+        let expected = try AgentHookSetupPlan.preparePrivateDirectory(
+            provider: .claudeCode, root: root
+        )
+        let events = root.appendingPathComponent(
+            "Pixel Companion/Agent Events", isDirectory: true
+        )
+        let redirected = root.appendingPathComponent("MovedEvents", isDirectory: true)
+        try FileManager.default.moveItem(at: events, to: redirected)
+        try FileManager.default.createSymbolicLink(
+            at: events, withDestinationURL: redirected
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: expected.path))
+        XCTAssertNil(ManagedAgentHookConnection.directory(
+            provider: .claudeCode, root: root
+        ))
+    }
+
+    func testInsecureParentModeDoesNotAutoConnect() throws {
+        let fixture = try fixture()
+        let root = fixture.root
+        defer { try? FileManager.default.removeItem(at: root) }
+        _ = try AgentHookSetupPlan.preparePrivateDirectory(provider: .codex, root: root)
+        let parent = root.appendingPathComponent("Pixel Companion", isDirectory: true)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: parent.path
+        )
+        XCTAssertNil(ManagedAgentHookConnection.directory(provider: .codex, root: root))
+    }
+
+    func testPrivateFullParentChainStillConnects() throws {
+        let fixture = try fixture()
+        let root = fixture.root
+        defer { try? FileManager.default.removeItem(at: root) }
+        for provider in AgentHookProvider.allCases {
+            let destination = try AgentHookSetupPlan.preparePrivateDirectory(
+                provider: provider, root: root
+            )
+            XCTAssertEqual(
+                ManagedAgentHookConnection.directory(provider: provider, root: root),
+                destination
+            )
+        }
+    }
+
     func testPreferenceIndependentOfExistingOptions() throws {
         let fixture = try fixture()
         let settings = fixture.settings
