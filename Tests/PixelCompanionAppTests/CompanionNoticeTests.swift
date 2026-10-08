@@ -95,6 +95,61 @@ final class CompanionNoticeTests: XCTestCase {
         )
     }
 
+    func testObservedRunCompletionInHistoryAfterNextRunStartsNotifiesOnce() {
+        var detector = CompanionNoticeDetector()
+        let oldRunning = session("a", run: "run-a", state: .running)
+        XCTAssertEqual(detector.observe(snapshot(sessions: [oldRunning])), [])
+
+        let nextRunning = session(
+            "a", run: "run-b", state: .running,
+            recentRuns: [
+                AgentRunSnapshot(id: "run-a", state: .completed),
+                AgentRunSnapshot(id: "run-b", state: .running)
+            ]
+        )
+        XCTAssertEqual(detector.observe(snapshot(sessions: [nextRunning])), [.completedRuns(1)])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [nextRunning])), [])
+        let nextCompleted = session(
+            "a", run: "run-b", state: .completed,
+            recentRuns: [AgentRunSnapshot(id: "run-a", state: .completed)]
+        )
+        XCTAssertEqual(detector.observe(snapshot(sessions: [nextCompleted])), [.completedRuns(1)])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [nextCompleted])), [])
+    }
+
+    func testObservedFailureInHistoryWhenNextRunIsSelected() {
+        var detector = CompanionNoticeDetector()
+        XCTAssertEqual(detector.observe(snapshot(sessions: [
+            session("a", run: "old-run", state: .queued)
+        ])), [])
+
+        let nextRunning = session(
+            "a", run: "next-run", state: .running,
+            recentRuns: [
+                AgentRunSnapshot(id: "old-run", state: .failed),
+                AgentRunSnapshot(id: "unseen-historical", state: .completed)
+            ]
+        )
+        XCTAssertEqual(detector.observe(snapshot(sessions: [nextRunning])), [.failedRuns(1)])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [nextRunning])), [])
+    }
+
+    func testNeverObservedHistoricalRunsAreNotReplayedAsNotifications() {
+        var detector = CompanionNoticeDetector()
+        let current = session(
+            "a", run: "new-run", state: .running,
+            recentRuns: [
+                AgentRunSnapshot(id: "unseen-done", state: .completed),
+                AgentRunSnapshot(id: "unseen-failed", state: .failed)
+            ]
+        )
+        XCTAssertEqual(detector.observe(snapshot(sessions: [current])), [])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [current])), [])
+        XCTAssertEqual(detector.observe(snapshot(sessions: [
+            session("a", run: "new-run", state: .completed, recentRuns: current.recentRuns)
+        ])), [.completedRuns(1)])
+    }
+
     func testUnknownAndUnconfirmedRunsNeverProduceCompletionNotice() {
         var detector = CompanionNoticeDetector()
         XCTAssertEqual(detector.observe(snapshot(sessions: [
@@ -149,7 +204,8 @@ final class CompanionNoticeTests: XCTestCase {
     private func session(
         _ agent: String,
         run: String,
-        state: AgentSessionSnapshot.RunState
+        state: AgentSessionSnapshot.RunState,
+        recentRuns: [AgentRunSnapshot] = []
     ) -> AgentSessionSnapshot {
         AgentSessionSnapshot(
             id: agent,
@@ -158,7 +214,8 @@ final class CompanionNoticeTests: XCTestCase {
             agentStatus: state.rawValue,
             runID: run,
             runState: state,
-            taskTitle: "Private details"
+            taskTitle: "Private details",
+            recentRuns: recentRuns
         )
     }
 }
