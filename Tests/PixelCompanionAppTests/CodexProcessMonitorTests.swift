@@ -83,7 +83,10 @@ final class CodexProcessMonitorTests: XCTestCase {
         // can be reinterpreted as proof of session activity.
         if let names = CodexProcessReader.readNames() {
             XCTAssertLessThanOrEqual(CodexProcessClassification.count(names: names), 64)
-            XCTAssertTrue(names.allSatisfy { !$0.contains(" ") && !$0.contains("/") })
+            // Other processes can legitimately contain whitespace/punctuation.
+            XCTAssertLessThanOrEqual(names.count, 16_384)
+            XCTAssertTrue(names.allSatisfy { $0.utf8.count <= 16 })
+            print("PC041_MAC_CODEX_PROCESS_COUNT=\(CodexProcessClassification.count(names: names))")
         }
     }
 
