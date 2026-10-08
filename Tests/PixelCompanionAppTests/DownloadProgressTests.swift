@@ -33,7 +33,7 @@ final class DownloadProgressTests: XCTestCase {
             DownloadProgressReport(receivedBytes: 0, expectedBytes: 0),
             DownloadProgressReport(receivedBytes: 10, expectedBytes: -1)
         ] {
-            XCTAssertEqual(.validated(report), .idle)
+            XCTAssertEqual(DownloadProgressState.validated(report), .idle)
         }
     }
 
