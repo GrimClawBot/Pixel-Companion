@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var publicGitHubState: GitHubPublicState = .off
     let focusTimer = FocusTimerController()
     let batteryMonitor = BatteryPowerMonitor()
+    let outputVolumeMonitor = OutputVolumeMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -63,7 +64,6 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: Settings
-
     var connectorID: ConnectorID {
         get { settings.connectorID }
         set {
@@ -204,28 +204,6 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: Lifecycle
-
-    func start() {
-        notificationManager.start()
-        publicGitHubMonitor.configure(settings.githubPublicRepository)
-        batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
-        calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
-        musicMonitor.configure(enabled: settings.musicWidgetEnabled)
-        rebuildConnector()
-        if powerObserver == nil {
-            powerObserver = NotificationCenter.default.addObserver(
-                forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor in
-                    self?.scheduleStepTimer()
-                    self?.batteryMonitor.refresh()
-                }
-            }
-        }
-        scheduleStepTimer()
-        if isPaperclipConnector { refreshConnector() }
-    }
-
     /// Rewinds the mock script to its first step. Local only; nothing outside the app changes.
     func restartScript() {
         mockConnector?.reset()
@@ -238,7 +216,6 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: Private
-
     private var mockConnector: MockConnector? { connector as? MockConnector }
     private var paperclipConnector: PaperclipConnector? { connector as? PaperclipConnector }
 
@@ -302,10 +279,33 @@ final class AppModel: ObservableObject {
 }
 
 extension AppModel {
+    func start() {
+        notificationManager.start()
+        publicGitHubMonitor.configure(settings.githubPublicRepository)
+        batteryMonitor.configure(enabled: settings.batteryHUDEnabled)
+        outputVolumeMonitor.configure(enabled: settings.outputVolumeHUDEnabled)
+        calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
+        musicMonitor.configure(enabled: settings.musicWidgetEnabled)
+        rebuildConnector()
+        if powerObserver == nil {
+            powerObserver = NotificationCenter.default.addObserver(
+                forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.scheduleStepTimer()
+                    self?.batteryMonitor.refresh()
+                }
+            }
+        }
+        scheduleStepTimer()
+        if isPaperclipConnector { refreshConnector() }
+    }
+
     /// Called by macOS on wake; only requests existing read-only connector state.
     func didWake() {
         focusTimer.refresh()
         batteryMonitor.refresh()
+        outputVolumeMonitor.refresh()
         calendarMonitor.refresh()
         musicMonitor.refresh()
         scheduleStepTimer()
@@ -347,6 +347,16 @@ extension AppModel {
             guard newValue != settings.calendarShowTitles else { return }
             objectWillChange.send()
             settings.calendarShowTitles = newValue
+        }
+    }
+
+    var outputVolumeHUDEnabled: Bool {
+        get { settings.outputVolumeHUDEnabled }
+        set {
+            guard newValue != settings.outputVolumeHUDEnabled else { return }
+            objectWillChange.send()
+            settings.outputVolumeHUDEnabled = newValue
+            outputVolumeMonitor.configure(enabled: newValue)
         }
     }
 

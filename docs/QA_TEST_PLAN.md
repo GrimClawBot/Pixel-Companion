@@ -33,3 +33,5 @@ This file is a **test plan, not proof that testing occurred**. Record exact sour
 Run the strict native gate on final SHA, verify GitHub Actions for that exact SHA, obtain Greptile final-SHA review or explicitly approved substitute and named human/security review for public API and transport changes, then record physical Mac acceptance. User authorization is needed later for official signing/notarization and public binary distribution. All PRs remain unmerged until every applicable gate passes.
 
 Missing v1 capabilities (GitHub/CI, infrastructure, authenticated Atlas chat, privileged approvals, full departments/logs) are **not** covered by this Alpha acceptance plan. Do not treat disabled placeholders as implemented functionality.
+
+- Output volume HUD OFF by default: verify CoreAudio reports only actual default-output master scalar/mute, including nil master controls, USB/HDMI/Bluetooth output and device swaps; turning OFF clears RAM state and stops polling. No volume/mute changes, microphone permission, media recording, device names/IDs, logs or history. Confirm Overview 360pt/440pt VoiceOver on notch and menu bar; wake refresh.

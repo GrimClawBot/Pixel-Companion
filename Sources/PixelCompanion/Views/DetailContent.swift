@@ -74,6 +74,8 @@ struct DetailContent: View {
     var focusTimer: FocusTimerController?
     var batteryHUDEnabled = false
     var batteryMonitor: BatteryPowerMonitor?
+    var outputVolumeHUDEnabled = false
+    var outputVolumeMonitor: OutputVolumeMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -168,6 +170,9 @@ struct DetailContent: View {
             }
             if batteryHUDEnabled, let batteryMonitor {
                 BatteryPowerView(monitor: batteryMonitor)
+            }
+            if outputVolumeHUDEnabled, let outputVolumeMonitor {
+                OutputVolumeView(monitor: outputVolumeMonitor)
             }
             if calendarWidgetEnabled, let calendarMonitor {
                 CalendarNextEventView(
@@ -310,7 +315,9 @@ struct DetailContent: View {
             }
         }
     }
+}
 
+extension DetailContent {
     private var footer: some View {
         HStack {
             Label("Read-only", systemImage: "eye")

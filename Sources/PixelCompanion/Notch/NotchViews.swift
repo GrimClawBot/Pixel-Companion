@@ -95,6 +95,8 @@ struct NotchRootView: View {
                 focusTimer: model.focusTimer,
                 batteryHUDEnabled: model.batteryHUDEnabled,
                 batteryMonitor: model.batteryMonitor,
+                outputVolumeHUDEnabled: model.outputVolumeHUDEnabled,
+                outputVolumeMonitor: model.outputVolumeMonitor,
                 calendarWidgetEnabled: model.calendarWidgetEnabled,
                 calendarShowTitles: model.calendarShowTitles,
                 calendarMonitor: model.calendarMonitor,

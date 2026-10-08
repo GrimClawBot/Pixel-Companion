@@ -29,6 +29,7 @@ public final class SettingsStore {
         case conserveEnergy = "pixelCompanion.conserveEnergy"
         case focusTimerEnabled = "pixelCompanion.focusTimerEnabled"
         case batteryHUDEnabled = "pixelCompanion.batteryHUDEnabled"
+        case outputVolumeHUDEnabled = "pixelCompanion.outputVolumeHUDEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -126,6 +127,12 @@ public final class SettingsStore {
     public var batteryHUDEnabled: Bool {
         get { (defaults.object(forKey: Key.batteryHUDEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.batteryHUDEnabled.rawValue) }
+    }
+
+    /// Read-only default output volume is disabled by default. No audio data is saved.
+    public var outputVolumeHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.outputVolumeHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.outputVolumeHUDEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.
