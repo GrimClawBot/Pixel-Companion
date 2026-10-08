@@ -183,6 +183,35 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
         XCTAssertEqual(connector.connectionState, .connected)
     }
 
+    func testAtomicPresentationCaptureKeepsSessionRowsAndEvidenceTogether() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        let before = connector.capturePresentation()
+        XCTAssertEqual(before.snapshot.connectionState, .connected)
+        XCTAssertNil(before.sessionsAt)
+        XCTAssertTrue(before.snapshot.agentSessions.isEmpty)
+
+        service.finishSessions(.success([session(id: "first")]), fetch: 1)
+        let first = connector.capturePresentation()
+        XCTAssertEqual(first.snapshot.agentSessions.map(\.agentID), ["first"])
+        XCTAssertEqual(first.sessionsAt, first.coreAt)
+
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 2)
+        let prior = connector.capturePresentation()
+        XCTAssertEqual(prior.snapshot.agentSessions.map(\.agentID), ["first"])
+        XCTAssertEqual(prior.sessionsAt, first.sessionsAt)
+
+        service.finishSessions(.success([session(id: "second")]), fetch: 2)
+        let second = connector.capturePresentation()
+        XCTAssertEqual(second.snapshot.agentSessions.map(\.agentID), ["second"])
+        XCTAssertEqual(second.sessionsAt, second.coreAt)
+    }
+
     func testFullDirectoryCanCapturePastOldEightAnd128Limits() {
         let service = GenerationDeferredService()
         let connector = PaperclipConnector(
