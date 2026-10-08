@@ -212,3 +212,26 @@ under PC-000 even when all automated checks pass.
 Real Mac QA: several agents, both notch/menu-bar layouts, missing runs/usage,
 newest-first order, stale/disconnected feeds, status transitions, and selecting
 another agent must not show somebody else's runs. Public release remains blocked.
+
+## Verified live session monitor (PC-019)
+
+The Agent inspector includes a read-only **Session monitor** card driven only
+by the current reported run state and actual timestamps. Running shows an
+indeterminate activity indicator, **not a completion percentage**. Queued,
+completed, failed, cancelled, idle and unconfirmed statuses never show a
+misleading spinner. The spinner is suppressed when macOS Reduce Motion is
+enabled. Reported start, last reported update, and finish are labeled
+explicitly. Duration is computed only for a terminal run with valid start/end
+ordering, not for idle or unconfirmed states. Values are never guessed.
+
+The context meter shows only explicitly reported valid used/window tokens and
+reuses the existing utilization/warning policy (80%/90%). Input/output run
+totals do not stand in for the window. Within the inspector the preexisting
+monthly-spend/running-tokens card remains, but its context portion is shown
+in the monitor instead of duplicated; the full per-agent Usage tab is intact.
+
+This feature adds no public models, endpoints, credentials or server mutations
+and does not change the existing connector polling schedule. Mac interaction
+QA is still required for running/idle/stale states, Reduce Motion and
+VoiceOver at the 440pt notch and 360pt menu-bar widths. No public binary
+release is authorized.

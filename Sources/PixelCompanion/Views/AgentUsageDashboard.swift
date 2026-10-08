@@ -90,6 +90,7 @@ enum AgentUsagePresentation {
 /// Read-only usage for each reported agent. Monthly costs are not per-run estimates.
 struct AgentUsageCard: View {
     let session: AgentSessionSnapshot
+    var showsContext = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -122,20 +123,22 @@ struct AgentUsageCard: View {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2.weight(.medium)).foregroundStyle(.orange)
             }
-            Text(AgentUsagePresentation.contextLabel(session))
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let fraction = AgentUsagePresentation.contextFraction(session) {
-                ProgressView(value: fraction)
-                    .progressViewStyle(.linear)
-                    .tint(fraction >= 0.9 ? .red : (fraction >= 0.8 ? .orange : .green))
-                    .accessibilityLabel("Context utilization")
-                    .accessibilityValue("\(Int(fraction * 100)) percent")
-            }
-            if let warning = AgentUsagePresentation.contextWarning(session) {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2.weight(.medium)).foregroundStyle(.orange)
+            if showsContext {
+                Text(AgentUsagePresentation.contextLabel(session))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let fraction = AgentUsagePresentation.contextFraction(session) {
+                    ProgressView(value: fraction)
+                        .progressViewStyle(.linear)
+                        .tint(fraction >= 0.9 ? .red : (fraction >= 0.8 ? .orange : .green))
+                        .accessibilityLabel("Context utilization")
+                        .accessibilityValue("\(Int(fraction * 100)) percent")
+                }
+                if let warning = AgentUsagePresentation.contextWarning(session) {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.orange)
+                }
             }
         }
         .companionCard()
