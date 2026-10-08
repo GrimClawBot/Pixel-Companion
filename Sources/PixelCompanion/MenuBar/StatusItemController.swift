@@ -72,6 +72,7 @@ struct MenuBarPopoverView: View {
         DetailContent(
             snapshot: model.snapshot, mood: model.mood,
             openSettings: openSettings, feedFreshness: model.feedFreshness,
+            agentFeedFreshness: model.agentFeedFreshness,
             lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
             publicGitHubState: model.publicGitHubState,
             focusTimerEnabled: model.focusTimerEnabled,

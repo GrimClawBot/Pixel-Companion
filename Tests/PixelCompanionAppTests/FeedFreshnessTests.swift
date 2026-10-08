@@ -40,6 +40,23 @@ final class FeedFreshnessTests: XCTestCase {
         XCTAssertTrue(FeedFreshness.current.canPresentAsLive)
     }
 
+    func testHealthyCoreDoesNotImplyFreshAgentTelemetry() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let currentCore = FeedFreshness.evaluate(
+            isPaperclip: true, state: .connected, lastSuccess: now, now: now
+        )
+        let unverifiedSessions = FeedFreshness.evaluate(
+            isPaperclip: true, state: .connected, lastSuccess: nil, now: now
+        )
+        let oldSessions = FeedFreshness.evaluate(
+            isPaperclip: true, state: .connected,
+            lastSuccess: now.addingTimeInterval(-45), now: now
+        )
+        XCTAssertTrue(currentCore.canPresentAsLive)
+        XCTAssertFalse(unverifiedSessions.canPresentAsLive)
+        XCTAssertFalse(oldSessions.canPresentAsLive)
+    }
+
     func testFailuresNeverShowCachedLiveStatus() {
         let before = Date(timeIntervalSince1970: 100)
         for state in [ConnectionState.error, .disconnected] {

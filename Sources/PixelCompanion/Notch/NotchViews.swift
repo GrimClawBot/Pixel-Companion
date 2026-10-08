@@ -79,6 +79,7 @@ struct NotchRootView: View {
             SnapshotContent(
                 snapshot: model.snapshot, mood: model.mood,
                 feedFreshness: model.feedFreshness,
+                    agentFeedFreshness: model.agentFeedFreshness,
                 lastSuccessfulSync: model.lastSuccessfulPaperclipSync
             )
                 .padding([.horizontal, .bottom], 16)
@@ -89,6 +90,7 @@ struct NotchRootView: View {
             DetailContent(
                 snapshot: model.snapshot, mood: model.mood,
                 openSettings: openSettings, feedFreshness: model.feedFreshness,
+                agentFeedFreshness: model.agentFeedFreshness,
                 lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
                 publicGitHubState: model.publicGitHubState,
                 focusTimerEnabled: model.focusTimerEnabled,

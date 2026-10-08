@@ -94,6 +94,22 @@ final class AgentsDirectoryFilterTests: XCTestCase {
         )
     }
 
+    func testDirectorySearchFindsAgentBeyond128Entries() {
+        let agents = (0..<181).map {
+            fixture(id: "agent-\($0)", name: "Member \($0)")
+        }
+        let results = AgentsDirectoryFilter.results(
+            agents, query: "Member 180", scope: .all, isLive: true
+        )
+        XCTAssertEqual(results.map(\.agentID), ["agent-180"])
+        XCTAssertEqual(
+            AgentsDirectoryFilter.results(
+                agents, query: "", scope: .all, isLive: true
+            ).count,
+            181
+        )
+    }
+
     func testEmptyMessagesDistinguishSearchAndConnectionStates() {
         XCTAssertTrue(
             AgentsDirectoryFilter.emptyMessage(total: 0, scope: .all, query: "", isLive: true)

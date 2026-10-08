@@ -9,6 +9,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var snapshot: ConnectorSnapshot = .noConnector
     @Published private(set) var mood: CharacterMood = .offline
     @Published private(set) var feedFreshness: FeedFreshness = .notApplicable
+    @Published private(set) var agentFeedFreshness: FeedFreshness = .notApplicable
     @Published private(set) var lastSuccessfulPaperclipSync: Date?
     /// Transient navigation shared by the notch and the menu-bar fallback.
     /// Never persisted or sent to Paperclip.
@@ -126,9 +127,14 @@ final class AppModel: ObservableObject {
             guard newValue != notificationManager.enabled else { return }
             objectWillChange.send()
             notificationManager.setEnabled(newValue)
+            var verifiedSnapshot = ConnectorSnapshot(
+                capturing: connector, sessionLimit: Int.max
+            )
+            if isPaperclipConnector, !agentFeedFreshness.canPresentAsLive {
+                verifiedSnapshot.agentSessions = []
+            }
             notificationManager.observe(
-                ConnectorSnapshot(capturing: connector, sessionLimit: 128),
-                isPaperclip: isPaperclipConnector
+                verifiedSnapshot, isPaperclip: isPaperclipConnector
             )
         }
     }
@@ -270,8 +276,11 @@ final class AppModel: ObservableObject {
         capture()
     }
 
+}
+
+extension AppModel {
     private func capture() {
-        let next = ConnectorSnapshot(capturing: connector)
+        let next = ConnectorSnapshot(capturing: connector, sessionLimit: Int.max)
         if next != snapshot { snapshot = next }
         let syncDate = paperclipConnector?.lastSuccessfulRefreshAt
         if lastSuccessfulPaperclipSync != syncDate { lastSuccessfulPaperclipSync = syncDate }
@@ -281,13 +290,25 @@ final class AppModel: ObservableObject {
             lastSuccess: syncDate
         )
         if feedFreshness != health { feedFreshness = health }
+        let agentHealth = FeedFreshness.evaluate(
+            isPaperclip: isPaperclipConnector,
+            state: next.connectionState,
+            lastSuccess: paperclipConnector?.lastSuccessfulSessionRefreshAt
+        )
+        if agentFeedFreshness != agentHealth { agentFeedFreshness = agentHealth }
         _ = stateMachine.update(with: next)
         // A delayed Paperclip poll must not leave a misleading "working" mood.
         let nextMood: CharacterMood = health == .stale ? .offline : stateMachine.mood
         if mood != nextMood { mood = nextMood }
         let notificationSnapshot = notificationsEnabled && isPaperclipConnector
-            ? ConnectorSnapshot(capturing: connector, sessionLimit: 128) : next
-        notificationManager.observe(notificationSnapshot, isPaperclip: isPaperclipConnector)
+            ? ConnectorSnapshot(capturing: connector, sessionLimit: Int.max) : next
+        var verifiedNotificationSnapshot = notificationSnapshot
+        if !agentHealth.canPresentAsLive {
+            verifiedNotificationSnapshot.agentSessions = []
+        }
+        notificationManager.observe(
+            verifiedNotificationSnapshot, isPaperclip: isPaperclipConnector
+        )
     }
 }
 
@@ -339,46 +360,6 @@ extension AppModel {
         musicMonitor.refresh()
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }
-    }
-
-    var musicWidgetEnabled: Bool {
-        get { settings.musicWidgetEnabled }
-        set {
-            guard newValue != settings.musicWidgetEnabled else { return }
-            objectWillChange.send()
-            settings.musicWidgetEnabled = newValue
-            musicMonitor.configure(enabled: newValue)
-        }
-    }
-
-    var calendarWidgetEnabled: Bool {
-        get { settings.calendarWidgetEnabled }
-        set {
-            guard newValue != settings.calendarWidgetEnabled else { return }
-            objectWillChange.send()
-            settings.calendarWidgetEnabled = newValue
-            calendarMonitor.configure(enabled: newValue)
-        }
-    }
-
-    var outputVolumeHUDEnabled: Bool {
-        get { settings.outputVolumeHUDEnabled }
-        set {
-            guard newValue != settings.outputVolumeHUDEnabled else { return }
-            objectWillChange.send()
-            settings.outputVolumeHUDEnabled = newValue
-            outputVolumeMonitor.configure(enabled: newValue)
-        }
-    }
-
-    var batteryHUDEnabled: Bool {
-        get { settings.batteryHUDEnabled }
-        set {
-            guard newValue != settings.batteryHUDEnabled else { return }
-            objectWillChange.send()
-            settings.batteryHUDEnabled = newValue
-            batteryMonitor.configure(enabled: newValue)
-        }
     }
 
     fileprivate func scheduleStepTimer() {

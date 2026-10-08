@@ -68,6 +68,7 @@ struct DetailContent: View {
     let mood: CharacterMood
     let openSettings: () -> Void
     var feedFreshness: FeedFreshness = .notApplicable
+    var agentFeedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
     var publicGitHubState: GitHubPublicState = .off
     var focusTimerEnabled = false
@@ -108,7 +109,17 @@ struct DetailContent: View {
     }
 
     private var canShowLive: Bool { feedFreshness.canPresentAsLive }
-    private var liveSessions: [AgentSessionSnapshot] { canShowLive ? snapshot.agentSessions : [] }
+    private var canShowAgentsLive: Bool {
+        canShowLive && agentFeedFreshness.canPresentAsLive
+    }
+    private var liveSessions: [AgentSessionSnapshot] {
+        canShowAgentsLive ? snapshot.agentSessions : []
+    }
+    private var verifiedSnapshot: ConnectorSnapshot {
+        var safe = snapshot
+        safe.agentSessions = liveSessions
+        return safe
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -126,6 +137,12 @@ struct DetailContent: View {
                             .foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("companion.feed.warning")
+                    }
+                    if canShowLive, let warning = agentFeedFreshness.warning {
+                        Label("Agent telemetry: " + warning, systemImage: "clock.badge.exclamationmark")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("companion.agent.feed.warning")
                     }
                     tabContent
                 }
@@ -187,7 +204,7 @@ struct DetailContent: View {
             }
             AgentsDirectoryView(
                 sessions: liveSessions,
-                isLive: canShowLive,
+                isLive: canShowAgentsLive,
                 tasks: canShowLive ? snapshot.tasks : [],
                 selectedAgentID: $selectedAgentID
             )
@@ -204,13 +221,13 @@ struct DetailContent: View {
             HStack {
                 SectionTitle(text: "Agent usage · latest reported run")
                 Spacer(minLength: 0)
-                if canShowLive {
+                if canShowAgentsLive {
                     Text("\(liveSessions.filter(\.isActive).count) / \(liveSessions.count) active")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
-            if canShowLive && !liveSessions.isEmpty {
+            if canShowAgentsLive && !liveSessions.isEmpty {
                 Picker("Agent usage filter", selection: $agentUsageScope) {
                     ForEach(AgentUsageScope.allCases, id: \.self) { scope in
                         Text(scope.label).tag(scope)
@@ -228,9 +245,9 @@ struct DetailContent: View {
                 }
             } else {
                 Placeholder(
-                    text: canShowLive
+                    text: canShowAgentsLive
                         ? "No agent usage reported yet."
-                        : "Usage cannot be verified until Paperclip reconnects."
+                        : "Agent usage cannot be verified until session telemetry refreshes."
                 )
             }
         }
@@ -244,7 +261,7 @@ struct DetailContent: View {
             }
             CompanyTasksView(
                 tasks: canShowLive ? snapshot.tasks : [],
-                agents: liveSessions, isLive: canShowLive,
+                agents: liveSessions, isLive: canShowAgentsLive,
                 onSelectAgent: { agentID in
                     selectedAgentID = agentID
                     navigate(to: .agents)
@@ -266,7 +283,7 @@ struct DetailContent: View {
                     snapshot.recentActivity,
                     currentActivity: AgentSessionPresentation.highlightedActivity(
                         activity: snapshot.currentActivity,
-                        sessions: snapshot.agentSessions
+                        sessions: liveSessions
                     )
                 ),
                 isLive: canShowLive
@@ -285,14 +302,14 @@ extension DetailContent {
     private var overviewContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                metric(value: canShowLive ? "\(snapshot.agentSessions.count)" : "—",
+                metric(value: canShowAgentsLive ? "\(liveSessions.count)" : "—",
                        label: "Agents", shortcut: .agents)
-                metric(value: canShowLive ? "\(liveSessions.filter(\.isActive).count)" : "—",
+                metric(value: canShowAgentsLive ? "\(liveSessions.filter(\.isActive).count)" : "—",
                        label: "Active", shortcut: .active)
                 metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
                        label: "Approvals", shortcut: .approvals)
             }
-            LiveActivityDigestView(snapshot: snapshot, isLive: canShowLive)
+            LiveActivityDigestView(snapshot: verifiedSnapshot, isLive: canShowLive)
             if let localAgentAttention,
                codexTurnMonitor?.enabled == true || claudeHookMonitor?.enabled == true {
                 LocalAgentAttentionView(attention: localAgentAttention) {
@@ -303,7 +320,7 @@ extension DetailContent {
             LiveOperationsPulseView(
                 sessions: liveSessions,
                 pendingApprovalCount: snapshot.pendingApprovals.count,
-                isLive: canShowLive,
+                isLive: canShowAgentsLive,
                 onSelectAgent: { agentID in
                     selectedAgentID = agentID
                     navigate(to: .agents)
@@ -312,7 +329,7 @@ extension DetailContent {
             )
             OperationalAttentionView(
                 sessions: liveSessions,
-                isLive: canShowLive,
+                isLive: canShowAgentsLive,
                 onSelectAgent: { agentID in
                     selectedAgentID = agentID
                     navigate(to: .agents)
