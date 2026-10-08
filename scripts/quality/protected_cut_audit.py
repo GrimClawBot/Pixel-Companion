@@ -263,6 +263,38 @@ def checked_reviews(command: list[str]) -> list[dict] | None:
     return data if all(isinstance(item, dict) for item in data) else None
 
 
+def read_live_base_sha(repo: str, base: str) -> str | None:
+    """Read a fresh, exact base commit from GitHub; reject malformed data."""
+    response = checked_json([
+        "gh", "api", "repos/" + repo + "/branches/" + base,
+    ])
+    if not isinstance(response, dict):
+        return None
+    commit = response.get("commit")
+    sha = commit.get("sha") if isinstance(commit, dict) else None
+    return sha if isinstance(sha, str) and re.fullmatch(r"[a-fA-F0-9]{40}", sha) else None
+
+
+def finalize_base_readback(
+    report: dict, *, pinned_base_sha: str, latest_base_sha: str | None
+) -> dict:
+    """Fail closed if main has moved since the first read or is unavailable."""
+    stable = (
+        isinstance(latest_base_sha, str)
+        and re.fullmatch(r"[a-fA-F0-9]{40}", latest_base_sha) is not None
+        and latest_base_sha == pinned_base_sha
+        and report["github_base_matches_live_and_local_git"]
+    )
+    report["live_base_stable_at_final_readback"] = stable
+    report["final_base_check_available"] = latest_base_sha is not None
+    if not stable:
+        report["blockers"].append(
+            "live GitHub base moved or became unavailable before final readiness"
+        )
+    report["ready_for_explicit_human_merge_decision"] = not report["blockers"]
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default="GrimClawBot/Pixel-Companion")
@@ -290,17 +322,14 @@ def main() -> int:
     protection = checked_json([
         "gh", "api", "repos/" + args.repo + "/branches/" + args.base + "/protection",
     ])
-    base_metadata = checked_json([
-        "gh", "api", "repos/" + args.repo + "/branches/" + args.base,
-    ])
+    live_sha = read_live_base_sha(args.repo, args.base)
     review_records = checked_reviews([
         "gh", "api", "--paginate", "--slurp",
         "repos/" + args.repo + "/pulls/" + str(args.pr) + "/reviews?per_page=100",
     ])
-    if base_metadata is None or review_records is None:
+    if live_sha is None or review_records is None:
         print("CUT_AUDIT: INCOMPLETE (live base or review data unavailable)")
         return 2
-    live_sha = (base_metadata.get("commit") or {}).get("sha")
     local_base = run_command([
         "git", "rev-parse", "--verify", "origin/" + args.base,
     ])
@@ -313,11 +342,12 @@ def main() -> int:
         print("CUT_AUDIT: INCOMPLETE (candidate ref unavailable)")
         return 2
     head_sha = local_tip.stdout.strip()
+    # Always validate immutable pinned commits, never mutable origin/main.
     ancestor = run_command([
-        "git", "merge-base", "--is-ancestor", "origin/" + args.base, head_sha
+        "git", "merge-base", "--is-ancestor", local_base_sha, head_sha
     ]).returncode == 0
     virtual = run_command([
-        "git", "merge-tree", "--write-tree", "origin/" + args.base, head_sha
+        "git", "merge-tree", "--write-tree", local_base_sha, head_sha
     ])
     runs_response = checked_json([
         "gh", "api",
@@ -337,6 +367,13 @@ def main() -> int:
         reviews=review_records,
         check_runs=runs_response["check_runs"],
     )
+    # Greptile PC-061: re-read GitHub main at the very end of all
+    # slow review/CI/Git calls. A prior correct base no longer counts
+    # if main moved before this check (or the API read fails).
+    last_base_sha = read_live_base_sha(args.repo, args.base)
+    report = finalize_base_readback(
+        report, pinned_base_sha=local_base_sha, latest_base_sha=last_base_sha
+    )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
@@ -344,6 +381,7 @@ def main() -> int:
     print("PR_NUMBER:", args.pr)
     print("HEAD_SHA_MATCH:", report["github_head_matches_local_git"])
     print("BASE_SHA_MATCH:", report["github_base_matches_live_and_local_git"])
+    print("FINAL_BASE_SHA_STABLE:", report["live_base_stable_at_final_readback"])
     print("INDEPENDENT_EXACT_HEAD_REVIEWS:", len(report["independent_human_approving_reviewers"]))
     print("BASE_APPROVAL_PROTECTION:", report["branch_requires_approval"])
     print("BASE_CI_PROTECTION:", report["branch_requires_ci"])
@@ -352,6 +390,8 @@ def main() -> int:
     print("VIRTUAL_MERGE_CLEAN:", report["git_virtual_merge_clean"])
     print("BLOCKERS:", "; ".join(report["blockers"]) or "none")
     print("MAIN_MUTATED: NO")
+    if not report["final_base_check_available"]:
+        return 2
     return 3 if report["blockers"] else 0
 
 
