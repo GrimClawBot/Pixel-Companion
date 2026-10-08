@@ -11,17 +11,30 @@ final class AppModel: ObservableObject {
     @Published private(set) var activeMode: PresentationMode = .menuBar
     @Published private(set) var notchAvailable = false
     @Published private(set) var paperclipCompanies: [PaperclipCompany] = []
+    @Published private(set) var notificationStatus = ""
+    @Published private(set) var notificationTestStatus: String?
 
     /// Called after the user changes the presentation preference.
     var onPresentationPreferenceChange: (() -> Void)?
 
     private let settings: SettingsStore
+    private let notificationManager: CompanionNotificationManager
     private var connector: (any Connector)?
     private var stateMachine = CharacterStateMachine()
     private var stepTimer: Timer?
 
-    init(settings: SettingsStore) {
+    init(
+        settings: SettingsStore,
+        notificationManager: CompanionNotificationManager? = nil
+    ) {
         self.settings = settings
+        self.notificationManager = notificationManager ?? CompanionNotificationManager()
+        notificationStatus = self.notificationManager.statusText
+        self.notificationManager.onChange = { [weak self] in
+            guard let self else { return }
+            self.notificationStatus = self.notificationManager.statusText
+            self.notificationTestStatus = self.notificationManager.testStatus
+        }
     }
 
     deinit {
@@ -72,6 +85,47 @@ final class AppModel: ObservableObject {
         }
     }
 
+    var notificationsEnabled: Bool {
+        get { notificationManager.enabled }
+        set {
+            guard newValue != notificationManager.enabled else { return }
+            objectWillChange.send()
+            notificationManager.setEnabled(newValue)
+            notificationManager.observe(
+                ConnectorSnapshot(capturing: connector, sessionLimit: 128),
+                isPaperclip: isPaperclipConnector
+            )
+        }
+    }
+
+    var notificationPermissionNeedsRequest: Bool {
+        notificationManager.permission == .needsPermission
+    }
+
+    func requestNotificationPermission() {
+        notificationManager.requestPermission()
+    }
+
+    var canSendTestNotification: Bool {
+        notificationManager.canSendTest
+    }
+
+    func sendTestNotification() async {
+        await notificationManager.sendTestNotification()
+    }
+
+    var canSimulateQAEvent: Bool {
+        notificationManager.canSimulateQAEvent
+    }
+
+    func simulateQAEvent(_ scenario: CompanionQAScenario) {
+        notificationManager.simulateQAEvent(scenario)
+    }
+
+    func refreshNotificationPermission() {
+        notificationManager.refreshPermission()
+    }
+
     var paperclipBaseURL: String { settings.paperclipBaseURL }
 
     func applyPaperclipBaseURL(_ newValue: String) {
@@ -112,6 +166,7 @@ final class AppModel: ObservableObject {
     // MARK: Lifecycle
 
     func start() {
+        notificationManager.start()
         rebuildConnector()
         scheduleStepTimer()
         if isPaperclipConnector { refreshConnector() }
@@ -134,6 +189,7 @@ final class AppModel: ObservableObject {
     private var paperclipConnector: PaperclipConnector? { connector as? PaperclipConnector }
 
     private func rebuildConnector(preservePaperclipCompanies: Bool = false) {
+        notificationManager.resetBaseline()
         let previousPaperclipCompanies = preservePaperclipCompanies ? paperclipCompanies : []
         let state = settings.mockConnectionState
         let configuration = PaperclipConfiguration(
@@ -173,6 +229,9 @@ final class AppModel: ObservableObject {
         let next = ConnectorSnapshot(capturing: connector)
         if next != snapshot { snapshot = next }
         if stateMachine.update(with: next) != nil { mood = stateMachine.mood }
+        let notificationSnapshot = notificationsEnabled && isPaperclipConnector
+            ? ConnectorSnapshot(capturing: connector, sessionLimit: 128) : next
+        notificationManager.observe(notificationSnapshot, isPaperclip: isPaperclipConnector)
     }
 
     private func scheduleStepTimer() {
