@@ -87,6 +87,7 @@ struct DetailContent: View {
     var localAgentFeed: LocalAgentFeedMonitor?
     var codexProcessMonitor: CodexProcessMonitor?
     var codexTurnMonitor: CodexTurnMonitor?
+    var claudeHookMonitor: ClaudeHookMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -175,6 +176,9 @@ struct DetailContent: View {
             }
             if let codexTurnMonitor, codexTurnMonitor.enabled {
                 CodexTurnView(monitor: codexTurnMonitor)
+            }
+            if let claudeHookMonitor, claudeHookMonitor.enabled {
+                ClaudeHookView(monitor: claudeHookMonitor)
             }
             if let localAgentFeed, localAgentFeed.enabled {
                 LocalAgentSessionsView(monitor: localAgentFeed)

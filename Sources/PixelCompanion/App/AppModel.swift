@@ -29,6 +29,7 @@ final class AppModel: ObservableObject {
     let localAgentFeed = LocalAgentFeedMonitor()
     let codexProcessMonitor = CodexProcessMonitor()
     let codexTurnMonitor = CodexTurnMonitor()
+    let claudeHookMonitor = ClaudeHookMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -298,6 +299,7 @@ extension AppModel {
         localAgentFeed.configure(enabled: settings.localAgentFeedEnabled)
         codexProcessMonitor.configure(enabled: settings.codexPresenceEnabled)
         codexTurnMonitor.configure(enabled: settings.codexTurnEventsEnabled)
+        claudeHookMonitor.configure(enabled: settings.claudeHookEventsEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
@@ -325,6 +327,7 @@ extension AppModel {
         localAgentFeed.refresh()
         codexProcessMonitor.refresh()
         codexTurnMonitor.refresh()
+        claudeHookMonitor.refresh()
         calendarMonitor.refresh()
         musicMonitor.refresh()
         scheduleStepTimer()
@@ -368,16 +371,6 @@ extension AppModel {
             objectWillChange.send()
             settings.batteryHUDEnabled = newValue
             batteryMonitor.configure(enabled: newValue)
-        }
-    }
-
-    var focusTimerEnabled: Bool {
-        get { settings.focusTimerEnabled }
-        set {
-            guard newValue != settings.focusTimerEnabled else { return }
-            objectWillChange.send()
-            settings.focusTimerEnabled = newValue
-            if !newValue { focusTimer.stop() }
         }
     }
 

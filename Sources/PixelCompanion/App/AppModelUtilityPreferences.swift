@@ -85,4 +85,22 @@ extension AppModel {
             codexTurnMonitor.configure(enabled: newValue)
         }
     }
+    var claudeHookEventsEnabled: Bool {
+        get { settings.claudeHookEventsEnabled }
+        set {
+            guard newValue != settings.claudeHookEventsEnabled else { return }
+            objectWillChange.send()
+            settings.claudeHookEventsEnabled = newValue
+            claudeHookMonitor.configure(enabled: newValue)
+        }
+    }
+    var focusTimerEnabled: Bool {
+        get { settings.focusTimerEnabled }
+        set {
+            guard newValue != settings.focusTimerEnabled else { return }
+            objectWillChange.send()
+            settings.focusTimerEnabled = newValue
+            if !newValue { focusTimer.stop() }
+        }
+    }
 }
