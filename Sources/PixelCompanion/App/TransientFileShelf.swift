@@ -47,6 +47,11 @@ final class TransientFileShelf: ObservableObject {
             guard input.isFileURL, !input.hasDirectoryPath else { continue }
             let url = input.standardizedFileURL
             guard url.lastPathComponent != "/", !url.lastPathComponent.isEmpty else { continue }
+            // Finder drags may encode a directory without a trailing slash.
+            // Read only URL metadata to reject folders; never inspect content.
+            let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]))
+                .flatMap { $0.isDirectory } == true
+            guard !isDirectory else { continue }
             guard !items.contains(where: { $0.url == url }) else { continue }
             items.append(
                 FileShelfItem(

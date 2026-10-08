@@ -698,3 +698,7 @@ and real-window visual QA are still required before release.
 ## Transient file shelf (PC-037 draft)
 
 Settings → Utilities → File shelf is OFF by default. Once enabled, Overview allows an explicit macOS file picker. Only up to eight unique local file URLs and sanitized short display names are held **in RAM**, for use with optional Reveal in Finder. The app does not copy, read, index, upload, bookmark or persist these files or send them to Paperclip/Pixel. Disable or quit to clear them. Drag/drop and AirDrop are not connected yet; evaluate only after separate privacy review. Manual narrow-layout, NSOpenPanel and VoiceOver tests remain necessary.
+
+## Finder drop and explicit native sharing (PC-038 draft)
+
+In the opt-in File shelf, Finder file URLs may be dragged onto the shelf card. Dropped web links, actual directories (even without a trailing slash), duplicates and over-limit URLs are rejected. A native macOS Share action on each item exposes the OS sharing interface, where the human may choose AirDrop when available. Selecting a recipient or other share destination is a user action: Pixel Companion never automatically sends a file. The OS sharing service may read/transmit a chosen file **only after the user explicitly shares it**. macOS/system UI and permissions remain authoritative. Validate actual Finder drag/drop and AirDrop recipient sheet on Mac before accepting this feature.
