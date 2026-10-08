@@ -158,6 +158,13 @@ extension SettingsView {
     var notificationSection: some View {
         Section {
             Toggle("System notifications", isOn: $model.notificationsEnabled)
+            Toggle("Local agent alerts", isOn: $model.localAgentAlertsEnabled)
+                .accessibilityIdentifier("companion.settings.local-agent-alerts")
+            Text("Requires System notifications and macOS permission. " +
+                 "Only Codex turn-end and Claude response-end / API-error signals; " +
+                 "never prompt submissions, session starts or inferred approvals.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text(model.notificationStatus)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -188,8 +195,8 @@ extension SettingsView {
             Text("Notifications")
         } footer: {
             Text(
-                "Off by default. New Paperclip approvals and agent run completions/failures only. "
-                    + "No task or identity details in banners; existing events are not replayed."
+                "Off by default. Paperclip notices remain independent. Optional local-agent "
+                    + "alerts require separate opt-in, suppress replay and use static privacy-safe text."
             )
                 .font(.caption)
                 .foregroundStyle(.secondary)

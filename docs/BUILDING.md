@@ -884,3 +884,29 @@ when the app exits. No local history files, prompts, transcripts,
 workspace identifiers, approvals, token usage or credentials are saved
 by Pixel Companion. Disabling the in-app display does NOT remove any
 separately configured hook (see PC-042 and PC-043 notes).
+
+## Local AI attention + notifications (PC-045)
+
+The Overview tab adds a read-only Local AI attention digest when either
+Codex/Claude hook monitor is enabled. It shows the most recent two *observed*
+Codex turn-ending or Claude response-ending / API-error markers, and a button
+to navigate to the independent Local AI activity timeline. There is no agent
+control, task/approval inference, provider API connection or new filesystem
+read. This does not show raw text, paths, timestamps in notification payloads,
+session IDs, transcripts, tokens or private messages.
+
+**OS notifications are a separate, default-OFF opt-in**: Settings ->
+Notifications -> System notifications AND Local agent alerts must BOTH be on,
+and macOS must actually grant permission. Turning on Local agent alerts by
+itself does NOT request permissions or enable the global notifications toggle.
+Only Codex turn ends and Claude response ends/API error ends are eligible;
+Claude prompt submit and session start/end are never alerted. Generic, static
+banner titles/bodies contain no identity/task/workspace information.
+Notification sending is limited to once per 90 seconds and only for freshly
+observed eligible events (no replay on enable, app launch, disconnect, stale
+marker, denied/pending permission or later permission grant). Pending local
+alerts are NEVER queued while macOS has denied or not yet granted permission.
+The existing Paperclip approvals/agent-run notification detector, private
+boundaries and QA simulation controls are unchanged. Hook sources still
+require separate explicit configuration outside the app; no hook is
+automatically installed. App never writes to Codex/Claude configs.
