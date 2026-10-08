@@ -85,6 +85,7 @@ struct DetailContent: View {
     var clipboardHistoryEnabled = false
     var clipboardHistory: TransientClipboardHistory?
     var localAgentFeed: LocalAgentFeedMonitor?
+    var codexProcessMonitor: CodexProcessMonitor?
     var calendarWidgetEnabled = false
     var calendarShowTitles = false
     var calendarMonitor: CalendarNextEventMonitor?
@@ -168,6 +169,9 @@ struct DetailContent: View {
 
     private var agentsContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let codexProcessMonitor, codexProcessMonitor.enabled {
+                CodexProcessView(monitor: codexProcessMonitor)
+            }
             if let localAgentFeed, localAgentFeed.enabled {
                 LocalAgentSessionsView(monitor: localAgentFeed)
             }

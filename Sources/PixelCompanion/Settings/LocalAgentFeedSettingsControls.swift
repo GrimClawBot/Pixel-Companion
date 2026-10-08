@@ -10,6 +10,20 @@ struct LocalAgentFeedSettingsControls: View {
 
     var body: some View {
         Section {
+            Toggle("Detect Codex process on this Mac", isOn: $model.codexPresenceEnabled)
+                .accessibilityIdentifier("companion.settings.codex-presence")
+            Text("Detects a Codex-named process only; this cannot determine " +
+                 "which sessions are active. No chat access or commands.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Codex process presence")
+        } footer: {
+            Text("Checks macOS process names only when enabled. " +
+                 "No private APIs, terminal commands or file access.")
+        }
+
+        Section {
             Toggle("Enable local agent status", isOn: $model.localAgentFeedEnabled)
                 .accessibilityIdentifier("companion.settings.local-agent-feed")
             if model.localAgentFeedEnabled {

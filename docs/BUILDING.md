@@ -740,3 +740,24 @@ stale; timestamps over 30 seconds in the future and malformed reports fail
 closed. The app opens only one manually selected regular file, rejecting
 symlinks and special devices, GET-only. The optional writer publishes with
 atomic replacement and mode 0600. No Pixel HQ configuration is required.
+
+## Codex process presence (PC-041; local QA only)
+
+Settings → Connections → **Detect Codex process on this Mac** is OFF by
+default. Once explicitly enabled, the app uses the public macOS BSD
+KERN_PROC_ALL sysctl process metadata interface, filtered to the current
+user and an exact process name of "codex". It refreshes at most once every
+15 seconds, and clears the reading immediately on disable. The card in
+Agents shows only whether one or more Codex-named processes were found,
+or an unavailable status if macOS denied the query.
+
+This is a **direct Codex process presence signal, NOT Codex session
+telemetry**. VS Code and other clients may leave their Codex app-server
+running while no session is active. A same-named unrelated process could
+also be counted. No claim is made about active coding, Codex provider
+identity/signature, sessions, prompts, tokens, context or approvals. No
+arguments, PIDs, executable paths or histories are stored or displayed.
+Pixel Companion does not call Codex CLI, inspect ~/.codex, or use private
+libproc APIs. The explicit status-feed transport from PC-040 remains a
+separate optional integration, and Paperclip data stays authoritative
+for company agents.
