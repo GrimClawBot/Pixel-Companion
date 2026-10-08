@@ -69,3 +69,30 @@ reviewed the historical PR #51 root, *not* the latest app. It raised
 issues (redirect privacy and initial eight-session snapshot limits)
 were already addressed by the latest approved QA work, but that does
 not imply the entire Alpha candidate passes independent review.
+
+## Second Greptile review — required CI producer and comments
+
+The completed Greptile run 3f7e2232-7344-4a3f-9372-221e6d200514
+reviewed PC-058 at 787130c. It reported two additional P1 issues:
+1. A name-matching CI check from a different GitHub App could satisfy
+   a protected branch rule that pins the required check to app_id.
+2. A later COMMENTED review was incorrectly treated as withdrawing a
+   prior APPROVED decision, even though GitHub retains the approval.
+
+The revised cut guard fetches GitHub REST commit check runs on the
+exact candidate head and requires each named required check to have
+a single successful, completed check run whose app.id matches the
+app_id configured in branch protection. Missing producer metadata,
+mismatched app, duplicate run, incomplete pagination and wrong
+commit SHA now block promotion. Policy without pinned producer data
+is not accepted as provenance-verified by this strict release gate.
+
+Independent human review state now ignores comment-only submissions
+while preserving dismissal/changes-requested decisions and exact-head
+approval rules. The formal GitHub APPROVED reviewDecision, protected
+main policy, and separate human merge authorization remain required.
+
+Additional tests cover wrong producer app, missing producer, wrong
+pinned app, wrong commit, approval followed by a comment, and prior
+changes requested. Run Greptile again on the latest commit; Greptile's
+historical report is not a verdict for newly changed code.

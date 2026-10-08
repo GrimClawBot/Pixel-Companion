@@ -39,7 +39,9 @@ def independent_approvals(reviews: list[dict], head_sha: str, author: str) -> li
         login = user.get("login")
         if not isinstance(login, str) or not login:
             continue
-        if review.get("state") not in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED", "COMMENTED"):
+        # COMMENTED is additive feedback, NOT a retraction of an approval.
+        # Only decision-changing submissions update the effective review.
+        if review.get("state") not in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
             continue
         latest[login.casefold()] = review
     return sorted(
@@ -64,6 +66,7 @@ def evaluate_cut(
     git_base_sha: str = "",
     live_base_sha: str = "",
     reviews: list[dict] | None = None,
+    check_runs: list[dict] | None = None,
 ) -> dict:
     """Use verified source metadata, not a PR author's assertion of approval."""
     blockers: list[str] = []
@@ -111,7 +114,40 @@ def evaluate_cut(
         and results_by_name[name][0] == "SUCCESS"
         for name in required_names
     )
-    checks_successful = statuses_all_successful and passing_required
+    # Branch protection pins each required workflow context to an App ID.
+    # Name-only matches may come from an unrelated check producer.
+    required_apps: dict[str, int] = {}
+    for rule in (checks_rule.get("checks") or []):
+        if not isinstance(rule, dict):
+            continue
+        name = rule.get("context")
+        app_id = rule.get("app_id")
+        if isinstance(name, str) and type(app_id) is int and app_id > 0:
+            required_apps[name] = app_id
+    trusted_producers = (
+        required_names == set(required_apps)
+        and bool(required_names)
+        and isinstance(check_runs, list)
+    )
+    producer_matches: dict[str, bool] = {}
+    if trusted_producers:
+        for name in sorted(required_names):
+            matches = [
+                run for run in check_runs or []
+                if isinstance(run, dict) and run.get("name") == name
+            ]
+            producer_matches[name] = (
+                len(matches) == 1
+                and matches[0].get("head_sha") == git_head
+                and matches[0].get("status") == "completed"
+                and matches[0].get("conclusion") == "success"
+                and isinstance(matches[0].get("app"), dict)
+                and matches[0]["app"].get("id") == required_apps[name]
+            )
+    producers_verified = trusted_producers and all(producer_matches.values())
+    checks_successful = statuses_all_successful and passing_required and producers_verified
+    if not producers_verified:
+        blockers.append("required native CI producer App identity not verified")
     admin_policy = (protection or {}).get("enforce_admins") or {}
     force_policy = (protection or {}).get("allow_force_pushes") or {}
     delete_policy = (protection or {}).get("allow_deletions") or {}
@@ -182,6 +218,7 @@ def evaluate_cut(
         "required_check_names": sorted(required_names),
         "missing_required_check_names": missing_required,
         "required_ci_checks_all_successful": passing_required,
+        "required_ci_producer_apps_verified": producers_verified,
         "main_enforces_admins": admin_enforced,
         "main_requires_fresh_base": strict_ci,
         "main_requires_fresh_independent_review": dismiss_stale and last_push_review,
@@ -282,12 +319,23 @@ def main() -> int:
     virtual = run_command([
         "git", "merge-tree", "--write-tree", "origin/" + args.base, head_sha
     ])
+    runs_response = checked_json([
+        "gh", "api",
+        "repos/" + args.repo + "/commits/" + head_sha + "/check-runs?per_page=100",
+    ])
+    if runs_response is None or not isinstance(runs_response.get("check_runs"), list):
+        print("CUT_AUDIT: INCOMPLETE (CI producer metadata unavailable)")
+        return 2
+    if runs_response.get("total_count") != len(runs_response["check_runs"]):
+        print("CUT_AUDIT: INCOMPLETE (CI producer result pagination incomplete)")
+        return 2
     report = evaluate_cut(
         pr, protection, base=args.base, candidate_head=args.head,
         git_head=head_sha, git_ancestor=ancestor,
         virtual_merge_clean=virtual.returncode == 0,
         git_base_sha=local_base_sha, live_base_sha=live_sha,
         reviews=review_records,
+        check_runs=runs_response["check_runs"],
     )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -299,6 +347,7 @@ def main() -> int:
     print("INDEPENDENT_EXACT_HEAD_REVIEWS:", len(report["independent_human_approving_reviewers"]))
     print("BASE_APPROVAL_PROTECTION:", report["branch_requires_approval"])
     print("BASE_CI_PROTECTION:", report["branch_requires_ci"])
+    print("REQUIRED_CI_APP_IDENTITY:", report["required_ci_producer_apps_verified"])
     print("GITHUB_APPROVED:", report["pr_approved"])
     print("VIRTUAL_MERGE_CLEAN:", report["git_virtual_merge_clean"])
     print("BLOCKERS:", "; ".join(report["blockers"]) or "none")
