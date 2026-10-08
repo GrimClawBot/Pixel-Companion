@@ -2,6 +2,26 @@ import Foundation
 import PixelCompanionCore
 import SwiftUI
 
+/// The user controls visibility only; changing scope never affects the connector or its data.
+enum AgentUsageScope: String, CaseIterable {
+    case all
+    case active
+
+    func sessions(_ values: [AgentSessionSnapshot]) -> [AgentSessionSnapshot] {
+        switch self {
+        case .all: return values
+        case .active: return values.filter(\.isActive)
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .all: return "All"
+        case .active: return "Active"
+        }
+    }
+}
+
 /// Strictly sourced usage. Never derive context occupancy from cumulative run tokens.
 enum AgentUsagePresentation {
     static func runTokens(_ session: AgentSessionSnapshot) -> String {
@@ -19,6 +39,22 @@ enum AgentUsagePresentation {
     static func monthlyBudget(_ session: AgentSessionSnapshot) -> String {
         guard let cents = session.monthlyBudgetCents else { return "Monthly budget not reported" }
         return cents > 0 ? "Monthly budget · \(money(cents))" : "No monthly budget set"
+    }
+
+    static func monthlyBudgetFraction(_ session: AgentSessionSnapshot) -> Double? {
+        guard let spend = session.monthlySpendCents, spend >= 0,
+              let budget = session.monthlyBudgetCents, budget > 0 else {
+            return nil
+        }
+        return Double(spend) / Double(budget)
+    }
+
+    static func monthlyBudgetWarning(_ session: AgentSessionSnapshot) -> String? {
+        guard let fraction = monthlyBudgetFraction(session) else { return nil }
+        if fraction >= 1 { return "Monthly spending has reached the agent budget" }
+        if fraction >= 0.9 { return "Monthly spending is above 90% of the agent budget" }
+        if fraction >= 0.8 { return "Monthly spending is above 80% of the agent budget" }
+        return nil
     }
 
     static func contextFraction(_ session: AgentSessionSnapshot) -> Double? {
@@ -71,6 +107,17 @@ struct AgentUsageCard: View {
                 .font(.caption2.monospacedDigit())
             Text(AgentUsagePresentation.monthlyBudget(session))
                 .font(.caption2).foregroundStyle(.secondary)
+            if let fraction = AgentUsagePresentation.monthlyBudgetFraction(session) {
+                ProgressView(value: min(fraction, 1))
+                    .progressViewStyle(.linear)
+                    .tint(fraction >= 1 ? .red : (fraction >= 0.8 ? .orange : .green))
+                    .accessibilityLabel("Monthly agent budget utilization")
+                    .accessibilityValue("\(Int(min(fraction, 100) * 100)) percent")
+            }
+            if let warning = AgentUsagePresentation.monthlyBudgetWarning(session) {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2.weight(.medium)).foregroundStyle(.orange)
+            }
             Text(AgentUsagePresentation.contextLabel(session))
                 .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             if let fraction = AgentUsagePresentation.contextFraction(session) {
