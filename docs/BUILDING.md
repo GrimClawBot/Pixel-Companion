@@ -74,3 +74,15 @@ existing approvals not triggering, one new approval producing one notice, run co
 repeated polls not producing duplicates, changing companies/reconnecting not replaying existing
 events, and disabling notifications. Verify the Notification Center content contains no private
 data. Do not change Paperclip production to manufacture test events.
+
+### Notification smoke test (PC-005)
+
+With a locally packaged .app open, select Settings → Notifications and explicitly enable
+system notifications. Grant the macOS permission prompt if one appears. After the status reads
+"Enabled for new Paperclip events", click **Send test notification** to request a harmless
+local banner: **Pixel Companion test — This is a local test notification.** No Paperclip
+instance, credentials or network connection is required. If macOS permission is denied,
+the button stays disabled. The app never fires the test automatically on launch or enable.
+
+Check Notification Center if the banner is not immediately visible (Focus modes may suppress
+banners). Record whether the alert appears; a successful build alone does not verify display.

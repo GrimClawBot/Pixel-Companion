@@ -104,6 +104,14 @@ final class AppModel: ObservableObject {
         notificationManager.requestPermission()
     }
 
+    var canSendTestNotification: Bool {
+        notificationManager.canSendTest
+    }
+
+    func sendTestNotification() {
+        notificationManager.sendTestNotification()
+    }
+
     func refreshNotificationPermission() {
         notificationManager.refreshPermission()
     }

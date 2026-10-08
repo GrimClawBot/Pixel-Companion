@@ -7,12 +7,14 @@ enum CompanionNotice: Equatable {
     case approvals(Int)
     case completedRuns(Int)
     case failedRuns(Int)
+    case test
 
     var title: String {
         switch self {
         case .approvals: return "Approval needed"
         case .completedRuns: return "Agent run completed"
         case .failedRuns: return "Agent run failed"
+        case .test: return "Pixel Companion test"
         }
     }
 
@@ -24,6 +26,8 @@ enum CompanionNotice: Equatable {
             return count == 1 ? "An agent finished its run." : "\(count) agent runs finished."
         case let .failedRuns(count):
             return count == 1 ? "An agent run needs attention." : "\(count) agent runs need attention."
+        case .test:
+            return "This is a local test notification."
         }
     }
 }
@@ -261,6 +265,16 @@ final class CompanionNotificationManager {
         case .off, .denied, .unavailable, .needsPermission:
             break
         }
+    }
+
+    /// Explicit local QA action; works without Paperclip and never sends runtime commands.
+    var canSendTest: Bool {
+        enabled && isBundled && permission == .ready
+    }
+
+    func sendTestNotification() {
+        guard canSendTest else { return }
+        center.deliver(.test)
     }
 
     func resetBaseline() {

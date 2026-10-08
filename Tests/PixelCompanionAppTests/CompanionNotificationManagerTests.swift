@@ -83,6 +83,30 @@ final class CompanionNotificationManagerTests: XCTestCase {
         XCTAssertEqual(center.delivered, [.approvals(1)])
     }
 
+    func testManualNotificationIsOnlySentWhenBundledAndAuthorized() async {
+        let center = FakeCenter()
+        let manager = makeManager(center: center)
+        XCTAssertFalse(manager.canSendTest)
+        manager.sendTestNotification()
+        XCTAssertTrue(center.delivered.isEmpty)
+
+        manager.setEnabled(true)
+        await drain()
+        XCTAssertFalse(manager.canSendTest)
+        manager.sendTestNotification()
+        XCTAssertTrue(center.delivered.isEmpty)
+
+        center.answer(true)
+        await drain()
+        XCTAssertTrue(manager.canSendTest)
+        manager.sendTestNotification()
+        XCTAssertEqual(center.delivered, [.test])
+
+        manager.setEnabled(false)
+        manager.sendTestNotification()
+        XCTAssertEqual(center.delivered, [.test])
+    }
+
     func testOffByDefaultAndUnbundledCannotRequestOrDeliver() async {
         let center = FakeCenter()
         let manager = makeManager(center: center, bundled: false)
