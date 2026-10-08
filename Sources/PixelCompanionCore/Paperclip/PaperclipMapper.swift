@@ -115,6 +115,7 @@ enum PaperclipMapper {
             monthlyBudgetCents: nonnegative(agent.budgetMonthlyCents),
             contextUsedTokens: nonnegative(usage?.contextUsedTokens),
             contextWindowTokens: positive(usage?.contextWindowTokens),
+            recentRuns: recentRuns(runs, issuesByID: issuesByID),
             startedAt: date(selectedRun?.startedAt),
             finishedAt: date(selectedRun?.finishedAt),
             updatedAt: date(selectedRun?.updatedAt)
@@ -122,6 +123,40 @@ enum PaperclipMapper {
             ?? date(agent.updatedAt)
             ?? date(agent.lastHeartbeatAt)
         )
+    }
+
+    /// This is a bounded sample, not a complete run audit log. Run IDs are authoritative;
+    /// issue titles describe their current state and may have changed since the run.
+    private static func recentRuns(
+        _ runs: [PaperclipHeartbeatRunResponse],
+        issuesByID: [String: PaperclipIssueResponse]
+    ) -> [AgentRunSnapshot] {
+        var seen = Set<String>()
+        let unique = runs.sorted { lhs, rhs in
+            let left = runTimestamp(lhs)
+            let right = runTimestamp(rhs)
+            return left == right ? lhs.id < rhs.id : left > right
+        }.filter { seen.insert($0.id).inserted }
+
+        return unique.prefix(5).map { run in
+            let issue = run.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
+            let task = issue.map { value in
+                [value.identifier, value.title].compactMap { $0 }.joined(separator: " · ")
+            }
+            return AgentRunSnapshot(
+                id: run.id,
+                state: runState(run.status, agentStatus: ""),
+                taskTitle: task,
+                model: run.usageJson?.model,
+                provider: run.usageJson?.provider,
+                inputTokens: nonnegative(run.usageJson?.inputTokens),
+                cachedInputTokens: nonnegative(run.usageJson?.cachedInputTokens),
+                outputTokens: nonnegative(run.usageJson?.outputTokens),
+                startedAt: date(run.startedAt),
+                finishedAt: date(run.finishedAt),
+                updatedAt: date(run.updatedAt) ?? date(run.createdAt) ?? date(run.startedAt)
+            )
+        }
     }
 
     private static func preferredRun(

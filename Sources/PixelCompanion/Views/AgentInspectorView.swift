@@ -81,6 +81,7 @@ struct AgentInspectorView: View {
             Text("Reported usage")
                 .font(.callout.weight(.semibold))
             AgentUsageCard(session: session)
+            AgentRunHistoryView(runs: session.recentRuns)
             Text("Read-only · Fields not supplied by the runtime remain unavailable")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
