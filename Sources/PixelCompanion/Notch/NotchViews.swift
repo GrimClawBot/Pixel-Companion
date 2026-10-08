@@ -105,6 +105,7 @@ struct NotchRootView: View {
                 fileShelf: model.fileShelf,
                 clipboardHistoryEnabled: model.clipboardHistoryEnabled,
                 clipboardHistory: model.clipboardHistory,
+                localAgentFeed: model.localAgentFeed,
                 calendarWidgetEnabled: model.calendarWidgetEnabled,
                 calendarShowTitles: model.calendarShowTitles,
                 calendarMonitor: model.calendarMonitor,

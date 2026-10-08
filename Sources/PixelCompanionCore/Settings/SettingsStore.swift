@@ -34,6 +34,7 @@ public final class SettingsStore {
         case downloadHUDEnabled = "pixelCompanion.downloadHUDEnabled"
         case fileShelfEnabled = "pixelCompanion.fileShelfEnabled"
         case clipboardHistoryEnabled = "pixelCompanion.clipboardHistoryEnabled"
+        case localAgentFeedEnabled = "pixelCompanion.localAgentFeedEnabled"
         case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
         case calendarShowTitles = "pixelCompanion.calendarShowTitles"
         case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
@@ -161,6 +162,12 @@ public final class SettingsStore {
     public var clipboardHistoryEnabled: Bool {
         get { (defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.clipboardHistoryEnabled.rawValue) }
+    }
+
+    /// Only enables opt-in local status; selected file paths never persist.
+    public var localAgentFeedEnabled: Bool {
+        get { (defaults.object(forKey: Key.localAgentFeedEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.localAgentFeedEnabled.rawValue) }
     }
 
     /// Calendar access itself is always controlled by macOS, never by a preference.

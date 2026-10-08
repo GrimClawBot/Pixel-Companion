@@ -706,3 +706,37 @@ In the opt-in File shelf, Finder file URLs may be dragged onto the shelf card. D
 ## Manual RAM-only clipboard text shelf (PC-039 draft)
 
 Settings → Utilities → Clipboard (manual capture) is OFF by default. Pixel Companion **does not monitor NSPasteboard**. Only when the user presses Save copied text does the app check recognized concealed/transient/password-manager pasteboard type markers, then read a plain-text string if allowed. It holds at most 5 bounded, display-sanitized snippets in RAM. Re-copy and remove happen only when clicked. Disable or quit clears them, and nothing is written to disk, sent to Paperclip/Pixel or logged. **Warning:** Some apps put passwords on the clipboard without marking them secret, which cannot be reliably detected; do not manually save passwords or sensitive data. This is not a credential manager.
+
+## Local agent status bridge (PC-040 draft)
+
+This is a working **read-only local status file transport**, NOT automatic
+Claude Code/Codex/Hermes session discovery. Enable Settings → Connections →
+Local agent sessions and explicitly choose a JSON file. No directory scanning,
+process discovery, CLI execution, transcripts, prompts or credential access.
+The file path is RAM-only and forgotten on disable/quit. In the Agents tab,
+Local agents appear **separately** from authoritative Paperclip company agents.
+
+A trusted local source can publish actual status using the optional one-shot
+status writer provided in this repository. Example:
+
+    python3 scripts/local_agent_feed_writer.py \
+      --output /tmp/local-agent-status.json \
+      --session codex codex-local running "Codex" \
+      --session claude-code claude-local waiting "Claude Code"
+
+Select that JSON file in Settings. Re-run the command whenever the agent's
+**actual** reported status changes, and refresh every two minutes for current
+status. The writer itself does NOT inspect Codex/Claude/Hermes sessions, so
+the caller is responsible for truthful status and fresh timestamps. No agent
+hooks are installed automatically. Hook/IPC/source-specific integrations
+require separate design and security review before enabling.
+
+Status schema version 1 uses these fields: schemaVersion=1 and sessions
+array with id, source, name, state and updatedAt (RFC3339/ISO8601 UTC). Source:
+codex, claude-code, hermes, custom. State: running, waiting, idle,
+completed, failed. Maximum 12 sessions, 64 KiB file, bounded IDs and labels,
+no prompt, token or task data. Status older than 120 seconds is visibly
+stale; timestamps over 30 seconds in the future and malformed reports fail
+closed. The app opens only one manually selected regular file, rejecting
+symlinks and special devices, GET-only. The optional writer publishes with
+atomic replacement and mode 0600. No Pixel HQ configuration is required.

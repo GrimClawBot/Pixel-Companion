@@ -26,6 +26,7 @@ final class AppModel: ObservableObject {
     let downloadMonitor = DownloadProgressMonitor()
     let fileShelf = TransientFileShelf()
     let clipboardHistory = TransientClipboardHistory()
+    let localAgentFeed = LocalAgentFeedMonitor()
     let calendarMonitor = CalendarNextEventMonitor()
     let musicMonitor = MusicNowPlayingMonitor()
 
@@ -292,6 +293,7 @@ extension AppModel {
         downloadMonitor.configure(enabled: settings.downloadHUDEnabled)
         fileShelf.configure(enabled: settings.fileShelfEnabled)
         clipboardHistory.configure(enabled: settings.clipboardHistoryEnabled)
+        localAgentFeed.configure(enabled: settings.localAgentFeedEnabled)
         calendarMonitor.configure(enabled: settings.calendarWidgetEnabled)
         musicMonitor.configure(enabled: settings.musicWidgetEnabled)
         rebuildConnector()
@@ -316,6 +318,7 @@ extension AppModel {
         outputVolumeMonitor.refresh()
         displayBrightnessMonitor.refresh()
         downloadMonitor.refresh()
+        localAgentFeed.refresh()
         calendarMonitor.refresh()
         musicMonitor.refresh()
         scheduleStepTimer()

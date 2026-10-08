@@ -129,6 +129,9 @@ struct SettingsView: View {
                         connectorSection
                         paperclipSection
                         githubPublicSection
+                        LocalAgentFeedSettingsControls(
+                            model: model, monitor: model.localAgentFeed
+                        )
                         if model.isMockConnector {
                             mockSection
                         }
