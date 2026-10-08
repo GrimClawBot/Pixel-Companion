@@ -8,12 +8,21 @@ enum ManagedAgentHookConnection {
         provider: AgentHookProvider,
         root: URL
     ) -> URL? {
-        let folder = root
-            .appendingPathComponent("Pixel Companion", isDirectory: true)
-            .appendingPathComponent("Agent Events", isDirectory: true)
-            .appendingPathComponent(provider.directoryName, isDirectory: true)
-        guard AgentHookSetupPlan.validDirectory(folder) else { return nil }
-        return folder
+        let appFolder = root.appendingPathComponent(
+            "Pixel Companion", isDirectory: true
+        )
+        let eventsFolder = appFolder.appendingPathComponent(
+            "Agent Events", isDirectory: true
+        )
+        let providerFolder = eventsFolder.appendingPathComponent(
+            provider.directoryName, isDirectory: true
+        )
+        // Reject a redirected or group-accessible parent, even when the
+        // final provider folder itself appears owner-private.
+        guard AgentHookSetupPlan.validDirectory(appFolder),
+              AgentHookSetupPlan.validDirectory(eventsFolder),
+              AgentHookSetupPlan.validDirectory(providerFolder) else { return nil }
+        return providerFolder
     }
 
     @MainActor
