@@ -116,4 +116,23 @@ final class PaperclipNetworkPolicyTests: XCTestCase {
             XCTFail("Valid Paperclip endpoint unexpectedly refused")
         }
     }
+
+    func testCompanyPathRejectsUnsafeIDBeforeInterpolation() {
+        XCTAssertEqual(
+            PaperclipNetworkPolicy.companyPath("company-123", resource: "agents"),
+            "api/companies/company-123/agents"
+        )
+        for id in [
+            "a/b", "a//b", "../admin", "x/agents", ".", "..", "",
+            "id?token=test", "id#fragment", "a%2Fb", "bad\\id"
+        ] {
+            XCTAssertNil(
+                PaperclipNetworkPolicy.companyPath(id, resource: "agents"),
+                "ID must be a single safe segment"
+            )
+        }
+        XCTAssertNil(
+            PaperclipNetworkPolicy.companyPath("valid-id", resource: "issues/extra")
+        )
+    }
 }
