@@ -22,7 +22,7 @@ final class SettingsWindowController {
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
-        window.title = "Pixel Companion Settings"
+        window.title = CompanionBuildInfo.settingsTitle
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.center()
@@ -46,6 +46,7 @@ struct SettingsView: View {
             mockSection
             presentationSection
             notificationSection
+            aboutSection
         }
         .formStyle(.grouped)
         .frame(width: 460)
@@ -160,6 +161,15 @@ struct SettingsView: View {
             )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            LabeledContent("Version", value: CompanionBuildInfo.version)
+            if let qaUpdate = CompanionBuildInfo.qaUpdate {
+                LabeledContent("Update", value: qaUpdate)
+            }
         }
     }
 
