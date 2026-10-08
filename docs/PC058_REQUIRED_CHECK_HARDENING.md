@@ -42,3 +42,30 @@ specifically asked. Their collaborator access is left unchanged.
 This tooling and documentation change does not merge, publish, create
 GitHub approval, modify main, change provider/Paperclip configurations,
 or alter the running local QA54 app.
+
+## Greptile independent code audit of the previous gate
+
+The completed Greptile review run f411bc11-0bb0-48ba-9a91-aee95b92e8a0
+reviewed PC-057 at commit 12f0693. It reported THREE P1 findings:
+- green unrelated CI checks could hide missing native-checks;
+- a stale origin/main ref could look mergeable against the old base;
+- APPROVED alone could hide a bot, self-review, or approval on an old SHA.
+
+This subsequent PC-058 patch specifically remedies all three in code:
+- exact required CI name/unique successful conclusion;
+- GitHub PR baseRefOid == live remote main SHA == local origin/main SHA;
+- GitHub REST review records must contain at least the policy-required
+  count of distinct independent, non-bot User approvals on exact head SHA,
+  with current state APPROVED and GitHub reviewDecision APPROVED.
+
+A later Greptile run is needed against the final PC-058 commit before
+calling the audit findings closed by independent review. The live
+first-cut remains BLOCKED until a human reviewer is requested and
+approves. No such request is currently open at user direction.
+
+The separate Greptile Alpha run 6e704bf0-f146-4c56-b364-21af817f7611
+reviewed the historical PR #51 root, *not* the latest app. It raised
+7 findings requiring current-code triage; two historically relevant
+issues (redirect privacy and initial eight-session snapshot limits)
+were already addressed by the latest approved QA work, but that does
+not imply the entire Alpha candidate passes independent review.

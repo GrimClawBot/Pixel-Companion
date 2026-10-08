@@ -1,14 +1,15 @@
 """Integration merge protection gate must fail closed on missing evidence."""
 import unittest
 
-from scripts.quality.protected_cut_audit import evaluate_cut
+from scripts.quality.protected_cut_audit import evaluate_cut, independent_approvals
 
 
 def pr(**overrides):
     result = {
         "number": 51, "baseRefName": "main",
         "headRefName": "integration/pixel-companion-readonly-alpha",
-        "headRefOid": "a" * 40,
+        "headRefOid": "a" * 40, "baseRefOid": "b" * 40,
+        "author": {"login": "GrimClawBot"},
         "isDraft": False, "reviewDecision": "APPROVED",
         "mergeable": "MERGEABLE",
         "statusCheckRollup": [{"name": "native-checks", "conclusion": "SUCCESS"}],
@@ -16,6 +17,13 @@ def pr(**overrides):
     result.update(overrides)
     return result
 
+
+HUMAN_REVIEW = [
+    {
+        "user": {"login": "IndependentReviewer", "type": "User"},
+        "state": "APPROVED", "commit_id": "a" * 40,
+    }
+]
 
 PROTECTION = {
     "required_pull_request_reviews": {
@@ -39,6 +47,9 @@ def audit(item=None, policy=PROTECTION, **overrides):
         "git_head": "a" * 40,
         "git_ancestor": True,
         "virtual_merge_clean": True,
+        "git_base_sha": "b" * 40,
+        "live_base_sha": "b" * 40,
+        "reviews": HUMAN_REVIEW,
     }
     defaults.update(overrides)
     return evaluate_cut(item or pr(), policy, **defaults)
@@ -57,6 +68,40 @@ class ProtectedCutAuditTests(unittest.TestCase):
         self.assertFalse(report["branch_requires_approval"])
         self.assertFalse(report["branch_requires_ci"])
         self.assertFalse(report["ready_for_explicit_human_merge_decision"])
+
+    def test_stale_base_sha_blocks_even_when_git_ancestry_clean(self):
+        result = audit(live_base_sha="c" * 40)
+        self.assertFalse(result["github_base_matches_live_and_local_git"])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_stale_local_base_ref_blocks(self):
+        self.assertFalse(
+            audit(git_base_sha="c" * 40)["ready_for_explicit_human_merge_decision"]
+        )
+
+    def test_human_approval_on_prior_commit_is_not_current_approval(self):
+        old = [{**HUMAN_REVIEW[0], "commit_id": "d" * 40}]
+        result = audit(reviews=old)
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_bot_and_pr_author_approvals_are_not_independent(self):
+        bot = {"user": {"login": "reviewbot[bot]", "type": "Bot"},
+               "state": "APPROVED", "commit_id": "a" * 40}
+        author = {"user": {"login": "GrimClawBot", "type": "User"},
+                  "state": "APPROVED", "commit_id": "a" * 40}
+        result = audit(reviews=[bot, author])
+        self.assertEqual(result["independent_human_approving_reviewers"], [])
+        self.assertFalse(result["ready_for_explicit_human_merge_decision"])
+
+    def test_latest_changes_requested_overrides_prior_approval(self):
+        changed = {**HUMAN_REVIEW[0], "state": "CHANGES_REQUESTED"}
+        self.assertEqual(
+            independent_approvals([HUMAN_REVIEW[0], changed], "a" * 40, "GrimClawBot"),
+            [],
+        )
+
+    def test_missing_review_data_is_not_approval(self):
+        self.assertFalse(audit(reviews=[])["ready_for_explicit_human_merge_decision"])
 
     def test_missing_or_null_policy_components_fail_closed(self):
         for key in ("enforce_admins", "allow_force_pushes", "allow_deletions"):

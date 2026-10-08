@@ -21,6 +21,37 @@ def run_command(arguments: list[str]) -> subprocess.CompletedProcess:
     )
 
 
+def independent_approvals(reviews: list[dict], head_sha: str, author: str) -> list[str]:
+    """Only latest, exact-head, human, non-author approvals may count.
+
+    Review lists come from GitHub REST in submission order. A more recent
+    CHANGES_REQUESTED or DISMISSED state replaces an older approval from
+    the same reviewer. This supplements (never replaces) GitHub's own
+    branch-protection enforcement and explicit human merge authorization.
+    """
+    latest: dict[str, dict] = {}
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        user = review.get("user")
+        if not isinstance(user, dict):
+            continue
+        login = user.get("login")
+        if not isinstance(login, str) or not login:
+            continue
+        if review.get("state") not in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED", "COMMENTED"):
+            continue
+        latest[login.casefold()] = review
+    return sorted(
+        reviewer for reviewer, review in latest.items()
+        if reviewer != author.casefold()
+        and review.get("state") == "APPROVED"
+        and review.get("commit_id") == head_sha
+        and review["user"].get("type") == "User"
+        and not reviewer.endswith("[bot]")
+    )
+
+
 def evaluate_cut(
     pr: dict,
     protection: dict | None,
@@ -30,6 +61,9 @@ def evaluate_cut(
     git_head: str,
     git_ancestor: bool,
     virtual_merge_clean: bool,
+    git_base_sha: str = "",
+    live_base_sha: str = "",
+    reviews: list[dict] | None = None,
 ) -> dict:
     """Use verified source metadata, not a PR author's assertion of approval."""
     blockers: list[str] = []
@@ -105,6 +139,20 @@ def evaluate_cut(
         blockers.append("PR is still draft")
     if pr.get("reviewDecision") != "APPROVED":
         blockers.append("independent GitHub APPROVED review not recorded")
+    github_base_sha = pr.get("baseRefOid")
+    sha_pattern = r"[a-fA-F0-9]{40}"
+    base_matches = (
+        isinstance(github_base_sha, str)
+        and re.fullmatch(sha_pattern, github_base_sha) is not None
+        and github_base_sha == git_base_sha == live_base_sha
+    )
+    if not base_matches:
+        blockers.append("GitHub, remote main, and local base commit differ")
+    author_data = pr.get("author") or {}
+    author = author_data.get("login", "") if isinstance(author_data, dict) else ""
+    eligible = independent_approvals(reviews or [], git_head, author)
+    if not author or not protected_review or len(eligible) < required_count:
+        blockers.append("missing independent human approval on exact current head")
     if pr.get("mergeable") != "MERGEABLE":
         blockers.append("GitHub reports unresolved mergeability")
     if not checks_successful:
@@ -127,6 +175,8 @@ def evaluate_cut(
         "head_branch": candidate_head,
         "head_commit": git_head,
         "github_head_matches_local_git": head_sha == git_head,
+        "github_base_matches_live_and_local_git": base_matches,
+        "independent_human_approving_reviewers": eligible,
         "branch_requires_approval": protected_review,
         "branch_requires_ci": protected_checks,
         "required_check_names": sorted(required_names),
@@ -161,6 +211,21 @@ def checked_json(command: list[str]) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def checked_reviews(command: list[str]) -> list[dict] | None:
+    result = run_command(command)
+    if result.returncode != 0:
+        return None
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        return None
+    if not isinstance(data, list):
+        return None
+    if all(isinstance(page, list) for page in data):
+        data = [item for page in data for item in page]
+    return data if all(isinstance(item, dict) for item in data) else None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default="GrimClawBot/Pixel-Companion")
@@ -176,8 +241,8 @@ def main() -> int:
         return 2
     pr = checked_json([
         "gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json",
-        "number,headRefOid,headRefName,baseRefName,isDraft,reviewDecision,"
-        "mergeable,statusCheckRollup",
+        "number,headRefOid,headRefName,baseRefName,baseRefOid,author,"
+        "isDraft,reviewDecision,mergeable,statusCheckRollup",
     ])
     if pr is None:
         print("CUT_AUDIT: INCOMPLETE (PR metadata unavailable)")
@@ -188,6 +253,24 @@ def main() -> int:
     protection = checked_json([
         "gh", "api", "repos/" + args.repo + "/branches/" + args.base + "/protection",
     ])
+    base_metadata = checked_json([
+        "gh", "api", "repos/" + args.repo + "/branches/" + args.base,
+    ])
+    review_records = checked_reviews([
+        "gh", "api", "--paginate", "--slurp",
+        "repos/" + args.repo + "/pulls/" + str(args.pr) + "/reviews?per_page=100",
+    ])
+    if base_metadata is None or review_records is None:
+        print("CUT_AUDIT: INCOMPLETE (live base or review data unavailable)")
+        return 2
+    live_sha = (base_metadata.get("commit") or {}).get("sha")
+    local_base = run_command([
+        "git", "rev-parse", "--verify", "origin/" + args.base,
+    ])
+    if local_base.returncode != 0:
+        print("CUT_AUDIT: INCOMPLETE (local base unavailable)")
+        return 2
+    local_base_sha = local_base.stdout.strip()
     local_tip = run_command(["git", "rev-parse", "--verify", "origin/" + args.head])
     if local_tip.returncode != 0:
         print("CUT_AUDIT: INCOMPLETE (candidate ref unavailable)")
@@ -203,6 +286,8 @@ def main() -> int:
         pr, protection, base=args.base, candidate_head=args.head,
         git_head=head_sha, git_ancestor=ancestor,
         virtual_merge_clean=virtual.returncode == 0,
+        git_base_sha=local_base_sha, live_base_sha=live_sha,
+        reviews=review_records,
     )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -210,6 +295,8 @@ def main() -> int:
     print("CUT_AUDIT:", "REVIEW_READY" if not report["blockers"] else "BLOCKED")
     print("PR_NUMBER:", args.pr)
     print("HEAD_SHA_MATCH:", report["github_head_matches_local_git"])
+    print("BASE_SHA_MATCH:", report["github_base_matches_live_and_local_git"])
+    print("INDEPENDENT_EXACT_HEAD_REVIEWS:", len(report["independent_human_approving_reviewers"]))
     print("BASE_APPROVAL_PROTECTION:", report["branch_requires_approval"])
     print("BASE_CI_PROTECTION:", report["branch_requires_ci"])
     print("GITHUB_APPROVED:", report["pr_approved"])
