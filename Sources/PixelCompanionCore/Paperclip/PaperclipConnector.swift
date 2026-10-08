@@ -7,7 +7,8 @@ public final class PaperclipConnector:
     ActivitySource,
     ApprovalProvider,
     UsageProvider,
-    AgentSessionSource {
+    AgentSessionSource,
+    TaskSource {
     public let id: ConnectorID = .paperclip
     public let configuration: PaperclipConfiguration
 
@@ -21,6 +22,7 @@ public final class PaperclipConnector:
         var approvals: [ApprovalRequest] = []
         var usage: UsageSnapshot?
         var agentSessions: [AgentSessionSnapshot] = []
+        var tasks: [TaskSnapshot] = []
         var inFlight = false
     }
 
@@ -56,6 +58,7 @@ public final class PaperclipConnector:
     public var approvals: (any ApprovalProvider)? { self }
     public var usage: (any UsageProvider)? { self }
     public var sessions: (any AgentSessionSource)? { self }
+    public var tasks: (any TaskSource)? { self }
     public var authStatus: AuthStatus { .notRequired }
 
     public var currentActivity: ActivityEvent? {
@@ -84,6 +87,10 @@ public final class PaperclipConnector:
 
     public func agentSessions(limit: Int) -> [AgentSessionSnapshot] {
         locked { Array(cache.agentSessions.prefix(max(limit, 0))) }
+    }
+
+    public func tasks(limit: Int) -> [TaskSnapshot] {
+        locked { Array(cache.tasks.prefix(max(limit, 0))) }
     }
 
     public func refresh() {
@@ -141,6 +148,7 @@ public final class PaperclipConnector:
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 value.agentSessions = []
+                value.tasks = []
                 publishedCoreGeneration = 0
             }
         }
@@ -170,6 +178,7 @@ public final class PaperclipConnector:
         value.companies = state.companies
         value.activity = state.activity
         value.approvals = state.approvals
+        value.tasks = state.tasks
         value.usage = state.usage
         if companyChanged || value.agentSessions.isEmpty {
             value.agentSessions = state.agentSessions

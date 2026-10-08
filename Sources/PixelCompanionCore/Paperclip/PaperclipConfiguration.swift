@@ -61,6 +61,7 @@ struct PaperclipRemoteState {
     let approvals: [ApprovalRequest]
     let usage: UsageSnapshot?
     let agentSessions: [AgentSessionSnapshot]
+    var tasks: [TaskSnapshot] = []
 }
 
 enum PaperclipServiceError: LocalizedError {

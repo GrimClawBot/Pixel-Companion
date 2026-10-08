@@ -11,6 +11,7 @@ public struct ConnectorSnapshot: Equatable, Sendable {
     public var pendingApprovals: [ApprovalRequest]
     public var usage: UsageSnapshot?
     public var agentSessions: [AgentSessionSnapshot]
+    public var tasks: [TaskSnapshot]
     public var recentMessages: [ChatMessage]
 
     public init(
@@ -23,6 +24,7 @@ public struct ConnectorSnapshot: Equatable, Sendable {
         pendingApprovals: [ApprovalRequest] = [],
         usage: UsageSnapshot? = nil,
         agentSessions: [AgentSessionSnapshot] = [],
+        tasks: [TaskSnapshot] = [],
         recentMessages: [ChatMessage] = []
     ) {
         self.connectorName = connectorName
@@ -34,6 +36,7 @@ public struct ConnectorSnapshot: Equatable, Sendable {
         self.pendingApprovals = pendingApprovals
         self.usage = usage
         self.agentSessions = agentSessions
+        self.tasks = tasks
         self.recentMessages = recentMessages
     }
 
@@ -43,7 +46,8 @@ public struct ConnectorSnapshot: Equatable, Sendable {
         capturing connector: (any Connector)?,
         activityLimit: Int = 8,
         sessionLimit: Int = 8,
-        messageLimit: Int = 8
+        messageLimit: Int = 8,
+        taskLimit: Int = 64
     ) {
         guard let connector else {
             self.init(connectorName: Self.noConnectorName, connectionState: .disconnected)
@@ -59,6 +63,7 @@ public struct ConnectorSnapshot: Equatable, Sendable {
             pendingApprovals: connector.approvals?.pendingApprovals() ?? [],
             usage: connector.usage?.currentUsage(),
             agentSessions: connector.sessions?.agentSessions(limit: max(sessionLimit, 0)) ?? [],
+            tasks: connector.tasks?.tasks(limit: max(taskLimit, 0)) ?? [],
             recentMessages: connector.chat?.recentMessages(limit: max(messageLimit, 0)) ?? []
         )
     }
