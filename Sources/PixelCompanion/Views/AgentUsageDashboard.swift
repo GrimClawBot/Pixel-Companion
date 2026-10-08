@@ -93,11 +93,15 @@ struct AgentUsageCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(session.agentName).font(.callout.weight(.semibold))
-                Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                Text(session.agentName)
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
                 Text(AgentSessionPresentation.stateLabel(session))
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(AgentSessionPresentation.tint(session.runState))
+                    .lineLimit(1)
             }
             Text(AgentSessionPresentation.runtimeLabel(session) ?? "Model/provider not reported")
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
@@ -119,7 +123,9 @@ struct AgentUsageCard: View {
                     .font(.caption2.weight(.medium)).foregroundStyle(.orange)
             }
             Text(AgentUsagePresentation.contextLabel(session))
-                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if let fraction = AgentUsagePresentation.contextFraction(session) {
                 ProgressView(value: fraction)
                     .progressViewStyle(.linear)
@@ -132,7 +138,7 @@ struct AgentUsageCard: View {
                     .font(.caption2.weight(.medium)).foregroundStyle(.orange)
             }
         }
-        .padding(.vertical, 3)
+        .companionCard()
         .accessibilityElement(children: .combine)
     }
 }

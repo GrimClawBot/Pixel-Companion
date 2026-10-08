@@ -52,7 +52,14 @@ struct DetailContent: View {
     var feedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
     @Binding var selectedTab: CompanionDetailTab
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var agentUsageScope: AgentUsageScope = .all
+
+    private func navigate(to tab: CompanionDetailTab) {
+        withAnimation(CompanionMotion.tabTransition(reduceMotion: reduceMotion)) {
+            selectedTab = tab
+        }
+    }
 
     private var canShowLive: Bool { feedFreshness.canPresentAsLive }
     private var liveSessions: [AgentSessionSnapshot] { canShowLive ? snapshot.agentSessions : [] }
@@ -89,7 +96,7 @@ struct DetailContent: View {
         HStack(spacing: 4) {
             ForEach(CompanionDetailTab.allCases) { tab in
                 Button {
-                    selectedTab = tab
+                    navigate(to: tab)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: tab.symbol)
@@ -102,9 +109,17 @@ struct DetailContent: View {
                     .frame(height: 42)
                     .contentShape(RoundedRectangle(cornerRadius: 10))
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.primary.opacity(selectedTab == tab ? 0.16 : 0.045))
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.primary.opacity(selectedTab == tab ? 0.18 : 0.04))
                     )
+                    .overlay(alignment: .bottom) {
+                        if selectedTab == tab {
+                            Capsule()
+                                .fill(Color.accentColor)
+                                .frame(width: 24, height: 2)
+                                .padding(.bottom, 1)
+                        }
+                    }
                     .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
                 }
                 .buttonStyle(.plain)
@@ -140,13 +155,13 @@ struct DetailContent: View {
                 feedFreshness: feedFreshness, lastSuccessfulSync: lastSuccessfulSync,
                 showsHeader: false
             )
-            Button("View usage details") { selectedTab = .usage }
+            Button("View usage details") { navigate(to: .usage) }
                 .font(.caption)
                 .buttonStyle(.plain)
                 .foregroundStyle(.tint)
                 .accessibilityIdentifier("companion.overview.usage")
             if canShowLive && snapshot.pendingApprovals.count > 2 {
-                Button("View all approvals in Activity") { selectedTab = .activity }
+                Button("View all approvals in Activity") { navigate(to: .activity) }
                     .font(.caption)
                     .buttonStyle(.plain)
                     .foregroundStyle(.tint)
@@ -158,7 +173,7 @@ struct DetailContent: View {
         value: String, label: String, shortcut: CompanionOverviewShortcut
     ) -> some View {
         Button {
-            selectedTab = shortcut.target
+            navigate(to: shortcut.target)
         } label: {
             VStack(alignment: .leading, spacing: 3) {
                 Text(value)
@@ -168,12 +183,8 @@ struct DetailContent: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-            .padding(9)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.primary.opacity(0.065))
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .companionCard()
+            .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Show \(label.lowercased())")
@@ -190,7 +201,6 @@ struct DetailContent: View {
             } else {
                 ForEach(liveSessions) { session in
                     AgentSessionRow(session: session)
-                    Divider()
                 }
             }
         }
@@ -227,7 +237,6 @@ struct DetailContent: View {
                 }
                 ForEach(visible) { session in
                     AgentUsageCard(session: session)
-                    Divider()
                 }
             } else {
                 Placeholder(

@@ -221,3 +221,18 @@ The Overview Agents, Active, and Approvals summary tiles are
 keyboard-accessible navigation buttons to their respective tabs. The separate
 View usage details link opens Usage. No shortcut acts on Paperclip or
 changes its permissions.
+
+## Native panel visual polish (PC-013)
+
+Agents and per-agent Usage entries share a lightweight rounded-card treatment
+with uniform padding and subtle borders, removing redundant list dividers.
+The full Agents row moves its relative update time below the title and metadata
+to protect narrow layouts, and all run states have readable status chips.
+The compact snapshot still uses the slim unboxed row.
+
+The selected tab has a subtle accent underline. Tab switches and Overview
+shortcuts use a short ease-in-out animation unless macOS **Reduce Motion** is
+enabled, in which case the selection switches without animation. No persistent
+theme settings, backend writes, network endpoints, or additional dependencies
+were added. Compare the notch (440pt) and menu-bar popover (360pt) manually for
+clipping and long text before releasing any public binary.
