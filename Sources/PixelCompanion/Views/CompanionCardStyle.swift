@@ -1,25 +1,31 @@
 import SwiftUI
 
-/// Accessibility controls animation policy. A disabled animation is not a zero-duration slide.
+/// Respect Reduce Motion; tabs change immediately when animation is disabled.
 enum CompanionMotion {
     static func tabTransition(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .easeInOut(duration: 0.18)
     }
 }
 
-/// Quiet native card material for compact panels, not a new window or theme.
+/// Semantic Mac surfaces follow Light/Dark Mode and system accessibility,
+/// without forced translucent overlays, fixed branding colors or extra blur.
 struct CompanionCardStyle: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     func body(content: Content) -> some View {
         content
-            .padding(10)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.07))
-            )
+            .background {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(
+                        Color(nsColor: .controlBackgroundColor)
+                            .opacity(reduceTransparency ? 1 : 0.78)
+                    )
+            }
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
             }
     }
 }

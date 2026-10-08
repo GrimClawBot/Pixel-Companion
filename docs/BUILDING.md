@@ -683,3 +683,14 @@ registered, the card reads No download integration connected. If the source
 doesn't report a total, no percentage is invented. Only counters reach this UI:
 filenames, URLs and tokens are neither read nor retained. This is a source
 contract and HUD, not a claim that system-wide downloads are already tracked.
+
+## Native design refresh (PC-036 draft)
+
+Settings now uses a native macOS resizable window with a sidebar for General,
+Connections, Utilities and Notifications. All settings remain bound to their
+original controls; selecting a sidebar row does not request permissions or alter
+the active connector. Utilities are grouped into Productivity, Mac status and
+Personal instead of one long fixed-height form. The notch/menu bar shares the
+same accessible tabs and semantic system card surfaces. The UI respects Light/
+Dark Mode, Reduce Transparency and Reduce Motion; final VoiceOver, large text
+and real-window visual QA are still required before release.
