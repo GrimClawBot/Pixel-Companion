@@ -52,6 +52,7 @@ struct SnapshotContent: View {
     var approvalLimit: Int? = 2
     var feedFreshness: FeedFreshness = .notApplicable
     var lastSuccessfulSync: Date?
+    var showsHeader = true
 
     private var visibleApprovals: [ApprovalRequest] {
         ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
@@ -59,15 +60,17 @@ struct SnapshotContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SummaryHeader(
-                snapshot: snapshot, mood: mood, feedFreshness: feedFreshness,
-                lastSuccessfulSync: lastSuccessfulSync
-            )
-            if let warning = feedFreshness.warning {
-                Text(warning)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+            if showsHeader {
+                SummaryHeader(
+                    snapshot: snapshot, mood: mood, feedFreshness: feedFreshness,
+                    lastSuccessfulSync: lastSuccessfulSync
+                )
+                if let warning = feedFreshness.warning {
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             if feedFreshness.canPresentAsLive {
                 liveContent

@@ -184,3 +184,28 @@ from a model name, the cumulative input tokens, or the number of messages.
 When Paperclip doesn't return these fields, the UI says Context usage
 unavailable. The dashboard requires no extra HTTP endpoints, credentials,
 or writes. The standalone mock connector works with no Paperclip instance.
+
+## Tabbed companion detail (PC-011, local QA)
+
+The expanded **detail** view in both the notched panel and the menu-bar
+popover is divided into **Overview**, **Agents**, **Usage**, and **Activity**.
+
+- Overview retains the connection header, active counts, featured activity,
+  the immediate approvals preview and the existing company usage summary.
+- Agents retains the agent/session list with state, model/provider, run and
+  session details.
+- Usage retains company and per-agent spend/budget, run tokens, context
+  availability, accurate warnings and the All/Active agent filter.
+- Activity retains the complete pending approvals list, event history
+  and available messages.
+- Settings and Quit stay in the fixed footer; Settings remains a separate window.
+
+The header and tabs do not scroll out of view. The notch's compact and hover
+behavior is unchanged, but its **detail panel** no longer treats tapping tab
+buttons as an outside click or notch expansion gesture. The app remains
+read-only and does not request new privileges or back-end access.
+
+For macOS visual QA, verify each of the four tabs in the **notch detail** and
+the **360-point menu-bar popover**. Test clicking/keyboard navigation, long
+agent names, 0/4/many agents, connection loss, approvals, notifications,
+and switching back and forth without dismissing the detail surface.
