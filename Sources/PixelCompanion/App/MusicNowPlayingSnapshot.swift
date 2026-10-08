@@ -26,9 +26,21 @@ struct MusicNowPlayingSnapshot: Equatable, Sendable {
     }
 
     private static func clean(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Untrusted Apple Event strings may contain newlines, terminal controls,
+        // invisible formatting, or Unicode direction overrides. Never let a
+        // track title reshape the compact status UI or impersonate another label.
+        let safeScalars = text.unicodeScalars.filter { scalar in
+            let code = scalar.value
+            let isDirectionalControl = (0x202A...0x202E).contains(code)
+                || (0x2066...0x2069).contains(code)
+                || code == 0x200E || code == 0x200F || code == 0x061C
+            return !CharacterSet.controlCharacters.contains(scalar)
+                && !isDirectionalControl
+        }
+        let trimmed = String(String.UnicodeScalarView(safeScalars))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        // Prevent a malformed or huge metadata field from occupying the notch.
+        // Bound visible metadata only after sanitization, preserving graphemes.
         return String(trimmed.prefix(160))
     }
 
