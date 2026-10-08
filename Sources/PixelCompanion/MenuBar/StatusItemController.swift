@@ -74,6 +74,8 @@ struct MenuBarPopoverView: View {
             openSettings: openSettings, feedFreshness: model.feedFreshness,
             lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
             publicGitHubState: model.publicGitHubState,
+            focusTimerEnabled: model.focusTimerEnabled,
+            focusTimer: model.focusTimer,
             selectedTab: $model.selectedDetailTab
         )
             .padding(16)

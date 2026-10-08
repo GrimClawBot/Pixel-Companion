@@ -51,6 +51,7 @@ struct SettingsView: View {
             presentationSection
             startupSection
             energySection
+            focusTimerSection
             notificationSection
             aboutSection
         }
@@ -205,6 +206,17 @@ struct SettingsView: View {
                 .accessibilityIdentifier("companion.settings.conserve-energy")
             Text("When macOS Low Power Mode is on, Paperclip checks slow from " +
                  "5 seconds to 20 seconds. Mock mode and GitHub refresh are unchanged.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var focusTimerSection: some View {
+        Section("Standalone utilities") {
+            Toggle("Enable Focus timer", isOn: $model.focusTimerEnabled)
+                .accessibilityIdentifier("companion.settings.focus-timer")
+            Text("A local 25/5/15-minute focus and break timer in Overview. " +
+                 "No account, new permissions, notifications, or timer data stored on disk.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

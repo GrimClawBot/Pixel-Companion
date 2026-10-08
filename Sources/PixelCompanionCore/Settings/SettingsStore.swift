@@ -27,6 +27,7 @@ public final class SettingsStore {
         case paperclipCompanyID = "pixelCompanion.paperclipCompanyID"
         case githubPublicRepository = "pixelCompanion.githubPublicRepository"
         case conserveEnergy = "pixelCompanion.conserveEnergy"
+        case focusTimerEnabled = "pixelCompanion.focusTimerEnabled"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -108,6 +109,12 @@ public final class SettingsStore {
     public var conserveEnergy: Bool {
         get { (defaults.object(forKey: Key.conserveEnergy.rawValue) as? Bool) ?? true }
         set { defaults.set(newValue, forKey: Key.conserveEnergy.rawValue) }
+    }
+
+    /// Standalone focus utility is disabled by default and holds no session data on disk.
+    public var focusTimerEnabled: Bool {
+        get { (defaults.object(forKey: Key.focusTimerEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.focusTimerEnabled.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.

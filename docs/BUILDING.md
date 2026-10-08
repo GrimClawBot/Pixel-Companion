@@ -533,3 +533,27 @@ Chat / Handoff action** until a backend authorizes the operation and a
 real ChatBackend supports session creation. Spec-parity #58 remains open for
 a full authenticated server-produced handoff, richer provider data, and
 real Mac accessibility acceptance.
+
+## Optional standalone Focus/Pomodoro timer (PC-029)
+
+**Settings → Standalone utilities → Enable Focus timer** exposes a compact
+Overview panel with a 25-minute focus session, a 5-minute break and a
+15-minute break. It is **off by default** and works in standalone Mock mode,
+with no Paperclip, GitHub, Pixel HQ or other account. Start/Pause/Resume/Reset
+are explicit user actions; switching modes resets the timer and sessions never
+restart or move to the next phase automatically.
+
+The running timer is entirely memory-resident, calculates remaining time
+from an actual wall-clock deadline, and retains its state while switching
+tabs or moving between notch and menu bar. A single one-second UI timer runs
+only while active. The normal macOS wake handler reconciles elapsed time
+after sleep. Disabling the utility stops and clears the session. Only the
+nonsecret on/off preference is stored; no timers, history, calendar events,
+clipboard contents, local files, new permissions, notifications or backend
+requests are created. No background execution or notification after quitting
+is promised.
+
+This is the first native-utility slice of [#62](https://github.com/GrimClawBot/Pixel-Companion/issues/62);
+Now Playing, calendar, system HUDs and other optional modules remain open.
+Real 360pt/440pt notch/menu bar keyboard, VoiceOver and sleep/wake tests
+remain human acceptance gates; this draft must not be publicly released.
