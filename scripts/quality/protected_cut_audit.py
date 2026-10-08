@@ -12,13 +12,45 @@ from pathlib import Path
 import re
 import subprocess
 
-GOOD_CHECKS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 REPO_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 
 
 def run_command(arguments: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(
         arguments, capture_output=True, text=True, timeout=45, check=False
+    )
+
+
+def independent_approvals(reviews: list[dict], head_sha: str, author: str) -> list[str]:
+    """Only latest, exact-head, human, non-author approvals may count.
+
+    Review lists come from GitHub REST in submission order. A more recent
+    CHANGES_REQUESTED or DISMISSED state replaces an older approval from
+    the same reviewer. This supplements (never replaces) GitHub's own
+    branch-protection enforcement and explicit human merge authorization.
+    """
+    latest: dict[str, dict] = {}
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        user = review.get("user")
+        if not isinstance(user, dict):
+            continue
+        login = user.get("login")
+        if not isinstance(login, str) or not login:
+            continue
+        # COMMENTED is additive feedback, NOT a retraction of an approval.
+        # Only decision-changing submissions update the effective review.
+        if review.get("state") not in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
+            continue
+        latest[login.casefold()] = review
+    return sorted(
+        reviewer for reviewer, review in latest.items()
+        if reviewer != author.casefold()
+        and review.get("state") == "APPROVED"
+        and review.get("commit_id") == head_sha
+        and review["user"].get("type") == "User"
+        and not reviewer.endswith("[bot]")
     )
 
 
@@ -31,6 +63,10 @@ def evaluate_cut(
     git_head: str,
     git_ancestor: bool,
     virtual_merge_clean: bool,
+    git_base_sha: str = "",
+    live_base_sha: str = "",
+    reviews: list[dict] | None = None,
+    check_runs: list[dict] | None = None,
 ) -> dict:
     """Use verified source metadata, not a PR author's assertion of approval."""
     blockers: list[str] = []
@@ -38,31 +74,121 @@ def evaluate_cut(
         check for check in (pr.get("statusCheckRollup") or [])
         if isinstance(check, dict) and check.get("name")
     ]
-    pending = any(check.get("conclusion") in (None, "") for check in checks)
-    failure = any(
-        check.get("conclusion") not in GOOD_CHECKS
-        and check.get("conclusion") not in (None, "")
-        for check in checks
+    check_names = {check["name"] for check in checks}
+    # A passed CodeRabbit check is not a substitute for native-checks.
+    # Requiring any random successful check is a fail-open release gate.
+    results_by_name: dict[str, list[str | None]] = {}
+    for check in checks:
+        results_by_name.setdefault(check["name"], []).append(check.get("conclusion"))
+    statuses_all_successful = bool(checks) and all(
+        check.get("conclusion") == "SUCCESS" for check in checks
     )
-    checks_successful = bool(checks) and not pending and not failure
     review_rule = (
         (protection or {}).get("required_pull_request_reviews") or {}
     )
+    if not isinstance(review_rule, dict):
+        review_rule = {}
     required_count = review_rule.get("required_approving_review_count")
     checks_rule = (protection or {}).get("required_status_checks") or {}
-    required_names = checks_rule.get("contexts") or [
-        check.get("context") for check in (checks_rule.get("checks") or [])
-    ]
-    protected_review = isinstance(required_count, int) and required_count >= 1
-    protected_checks = bool(required_names)
+    if not isinstance(checks_rule, dict):
+        checks_rule = {}
+    protected_review = (
+        type(required_count) is int and required_count >= 1
+    )
+    protected_checks = bool(checks_rule.get("contexts") or checks_rule.get("checks"))
+    required_contexts = set(checks_rule.get("contexts") or [])
+    required_contexts.update(
+        check["context"] for check in (checks_rule.get("checks") or [])
+        if isinstance(check, dict) and isinstance(check.get("context"), str)
+    )
+    # A context is genuinely required only when it is a nonempty name
+    # whose exact GitHub check has a successful conclusion on this PR.
+    required_names = {
+        context for context in required_contexts
+        if isinstance(context, str) and context.strip()
+    }
+    protected_checks = protected_checks and bool(required_names)
+    missing_required = sorted(required_names - check_names)
+    passing_required = all(
+        len(results_by_name.get(name, [])) == 1
+        and results_by_name[name][0] == "SUCCESS"
+        for name in required_names
+    )
+    # Branch protection pins each required workflow context to an App ID.
+    # Name-only matches may come from an unrelated check producer.
+    required_apps: dict[str, int] = {}
+    for rule in (checks_rule.get("checks") or []):
+        if not isinstance(rule, dict):
+            continue
+        name = rule.get("context")
+        app_id = rule.get("app_id")
+        if isinstance(name, str) and type(app_id) is int and app_id > 0:
+            required_apps[name] = app_id
+    trusted_producers = (
+        required_names == set(required_apps)
+        and bool(required_names)
+        and isinstance(check_runs, list)
+    )
+    producer_matches: dict[str, bool] = {}
+    if trusted_producers:
+        for name in sorted(required_names):
+            matches = [
+                run for run in check_runs or []
+                if isinstance(run, dict) and run.get("name") == name
+            ]
+            producer_matches[name] = (
+                len(matches) == 1
+                and matches[0].get("head_sha") == git_head
+                and matches[0].get("status") == "completed"
+                and matches[0].get("conclusion") == "success"
+                and isinstance(matches[0].get("app"), dict)
+                and matches[0]["app"].get("id") == required_apps[name]
+            )
+    producers_verified = trusted_producers and all(producer_matches.values())
+    checks_successful = statuses_all_successful and passing_required and producers_verified
+    if not producers_verified:
+        blockers.append("required native CI producer App identity not verified")
+    admin_policy = (protection or {}).get("enforce_admins") or {}
+    force_policy = (protection or {}).get("allow_force_pushes") or {}
+    delete_policy = (protection or {}).get("allow_deletions") or {}
+    admin_enforced = isinstance(admin_policy, dict) and admin_policy.get("enabled") is True
+    strict_ci = checks_rule.get("strict") is True
+    dismiss_stale = review_rule.get("dismiss_stale_reviews") is True
+    last_push_review = review_rule.get("require_last_push_approval") is True
+    no_force_push = isinstance(force_policy, dict) and force_policy.get("enabled") is False
+    no_deletion = isinstance(delete_policy, dict) and delete_policy.get("enabled") is False
     if not protected_review:
         blockers.append("main lacks enforced approving PR review requirement")
     if not protected_checks:
         blockers.append("main lacks required CI status checks")
+    if missing_required or not passing_required:
+        blockers.append("a required named CI check is absent, repeated or unsuccessful")
+    if not admin_enforced:
+        blockers.append("main protection is not enforced for administrators")
+    if not strict_ci:
+        blockers.append("main required checks do not enforce current base")
+    if not dismiss_stale or not last_push_review:
+        blockers.append("main can reuse stale or self-push approvals")
+    if not no_force_push or not no_deletion:
+        blockers.append("main permits force pushes or deletion")
     if pr.get("isDraft") is not False:
         blockers.append("PR is still draft")
     if pr.get("reviewDecision") != "APPROVED":
         blockers.append("independent GitHub APPROVED review not recorded")
+    github_base_sha = pr.get("baseRefOid")
+    sha_pattern = r"[a-fA-F0-9]{40}"
+    base_matches = (
+        isinstance(github_base_sha, str)
+        and re.fullmatch(sha_pattern, github_base_sha) is not None
+        and github_base_sha == git_base_sha == live_base_sha
+    )
+    if not base_matches:
+        blockers.append("GitHub, remote main, and local base commit differ")
+    author_data = pr.get("author") or {}
+    author = author_data.get("login", "") if isinstance(author_data, dict) else ""
+    eligible = independent_approvals(reviews or [], git_head, author)
+    if not author or not protected_review or len(eligible) < required_count:
+        blockers.append("missing independent human approval on exact current head")
     if pr.get("mergeable") != "MERGEABLE":
         blockers.append("GitHub reports unresolved mergeability")
     if not checks_successful:
@@ -85,8 +211,18 @@ def evaluate_cut(
         "head_branch": candidate_head,
         "head_commit": git_head,
         "github_head_matches_local_git": head_sha == git_head,
+        "github_base_matches_live_and_local_git": base_matches,
+        "independent_human_approving_reviewers": eligible,
         "branch_requires_approval": protected_review,
         "branch_requires_ci": protected_checks,
+        "required_check_names": sorted(required_names),
+        "missing_required_check_names": missing_required,
+        "required_ci_checks_all_successful": passing_required,
+        "required_ci_producer_apps_verified": producers_verified,
+        "main_enforces_admins": admin_enforced,
+        "main_requires_fresh_base": strict_ci,
+        "main_requires_fresh_independent_review": dismiss_stale and last_push_review,
+        "main_blocks_force_pushes_and_deletion": no_force_push and no_deletion,
         "required_approving_review_count": required_count if protected_review else 0,
         "pr_approved": pr.get("reviewDecision") == "APPROVED",
         "pr_draft": pr.get("isDraft") is True,
@@ -112,6 +248,21 @@ def checked_json(command: list[str]) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def checked_reviews(command: list[str]) -> list[dict] | None:
+    result = run_command(command)
+    if result.returncode != 0:
+        return None
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        return None
+    if not isinstance(data, list):
+        return None
+    if all(isinstance(page, list) for page in data):
+        data = [item for page in data for item in page]
+    return data if all(isinstance(item, dict) for item in data) else None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default="GrimClawBot/Pixel-Companion")
@@ -127,8 +278,8 @@ def main() -> int:
         return 2
     pr = checked_json([
         "gh", "pr", "view", str(args.pr), "--repo", args.repo, "--json",
-        "number,headRefOid,headRefName,baseRefName,isDraft,reviewDecision,"
-        "mergeable,statusCheckRollup",
+        "number,headRefOid,headRefName,baseRefName,baseRefOid,author,"
+        "isDraft,reviewDecision,mergeable,statusCheckRollup",
     ])
     if pr is None:
         print("CUT_AUDIT: INCOMPLETE (PR metadata unavailable)")
@@ -139,6 +290,24 @@ def main() -> int:
     protection = checked_json([
         "gh", "api", "repos/" + args.repo + "/branches/" + args.base + "/protection",
     ])
+    base_metadata = checked_json([
+        "gh", "api", "repos/" + args.repo + "/branches/" + args.base,
+    ])
+    review_records = checked_reviews([
+        "gh", "api", "--paginate", "--slurp",
+        "repos/" + args.repo + "/pulls/" + str(args.pr) + "/reviews?per_page=100",
+    ])
+    if base_metadata is None or review_records is None:
+        print("CUT_AUDIT: INCOMPLETE (live base or review data unavailable)")
+        return 2
+    live_sha = (base_metadata.get("commit") or {}).get("sha")
+    local_base = run_command([
+        "git", "rev-parse", "--verify", "origin/" + args.base,
+    ])
+    if local_base.returncode != 0:
+        print("CUT_AUDIT: INCOMPLETE (local base unavailable)")
+        return 2
+    local_base_sha = local_base.stdout.strip()
     local_tip = run_command(["git", "rev-parse", "--verify", "origin/" + args.head])
     if local_tip.returncode != 0:
         print("CUT_AUDIT: INCOMPLETE (candidate ref unavailable)")
@@ -150,10 +319,23 @@ def main() -> int:
     virtual = run_command([
         "git", "merge-tree", "--write-tree", "origin/" + args.base, head_sha
     ])
+    runs_response = checked_json([
+        "gh", "api",
+        "repos/" + args.repo + "/commits/" + head_sha + "/check-runs?per_page=100",
+    ])
+    if runs_response is None or not isinstance(runs_response.get("check_runs"), list):
+        print("CUT_AUDIT: INCOMPLETE (CI producer metadata unavailable)")
+        return 2
+    if runs_response.get("total_count") != len(runs_response["check_runs"]):
+        print("CUT_AUDIT: INCOMPLETE (CI producer result pagination incomplete)")
+        return 2
     report = evaluate_cut(
         pr, protection, base=args.base, candidate_head=args.head,
         git_head=head_sha, git_ancestor=ancestor,
         virtual_merge_clean=virtual.returncode == 0,
+        git_base_sha=local_base_sha, live_base_sha=live_sha,
+        reviews=review_records,
+        check_runs=runs_response["check_runs"],
     )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -161,8 +343,11 @@ def main() -> int:
     print("CUT_AUDIT:", "REVIEW_READY" if not report["blockers"] else "BLOCKED")
     print("PR_NUMBER:", args.pr)
     print("HEAD_SHA_MATCH:", report["github_head_matches_local_git"])
+    print("BASE_SHA_MATCH:", report["github_base_matches_live_and_local_git"])
+    print("INDEPENDENT_EXACT_HEAD_REVIEWS:", len(report["independent_human_approving_reviewers"]))
     print("BASE_APPROVAL_PROTECTION:", report["branch_requires_approval"])
     print("BASE_CI_PROTECTION:", report["branch_requires_ci"])
+    print("REQUIRED_CI_APP_IDENTITY:", report["required_ci_producer_apps_verified"])
     print("GITHUB_APPROVED:", report["pr_approved"])
     print("VIRTUAL_MERGE_CLEAN:", report["git_virtual_merge_clean"])
     print("BLOCKERS:", "; ".join(report["blockers"]) or "none")
