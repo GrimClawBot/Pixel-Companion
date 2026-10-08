@@ -11,6 +11,24 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Fixed keyboard shortcuts keep destinations predictable across display modes.
+    var keyboardNumber: Character {
+        switch self {
+        case .overview: return "1"
+        case .agents: return "2"
+        case .usage: return "3"
+        case .activity: return "4"
+        }
+    }
+
+    /// Arrow navigation stops at either end rather than unexpectedly wrapping.
+    func moving(by offset: Int) -> CompanionDetailTab {
+        let tabs = Self.allCases
+        guard let index = tabs.firstIndex(of: self) else { return self }
+        let target = min(max(index + offset, 0), tabs.count - 1)
+        return tabs[target]
+    }
+
     var label: String {
         switch self {
         case .overview: return "Overview"
@@ -65,7 +83,7 @@ struct DetailContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SummaryHeader(snapshot: snapshot, mood: mood)
-            tabBar
+            CompanionTabBar(selectedTab: $selectedTab, reduceMotion: reduceMotion)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -82,49 +100,12 @@ struct DetailContent: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 6)
             }
+            // Switching tabs creates a fresh scroll position and a predictable reading start.
+            .id(selectedTab)
             .accessibilityIdentifier("companion.detail.content")
             Divider()
             footer
         }
-    }
-
-    private var tabBar: some View {
-        HStack(spacing: 4) {
-            ForEach(CompanionDetailTab.allCases) { tab in
-                Button {
-                    navigate(to: tab)
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 14, weight: .medium))
-                        Text(tab.label)
-                            .font(.system(size: 10, weight: .medium))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .contentShape(RoundedRectangle(cornerRadius: 10))
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.primary.opacity(selectedTab == tab ? 0.18 : 0.04))
-                    )
-                    .overlay(alignment: .bottom) {
-                        if selectedTab == tab {
-                            Capsule()
-                                .fill(Color.accentColor)
-                                .frame(width: 24, height: 2)
-                                .padding(.bottom, 1)
-                        }
-                    }
-                    .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.label + " tab")
-                .accessibilityValue(selectedTab == tab ? "Selected" : "Not selected")
-                .accessibilityIdentifier("companion.tab." + tab.rawValue)
-            }
-        }
-        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder private var tabContent: some View {
