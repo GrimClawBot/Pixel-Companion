@@ -487,3 +487,29 @@ Role is not department. Company/department hierarchy navigation remains a
 separate feature until Paperclip or another reviewed connector exposes
 structured department IDs. This public model field is subject to independent
 PC-000 review before merge; Mac visual/VoiceOver acceptance is still needed.
+
+## Canonical Live Activity foundation (PC-027)
+
+CompanionLiveSignal introduces an additive versioned source/entity-identified
+read-only event envelope, optional reported progress and explicit semantic
+kind. Only valid numerator/denominator pairs become progress.
+The deterministic priority resolver prefers security, owner approvals,
+infrastructure alerts, agent failures, budget warnings, specific work,
+ordinary work, recent completion. It deduplicates current activity
+against recent history and rejects live status when stale/offline.
+Terminal task failures/completions expire from the primary live surface
+after 90 seconds. An active backend agent failure is separately retained.
+
+The character now understands thinking/coding/testing/reviewing/success,
+budget-warning/infrastructure/security as source-reported values, keeping
+the original five stable moods as fallback. Paperclip structured issue
+status maps to working/completed/failed, but task names cannot turn into
+coding/testing/security signals. Overview displays a bounded single-row
+Live Activity digest with the highest-priority source signal and a count
+of others. No new network, notifications, approval actions or privileges.
+
+The initial schema/priority/character is not the entire issue #61.
+Distinct character artwork, event stream providers, automatic transient
+collapse animation, a personality-disable setting and physical Mac
+VoiceOver/360pt/440pt verification remain open. QA24 remains installed
+until a new signed local QA has successfully launched.

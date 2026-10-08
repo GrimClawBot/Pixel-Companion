@@ -133,6 +133,7 @@ struct DetailContent: View {
                 metric(value: canShowLive ? "\(snapshot.pendingApprovals.count)" : "—",
                        label: "Approvals", shortcut: .approvals)
             }
+            LiveActivityDigestView(snapshot: snapshot, isLive: canShowLive)
             PublicGitHubPulseView(state: publicGitHubState)
             LiveOperationsPulseView(
                 sessions: liveSessions,

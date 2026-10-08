@@ -42,7 +42,9 @@ enum PaperclipMapper {
             kind: issueKind(issue.status),
             title: issue.title,
             detail: details.joined(separator: " · "),
-            timestamp: timestamp
+            timestamp: timestamp,
+            signal: issueSignal(issue.status),
+            sourceID: "paperclip", entityID: issue.id
         )
     }
 
@@ -55,7 +57,9 @@ enum PaperclipMapper {
             kind: kind,
             title: "\(agent.name) · \(agent.status)",
             detail: agent.title,
-            timestamp: date(agent.updatedAt) ?? date(agent.lastHeartbeatAt) ?? .distantPast
+            timestamp: date(agent.updatedAt) ?? date(agent.lastHeartbeatAt) ?? .distantPast,
+            signal: kind == .failed ? .agentFailure : (status == "running" ? .working : nil),
+            sourceID: "paperclip", entityID: agent.id
         )
     }
 
@@ -227,14 +231,6 @@ enum PaperclipMapper {
         case "cancelled", "canceled": return .cancelled
         default: return .unknown
         }
-    }
-
-    private static func issueKind(_ rawStatus: String) -> ActivityEvent.Kind {
-        let status = rawStatus.lowercased()
-        if ["done", "completed", "closed"].contains(status) { return .completed }
-        if ["failed", "error", "cancelled"].contains(status) { return .failed }
-        if ["in_progress", "running", "started"].contains(status) { return .running }
-        return .note
     }
 
     private static func approvals(_ responses: [PaperclipApprovalResponse]) -> [ApprovalRequest] {
