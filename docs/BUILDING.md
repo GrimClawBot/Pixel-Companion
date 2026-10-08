@@ -256,3 +256,27 @@ permission, persistent state or Paperclip mutation was introduced.
 Human QA: inspect counts in both notch and menu-bar widths, tap each agent
 shortcut, verify Back, approvals shortcut, empty state, stale feed/recovery,
 and keyboard/VoiceOver access before accepting the UI.
+
+## Operational attention digest (PC-021, local QA only)
+
+Overview now includes an **Attention needed** panel. It derives read-only,
+stable-per-agent/category diagnostic rows from **current live** agent snapshots:
+the *latest reported* run failed, agent monthly spending is at least
+80%/90%/100% of its *reported* monthly budget, or context-window occupancy is
+at least 80%/90% using both explicitly reported token counts. Invalid or
+missing budget/context measurements never become warnings; old failed history
+does not imply a present failed run. The view sorts critical signals first,
+preserves source order within severity, and previews at most four with the
+full count. Selecting any item opens that agent's existing inspector by
+structured agent ID.
+
+The app does **not** know a root cause merely because a run failed; it says
+"Cause not reported here" rather than inventing a diagnosis. During
+Paperclip stale/disconnected status the digest is unavailable, not a cached
+live alert. The pending-approval shortcut remains separately company-wide.
+These are **in-app signals only**, not new macOS notifications: existing
+permission-gated, state-transition-deduped system notifications remain
+unchanged, avoiding duplicate push alerts. There are no backend requests,
+new privileges or persistence. QA needs both notch and menu-bar visual checks,
+keyboard/VoiceOver tests, agent tap-through and stale/recovery trials before
+this draft can merge; public distribution remains blocked.
