@@ -202,6 +202,7 @@ final class CompanionNotificationManager {
     private(set) var permission: PermissionState = .off
     private(set) var testStatus: String?
     private var submittingTest = false
+    private var testGeneration = 0
     var onChange: (() -> Void)?
 
     init(
@@ -235,6 +236,8 @@ final class CompanionNotificationManager {
         enabled = value
         defaults.set(value, forKey: Self.preferenceKey)
         resetBaseline()
+        testGeneration += 1
+        submittingTest = false
         testStatus = nil
         if value {
             requestPermission()
@@ -303,15 +306,20 @@ final class CompanionNotificationManager {
 
     func sendTestNotification() async {
         guard canSendTest else { return }
+        let generation = testGeneration
         submittingTest = true
         testStatus = "Submitting local test notification…"
         onChange?()
+        let result: String
         do {
             try await center.submitTest()
-            testStatus = "macOS accepted the test. If no banner appears, check Notification Center and Focus."
+            result = "macOS accepted the test. If no banner appears, check Notification Center and Focus."
         } catch {
-            testStatus = "macOS rejected the notification: \(error.localizedDescription)"
+            result = "macOS rejected the notification: \(error.localizedDescription)"
         }
+        // Disabling, re-enabling or losing authorization invalidates in-flight results.
+        guard generation == testGeneration && enabled && permission == .ready else { return }
+        testStatus = result
         submittingTest = false
         onChange?()
     }
@@ -322,7 +330,11 @@ final class CompanionNotificationManager {
     }
 
     private func setPermission(_ value: PermissionState) {
-        if value != .ready { testStatus = nil }
+        if value != .ready {
+            testGeneration += 1
+            submittingTest = false
+            testStatus = nil
+        }
         let wasReady = permission == .ready
         permission = value
         if value == .ready && !wasReady {

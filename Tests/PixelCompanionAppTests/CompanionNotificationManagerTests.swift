@@ -25,10 +25,20 @@ final class CompanionNotificationManagerTests: XCTestCase {
         }
 
         var testFailure: Error?
+        var pauseTest = false
+        var testContinuation: CheckedContinuation<Void, Never>?
 
         func submitTest() async throws {
+            if pauseTest {
+                await withCheckedContinuation { testContinuation = $0 }
+            }
             if let testFailure { throw testFailure }
             delivered.append(.test)
+        }
+
+        func finishTest() {
+            testContinuation?.resume()
+            testContinuation = nil
         }
 
         func answer(_ value: Bool) {
@@ -128,6 +138,29 @@ final class CompanionNotificationManagerTests: XCTestCase {
         XCTAssertTrue(manager.testStatus?.contains("macOS rejected") == true)
         XCTAssertTrue(center.delivered.isEmpty)
         XCTAssertTrue(manager.canSendTest)
+    }
+
+    func testDisableWhileTestSubmissionIsPendingDoesNotShowStaleResult() async {
+        let center = FakeCenter()
+        let manager = makeManager(center: center)
+        manager.setEnabled(true)
+        await drain()
+        center.answer(true)
+        await drain()
+
+        center.pauseTest = true
+        let request = Task { await manager.sendTestNotification() }
+        await drain()
+        XCTAssertNotNil(center.testContinuation)
+        XCTAssertTrue(manager.testStatus?.contains("Submitting") == true)
+
+        manager.setEnabled(false)
+        XCTAssertNil(manager.testStatus)
+        center.finishTest()
+        await request.value
+
+        XCTAssertNil(manager.testStatus)
+        XCTAssertFalse(manager.canSendTest)
     }
 
     func testOffByDefaultAndUnbundledCannotRequestOrDeliver() async {
