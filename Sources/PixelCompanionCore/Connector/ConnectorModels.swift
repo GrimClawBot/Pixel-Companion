@@ -141,6 +141,14 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     public let inputTokens: Int?
     public let cachedInputTokens: Int?
     public let outputTokens: Int?
+    /// Paperclip agent monthly totals; these are not estimates of this run's cost.
+    public let monthlySpendCents: Int?
+    public let monthlyBudgetCents: Int?
+    /// Context occupancy is known only if the runtime reports both exact values.
+    public let contextUsedTokens: Int?
+    public let contextWindowTokens: Int?
+    /// At most five recent runs returned by the current bounded telemetry fetch.
+    public let recentRuns: [AgentRunSnapshot]
     public let startedAt: Date?
     public let finishedAt: Date?
     public let updatedAt: Date?
@@ -160,6 +168,11 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         inputTokens: Int? = nil,
         cachedInputTokens: Int? = nil,
         outputTokens: Int? = nil,
+        monthlySpendCents: Int? = nil,
+        monthlyBudgetCents: Int? = nil,
+        contextUsedTokens: Int? = nil,
+        contextWindowTokens: Int? = nil,
+        recentRuns: [AgentRunSnapshot] = [],
         startedAt: Date? = nil,
         finishedAt: Date? = nil,
         updatedAt: Date? = nil
@@ -178,6 +191,11 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         self.inputTokens = inputTokens
         self.cachedInputTokens = cachedInputTokens
         self.outputTokens = outputTokens
+        self.monthlySpendCents = monthlySpendCents
+        self.monthlyBudgetCents = monthlyBudgetCents
+        self.contextUsedTokens = contextUsedTokens
+        self.contextWindowTokens = contextWindowTokens
+        self.recentRuns = recentRuns
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.updatedAt = updatedAt

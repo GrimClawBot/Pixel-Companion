@@ -22,7 +22,7 @@ final class SettingsWindowController {
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
-        window.title = "Pixel Companion Settings"
+        window.title = CompanionBuildInfo.settingsTitle
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.center()
@@ -32,6 +32,7 @@ final class SettingsWindowController {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @StateObject private var loginItem = LaunchAtLoginController()
     @State private var paperclipBaseURLDraft: String
 
     init(model: AppModel) {
@@ -45,6 +46,9 @@ struct SettingsView: View {
             paperclipSection
             mockSection
             presentationSection
+            startupSection
+            notificationSection
+            aboutSection
         }
         .formStyle(.grouped)
         .frame(width: 460)
@@ -86,6 +90,18 @@ struct SettingsView: View {
                     Spacer()
                     Button("Refresh") { model.applyPaperclipBaseURL(paperclipBaseURLDraft) }
                 }
+                if let lastSync = model.lastSuccessfulPaperclipSync {
+                    LabeledContent("Last successful sync") {
+                        Text(lastSync, style: .relative)
+                    }
+                } else {
+                    LabeledContent("Last successful sync", value: "Not yet")
+                }
+                if let warning = model.feedFreshness.warning {
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 if let error = model.snapshot.lastError {
                     Text(error)
                         .font(.caption)
@@ -122,6 +138,24 @@ struct SettingsView: View {
         .disabled(!model.isMockConnector)
     }
 
+    private var startupSection: some View {
+        Section("Startup") {
+            Toggle("Launch at Login", isOn: Binding(
+                get: { loginItem.enabled },
+                set: { loginItem.setEnabled($0) }
+            ))
+            .disabled(!loginItem.canChange)
+            .accessibilityIdentifier("companion.settings.launch-at-login")
+            Text(loginItem.statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if loginItem.canChange {
+                Button("Refresh login status") { loginItem.refresh() }
+                    .controlSize(.small)
+            }
+        }
+    }
+
     private var presentationSection: some View {
         Section("Presentation") {
             Picker("Show in", selection: $model.presentation) {
@@ -135,6 +169,56 @@ struct SettingsView: View {
                 Text("No display with a notch is connected, so the menu bar is used.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var notificationSection: some View {
+        Section {
+            Toggle("System notifications", isOn: $model.notificationsEnabled)
+            Text(model.notificationStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if model.notificationPermissionNeedsRequest {
+                Button("Grant permission…") { model.requestNotificationPermission() }
+            }
+            Button("Send test notification") {
+                Task { await model.sendTestNotification() }
+            }
+            .disabled(!model.canSendTestNotification)
+            if CompanionBuildInfo.qaUpdate != nil {
+                Button("Simulate new approval (local QA)") { model.simulateQAEvent(.newApproval) }
+                    .disabled(!model.canSimulateQAEvent)
+                Button("Simulate run completed (local QA)") { model.simulateQAEvent(.runCompleted) }
+                    .disabled(!model.canSimulateQAEvent)
+                Button("Simulate run failed (local QA)") { model.simulateQAEvent(.runFailed) }
+                    .disabled(!model.canSimulateQAEvent)
+                Text("QA-only simulated events. No data is sent to Paperclip.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let status = model.notificationTestStatus {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text(
+                "Off by default. New Paperclip approvals and agent run completions/failures only. "
+                    + "No task or identity details in banners; existing events are not replayed."
+            )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            LabeledContent("Version", value: CompanionBuildInfo.version)
+            if let qaUpdate = CompanionBuildInfo.qaUpdate {
+                LabeledContent("Update", value: qaUpdate)
             }
         }
     }
