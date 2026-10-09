@@ -4,6 +4,11 @@ import XCTest
 
 final class PaperclipUsageMappingTests: XCTestCase {
     private let company = PaperclipCompany(id: "qa", name: "Test", status: "active")
+    private struct ContextVariant {
+        let fields: String
+        let used: Int?
+        let window: Int?
+    }
 
     private func state(agent: String, run: String? = nil) throws -> AgentSessionSnapshot {
         let agent = try JSONDecoder().decode(
@@ -45,6 +50,77 @@ final class PaperclipUsageMappingTests: XCTestCase {
         )
         XCTAssertNil(malformed.monthlySpendCents)
         XCTAssertNil(malformed.monthlyBudgetCents)
+    }
+
+    func testMalformedOptionalContextCountsDoNotDropValidRun() throws {
+        let agent = #"{"id":"a","name":"Test","status":"running"}"#
+        let unusualUsage = """
+        {"id":"valid-run","agentId":"a","status":"running",
+         "usageJson":{"model":"runtime-model","provider":"runtime-provider",
+                      "inputTokens":230,"cachedInputTokens":21,"outputTokens":55,
+                      "contextUsedTokens":{"unexpected":"object"},
+                      "contextWindowTokens":"not-an-int"}}
+        """
+        let decoded = try JSONDecoder().decode(
+            PaperclipHeartbeatRunResponse.self, from: Data(unusualUsage.utf8)
+        )
+        XCTAssertEqual(decoded.id, "valid-run")
+        XCTAssertEqual(decoded.status, "running")
+        XCTAssertEqual(decoded.usageJson?.model, "runtime-model")
+        XCTAssertEqual(decoded.usageJson?.inputTokens, 230)
+        XCTAssertNil(decoded.usageJson?.contextUsedTokens)
+        XCTAssertNil(decoded.usageJson?.contextWindowTokens)
+
+        let session = try state(agent: agent, run: unusualUsage)
+        XCTAssertEqual(session.runID, "valid-run")
+        XCTAssertEqual(session.runState, .running)
+        XCTAssertEqual(session.inputTokens, 230)
+        XCTAssertEqual(session.cachedInputTokens, 21)
+        XCTAssertEqual(session.outputTokens, 55)
+        XCTAssertNil(session.contextUsedTokens)
+        XCTAssertNil(session.contextWindowTokens)
+    }
+
+    func testMixedValidMalformedAndNullContextMetricsPreserveOtherCount() throws {
+        let agent = #"{"id":"a","name":"Test","status":"running"}"#
+        let variants: [ContextVariant] = [
+            .init(fields: #""contextUsedTokens":"invalid","contextWindowTokens":8192"#,
+                  used: nil, window: 8192),
+            .init(fields: #""contextUsedTokens":1024,"contextWindowTokens":{"bad":true}"#,
+                  used: 1024, window: nil),
+            .init(fields: #""contextUsedTokens":null,"contextWindowTokens":8192"#,
+                  used: nil, window: 8192),
+            .init(fields: #""contextUsedTokens":1024,"contextWindowTokens":null"#,
+                  used: 1024, window: nil)
+        ]
+        for variant in variants {
+            let record = """
+            {"id":"mixed-validity","agentId":"a","status":"running",
+             "usageJson":{"inputTokens":230,"outputTokens":55,\(variant.fields)}}
+            """
+            let decoded = try JSONDecoder().decode(
+                PaperclipHeartbeatRunResponse.self, from: Data(record.utf8)
+            )
+            XCTAssertEqual(decoded.id, "mixed-validity")
+            XCTAssertEqual(decoded.usageJson?.inputTokens, 230)
+            XCTAssertEqual(decoded.usageJson?.contextUsedTokens, variant.used)
+            XCTAssertEqual(decoded.usageJson?.contextWindowTokens, variant.window)
+            let mapped = try state(agent: agent, run: record)
+            XCTAssertEqual(mapped.runID, "mixed-validity")
+            XCTAssertEqual(mapped.inputTokens, 230)
+            XCTAssertEqual(mapped.contextUsedTokens, variant.used)
+            XCTAssertEqual(mapped.contextWindowTokens, variant.window)
+        }
+    }
+
+    func testRequiredRunMetadataRemainsStrictWithMalformedContext() {
+        let malformed = """
+        {"id":"invalid","agentId":123,"status":"running",
+         "usageJson":{"inputTokens":200,"contextUsedTokens":"bad"}}
+        """
+        XCTAssertThrowsError(
+            try JSONDecoder().decode(PaperclipHeartbeatRunResponse.self, from: Data(malformed.utf8))
+        )
     }
 
     func testRunUsageMappingSupportsExplicitContextCountsOnly() throws {

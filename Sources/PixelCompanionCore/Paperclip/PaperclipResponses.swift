@@ -111,6 +111,36 @@ struct PaperclipHeartbeatRunResponse: Decodable, Sendable {
     let contextSnapshot: Context?
 }
 
+// Only OPTIONAL context metrics may be soft-failed. All other usage
+// fields retain Decodable's existing validation behavior, so a malformed
+// required run or unrelated usage field cannot silently appear valid.
+extension PaperclipHeartbeatRunResponse.Usage {
+    private enum CodingKeys: String, CodingKey {
+        case model
+        case provider
+        case inputTokens
+        case cachedInputTokens
+        case outputTokens
+        case contextUsedTokens
+        case contextWindowTokens
+        case persistedSessionId
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        provider = try container.decodeIfPresent(String.self, forKey: .provider)
+        inputTokens = try container.decodeIfPresent(Int.self, forKey: .inputTokens)
+        cachedInputTokens = try container.decodeIfPresent(Int.self, forKey: .cachedInputTokens)
+        outputTokens = try container.decodeIfPresent(Int.self, forKey: .outputTokens)
+        // A third-party runtime may encode these optional metrics with an
+        // incompatible type. Keep the run, omit only unreliable measurements.
+        contextUsedTokens = try? container.decode(Int.self, forKey: .contextUsedTokens)
+        contextWindowTokens = try? container.decode(Int.self, forKey: .contextWindowTokens)
+        persistedSessionId = try container.decodeIfPresent(String.self, forKey: .persistedSessionId)
+    }
+}
+
 struct PaperclipIssueResponse: Decodable, Sendable {
     let id: String
     let identifier: String?
