@@ -85,6 +85,7 @@ struct CompanyTasksView: View {
                         task: selectedTask, sessions: agents, isLive: isLive,
                         onBack: { selectedTaskID = nil }, onSelectAgent: onSelectAgent
                     )
+                    .id(selectedTask.id)
                 } else {
                     TextField("Search tasks…", text: $query)
                         .textFieldStyle(.roundedBorder)
