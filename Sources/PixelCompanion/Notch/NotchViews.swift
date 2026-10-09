@@ -4,7 +4,7 @@ import SwiftUI
 /// Panel sizes per surface. Compact mode stays within the physical notch width and adds a
 /// short status strip below the camera housing, so adjacent menu-bar items remain untouched.
 enum NotchLayout {
-    static let compactBarHeight: CGFloat = 24
+    static let compactBarHeight: CGFloat = 32
     static let snapshotSize = CGSize(width: 400, height: 200)
     static let detailSize = CGSize(width: 440, height: 440)
 
@@ -47,7 +47,8 @@ struct NotchRootView: View {
                 Color.clear
                     .frame(height: state.notchSize.height)
                 CompactBar(
-                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                    snapshot: model.snapshot, mood: model.mood,
+                    feedFreshness: model.feedFreshness, showsStatusText: true
                 )
                     .frame(height: NotchLayout.compactBarHeight)
                     .padding(.horizontal, 8)
@@ -127,16 +128,51 @@ struct NotchRootView: View {
     }
 }
 
-/// The compact status strip: character on the left, status on the right.
+/// Shows the true source status even when a prior working mood has gone stale.
+enum CompactBarPresentation {
+    static func status(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
+        switch feedFreshness {
+        case .connecting: return "Connecting"
+        case .stale: return "Updates delayed"
+        case .unavailable: return "Disconnected"
+        case .current, .notApplicable: return mood.title
+        }
+    }
+
+    static func indicator(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
+        switch feedFreshness {
+        case .connecting: return "arrow.triangle.2.circlepath"
+        case .stale: return "wifi.exclamationmark"
+        case .unavailable: return "wifi.slash"
+        case .current, .notApplicable: return mood.symbolName
+        }
+    }
+}
+
+/// The compact status strip: bigger pixel character with an honest status label.
 struct CompactBar: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
     var feedFreshness: FeedFreshness = .notApplicable
+    var showsStatusText = false
+
+    private var label: String {
+        CompactBarPresentation.status(mood: mood, feedFreshness: feedFreshness)
+    }
 
     var body: some View {
-        HStack {
-            CharacterView(mood: mood, pixelSize: 2)
-            Spacer()
+        HStack(spacing: 6) {
+            CharacterView(mood: mood, pixelSize: 2.6)
+                .accessibilityHidden(showsStatusText)
+            if showsStatusText {
+                Text(label)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .accessibilityLabel("Companion status: " + label)
+            }
+            Spacer(minLength: 0)
             trailingIndicator
         }
     }
@@ -150,10 +186,12 @@ struct CompactBar: View {
                 .background(Capsule().fill(Color.orange))
                 .accessibilityLabel("\(snapshot.pendingApprovals.count) waiting for approval")
         } else {
-            Image(systemName: mood.symbolName)
+            Image(systemName: CompactBarPresentation.indicator(
+                mood: mood, feedFreshness: feedFreshness
+            ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel(mood.title)
+                .accessibilityLabel(label)
         }
     }
 }
