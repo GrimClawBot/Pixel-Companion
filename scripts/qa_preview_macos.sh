@@ -7,12 +7,14 @@ PLIST="$ROOT/packaging/Info.plist"
 QA="72"
 
 usage() {
-  echo "Usage: scripts/qa_preview_macos.sh [--qa-number 72|74] [--no-open]"
+  echo "Usage: scripts/qa_preview_macos.sh [--qa-number 72|74] [--no-open] [--print-plan]"
 }
 OPEN_APP=1
+PRINT_PLAN=0
 while (( $# )); do
   case "$1" in
     --no-open) OPEN_APP=0; shift ;;
+    --print-plan) PRINT_PLAN=1; shift ;;
     --qa-number) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; QA="$2"; shift 2 ;;
     --help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
@@ -24,6 +26,11 @@ case "$QA" in
   *) echo "Unsupported QA number: $QA (allowed: 72, 74)" >&2; exit 2 ;;
 esac
 APP="$HOME/Applications/Pixel Companion QA Update $QA.app"
+if [[ "$PRINT_PLAN" == 1 ]]; then
+  # Planning is side-effect free and does not claim an app was built or signed.
+  printf "PLANNED_QA_NUMBER=%s\nPLANNED_APP=%s\nPLANNED_QA_MARKER=%s\n" "$QA" "$APP" "$QA"
+  exit 0
+fi
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This preview must be built on the owner's Mac." >&2
