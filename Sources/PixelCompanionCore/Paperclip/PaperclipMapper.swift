@@ -121,6 +121,7 @@ enum PaperclipMapper {
             agentName: agent.name,
             agentTitle: agent.title,
             agentRole: agent.role,
+            managerAgentID: agent.reportsTo,
             agentStatus: agent.status,
             runID: selectedRun?.id,
             runState: runState(selectedRun?.status, agentStatus: agent.status),

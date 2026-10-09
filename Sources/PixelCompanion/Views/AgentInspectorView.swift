@@ -18,6 +18,8 @@ enum AgentInspectorSelection {
 struct AgentInspectorView: View {
     let session: AgentSessionSnapshot
     var assignedTasks: [TaskSnapshot] = []
+    var peerSessions: [AgentSessionSnapshot] = []
+    var onSelectAgent: ((String) -> Void)?
     let back: () -> Void
 
     var body: some View {
@@ -52,6 +54,23 @@ struct AgentInspectorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                if let manager = AgentReportingHierarchy.manager(
+                    for: session, in: peerSessions
+                ) {
+                    Button {
+                        onSelectAgent?(manager.agentID)
+                    } label: {
+                        Label("Reports to " + manager.agentName, systemImage: "arrow.up.right")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                    .accessibilityIdentifier("companion.agent.reported-manager")
+                } else if session.managerAgentID != nil {
+                    Text("Reporting manager unavailable or unverified")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 if let task = session.taskTitle {
                     Text(task)

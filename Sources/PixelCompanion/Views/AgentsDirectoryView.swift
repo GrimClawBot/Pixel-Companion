@@ -38,6 +38,12 @@ enum AgentsDirectoryFilter {
     }
 }
 
+enum AgentDirectoryLayout: String, CaseIterable {
+    case list
+    case byRole
+    case reporting
+}
+
 /// Agent directory and the existing inspector share the same live snapshot and selection.
 struct AgentsDirectoryView: View {
     let sessions: [AgentSessionSnapshot]
@@ -46,7 +52,7 @@ struct AgentsDirectoryView: View {
     @Binding var selectedAgentID: String?
     @State private var query = ""
     @State private var scope: AgentUsageScope = .all
-    @State private var groupByRole = false
+    @State private var layout: AgentDirectoryLayout = .list
 
     private var visible: [AgentSessionSnapshot] {
         AgentsDirectoryFilter.results(sessions, query: query, scope: scope, isLive: isLive)
@@ -65,8 +71,11 @@ struct AgentsDirectoryView: View {
                     session: selected,
                     assignedTasks: CompanyTaskPresentation.assigned(
                         tasks, to: selected.agentID, isLive: isLive
-                    )
-                ) { selectedAgentID = nil }
+                    ),
+                    peerSessions: sessions,
+                    onSelectAgent: { selectedAgentID = $0 },
+                    back: { selectedAgentID = nil }
+                )
             } else {
                 directory
             }
@@ -106,9 +115,10 @@ struct AgentsDirectoryView: View {
             .controlSize(.small)
             .accessibilityIdentifier("companion.agents.filter")
 
-            Picker("Agent layout", selection: $groupByRole) {
-                Text("List").tag(false)
-                Text("By role").tag(true)
+            Picker("Agent layout", selection: $layout) {
+                Text("List").tag(AgentDirectoryLayout.list)
+                Text("By role").tag(AgentDirectoryLayout.byRole)
+                Text("Reporting").tag(AgentDirectoryLayout.reporting)
             }
             .pickerStyle(.segmented)
             .controlSize(.small)
@@ -118,7 +128,28 @@ struct AgentsDirectoryView: View {
                 Placeholder(text: AgentsDirectoryFilter.emptyMessage(
                     total: sessions.count, scope: scope, query: query, isLive: isLive
                 ))
-            } else if groupByRole {
+            } else if layout == .reporting {
+                Text("Reporting lines · verified agent IDs only")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                ForEach(AgentReportingHierarchy.rows(visible)) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let manager = entry.managerName {
+                            Label("Reports to " + manager, systemImage: "arrow.turn.down.right")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let note = entry.note {
+                            Text(note)
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                        selectableAgentRow(entry.session)
+                    }
+                    .padding(.leading, CGFloat(min(entry.depth, 4)) * 10)
+                    .accessibilityIdentifier("companion.agent.reporting-row")
+                }
+            } else if layout == .byRole {
                 ForEach(AgentRoleGrouping.groups(visible)) { group in
                     HStack {
                         SectionTitle(text: group.label)
