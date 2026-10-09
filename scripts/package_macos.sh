@@ -8,9 +8,10 @@ MODE=release
 DEFAULT="$ROOT/dist/Pixel Companion.app"
 OUTPUT="$DEFAULT"
 IDENTITY="-"
+INFO_PLIST="$ROOT/packaging/Info.plist"
 
 usage() {
-  echo "Usage: $0 [--debug|--release] [--output /path/App.app] [--sign-identity 'Developer ID Application: ...']"
+  echo "Usage: $0 [--debug|--release] [--output /path/App.app] [--info-plist /path/Info.plist] [--sign-identity 'Developer ID Application: ...']"
 }
 while (( $# )); do
   case "$1" in
@@ -18,11 +19,13 @@ while (( $# )); do
     --release) MODE=release; shift ;;
     --output) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; OUTPUT="$2"; shift 2 ;;
     --sign-identity) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; IDENTITY="$2"; shift 2 ;;
+    --info-plist) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; INFO_PLIST="$2"; shift 2 ;;
     --help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
 done
 [[ "$OUTPUT" == *.app ]] || { echo "Output must end in .app" >&2; exit 2; }
+[[ "$INFO_PLIST" == /* ]] || INFO_PLIST="$CALLER/$INFO_PLIST"
 [[ "$OUTPUT" == /* ]] || OUTPUT="$CALLER/$OUTPUT"
 # Create the requested parent first, then use its physical path for BOTH the
 # destination and the lock. An alias via a symlinked directory must not create
@@ -48,7 +51,7 @@ if [[ "$IDENTITY" != "-" && "$MODE" != "release" ]]; then
   exit 2
 fi
 for tool in swift codesign sips iconutil python3 plutil; do command -v "$tool" >/dev/null; done
-plutil -lint "$ROOT/packaging/Info.plist"
+plutil -lint "$INFO_PLIST"
 
 # An exclusive, on-filesystem directory lock prevents overlapping runs targeting the
 # same path; never remove a lock acquired by a different packaging process.
@@ -91,7 +94,7 @@ TMP="$(mktemp -d /tmp/pixel-companion-package.XXXXXXXX)"
 APP="$TMP/Pixel Companion.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$TMP/PixelCompanion.iconset"
 cp "$EXECUTABLE" "$APP/Contents/MacOS/PixelCompanion"
-cp packaging/Info.plist "$APP/Contents/Info.plist"
+cp "$INFO_PLIST" "$APP/Contents/Info.plist"
 python3 scripts/quality/make_icon.py "$TMP/source-icon.png"
 for size in 16 32 128 256 512; do
   sips -s format png -z "$size" "$size" "$TMP/source-icon.png" \
