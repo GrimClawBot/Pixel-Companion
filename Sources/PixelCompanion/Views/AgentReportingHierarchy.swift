@@ -1,8 +1,7 @@
 import Foundation
 import PixelCompanionCore
 
-/// A read-only forest made solely from source-reported agent IDs and reportsTo.
-/// Invalid, absent or filtered-out ancestors are not repaired with role/title guesses.
+/// Read-only reporting, never a guessed department or inferred security authority.
 struct AgentReportingRow: Identifiable {
     let session: AgentSessionSnapshot
     let depth: Int
@@ -13,6 +12,11 @@ struct AgentReportingRow: Identifiable {
 }
 
 enum AgentReportingHierarchy {
+    private struct ReportingLink {
+        let parent: String?
+        let note: String?
+    }
+
     static func rows(_ sessions: [AgentSessionSnapshot]) -> [AgentReportingRow] {
         var byID: [String: AgentSessionSnapshot] = [:]
         var ordered: [AgentSessionSnapshot] = []
@@ -25,37 +29,45 @@ enum AgentReportingHierarchy {
         var parents: [String: String] = [:]
         var notes: [String: String] = [:]
         for session in ordered {
-            let parentID = normalized(session.managerAgentID)
-            guard let parentID else { continue }
-
-            // Validate the entire chain before displaying a hierarchical edge.
-            var seen = Set<String>()
-            var current = session.agentID
-            var valid = true
-            while true {
-                guard seen.insert(current).inserted else {
-                    notes[session.agentID] = "Reporting cycle not verified"
-                    valid = false
-                    break
-                }
-                guard let node = byID[current] else {
-                    notes[session.agentID] = "Manager chain not in this view"
-                    valid = false
-                    break
-                }
-                guard let next = normalized(node.managerAgentID) else { break }
-                guard byID[next] != nil else {
-                    notes[session.agentID] = "Manager not in this view"
-                    valid = false
-                    break
-                }
-                current = next
-            }
-            if valid {
-                parents[session.agentID] = parentID
-            }
+            let link = verifiedLink(for: session, in: byID)
+            if let parent = link.parent { parents[session.agentID] = parent }
+            if let note = link.note { notes[session.agentID] = note }
         }
+        return flattenedRows(ordered: ordered, byID: byID, parents: parents, notes: notes)
+    }
 
+    /// Fail closed if any ancestor is absent, filtered out, cyclic or self-referencing.
+    private static func verifiedLink(
+        for session: AgentSessionSnapshot, in byID: [String: AgentSessionSnapshot]
+    ) -> ReportingLink {
+        guard let parentID = normalized(session.managerAgentID) else {
+            return ReportingLink(parent: nil, note: nil)
+        }
+        var seen = Set<String>()
+        var current = session.agentID
+        while true {
+            guard seen.insert(current).inserted else {
+                return ReportingLink(parent: nil, note: "Reporting cycle not verified")
+            }
+            guard let node = byID[current] else {
+                return ReportingLink(parent: nil, note: "Manager chain not in this view")
+            }
+            guard let next = normalized(node.managerAgentID) else {
+                return ReportingLink(parent: parentID, note: nil)
+            }
+            guard byID[next] != nil else {
+                return ReportingLink(parent: nil, note: "Manager not in this view")
+            }
+            current = next
+        }
+    }
+
+    private static func flattenedRows(
+        ordered: [AgentSessionSnapshot],
+        byID: [String: AgentSessionSnapshot],
+        parents: [String: String],
+        notes: [String: String]
+    ) -> [AgentReportingRow] {
         var children: [String: [AgentSessionSnapshot]] = [:]
         for session in ordered {
             if let parent = parents[session.agentID] {
@@ -83,8 +95,8 @@ enum AgentReportingHierarchy {
     static func manager(
         for session: AgentSessionSnapshot, in sessions: [AgentSessionSnapshot]
     ) -> AgentSessionSnapshot? {
-        let match = rows(sessions).first { $0.session.agentID == session.agentID }
-        guard match?.managerName != nil,
+        let verified = rows(sessions).first { $0.session.agentID == session.agentID }
+        guard verified?.managerName != nil,
               let managerID = normalized(session.managerAgentID) else {
             return nil
         }
