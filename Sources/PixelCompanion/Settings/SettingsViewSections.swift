@@ -120,6 +120,13 @@ extension SettingsView {
             Text(loginItem.statusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if loginItem.pendingApproval {
+                Button("Cancel pending login request") {
+                    loginItem.cancelPendingApproval()
+                }
+                .controlSize(.small)
+                .accessibilityIdentifier("companion.settings.cancel-pending-login")
+            }
             if loginItem.canChange {
                 Button("Refresh login status") { loginItem.refresh() }
                     .controlSize(.small)
