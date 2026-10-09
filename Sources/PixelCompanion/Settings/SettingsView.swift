@@ -143,6 +143,9 @@ struct SettingsView: View {
                         LocalAgentFeedSettingsControls(
                             model: model, monitor: model.localAgentFeed
                         )
+                        LocalInfrastructureSettingsControls(
+                            model: model, monitor: model.localInfrastructureMonitor
+                        )
                         CodexTurnSettingsControls(model: model, monitor: model.codexTurnMonitor)
                         ClaudeHookSettingsControls(model: model, monitor: model.claudeHookMonitor)
                         if model.isMockConnector {

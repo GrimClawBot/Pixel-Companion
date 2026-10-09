@@ -69,6 +69,14 @@ struct MenuBarPopoverView: View {
     let openSettings: () -> Void
 
     var body: some View {
+        detailContent
+            .padding(16)
+            .frame(width: 360, height: 440, alignment: .top)
+    }
+
+    // Expose the same detail composition to the notch and menu-bar fallback.
+    // Unit tests assert the optional monitoring source is actually connected.
+    var detailContent: DetailContent {
         DetailContent(
             snapshot: model.snapshot, mood: model.mood,
             openSettings: openSettings, feedFreshness: model.feedFreshness,
@@ -90,6 +98,7 @@ struct MenuBarPopoverView: View {
             clipboardHistoryEnabled: model.clipboardHistoryEnabled,
             clipboardHistory: model.clipboardHistory,
             localAgentFeed: model.localAgentFeed,
+            localInfrastructureMonitor: model.localInfrastructureMonitor,
             codexProcessMonitor: model.codexProcessMonitor,
             codexTurnMonitor: model.codexTurnMonitor,
             claudeHookMonitor: model.claudeHookMonitor,
@@ -103,7 +112,5 @@ struct MenuBarPopoverView: View {
             musicMonitor: model.musicMonitor,
             selectedTab: $model.selectedDetailTab
         )
-            .padding(16)
-            .frame(width: 360, height: 440, alignment: .top)
     }
 }

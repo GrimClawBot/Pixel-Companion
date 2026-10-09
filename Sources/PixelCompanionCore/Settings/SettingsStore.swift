@@ -35,6 +35,7 @@ public final class SettingsStore {
         case fileShelfEnabled = "pixelCompanion.fileShelfEnabled"
         case clipboardHistoryEnabled = "pixelCompanion.clipboardHistoryEnabled"
         case localAgentFeedEnabled = "pixelCompanion.localAgentFeedEnabled"
+        case localInfrastructureEnabled = "pixelCompanion.localInfrastructureEnabled"
         case codexPresenceEnabled = "pixelCompanion.codexPresenceEnabled"
         case codexTurnEventsEnabled = "pixelCompanion.codexTurnEventsEnabled"
         case claudeHookEventsEnabled = "pixelCompanion.claudeHookEventsEnabled"
@@ -173,6 +174,12 @@ public final class SettingsStore {
     public var localAgentFeedEnabled: Bool {
         get { (defaults.object(forKey: Key.localAgentFeedEnabled.rawValue) as? Bool) ?? false }
         set { defaults.set(newValue, forKey: Key.localAgentFeedEnabled.rawValue) }
+    }
+
+    /// Optional generic infrastructure status file; default off and path never persisted.
+    public var localInfrastructureEnabled: Bool {
+        get { (defaults.object(forKey: Key.localInfrastructureEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.localInfrastructureEnabled.rawValue) }
     }
 
     /// Local process presence only; never a claim about active Codex sessions.
