@@ -7,6 +7,10 @@ import sys
 def install(staged: Path, destination: Path, default_destination: Path) -> None:
     if not staged.is_dir() or destination.suffix != ".app":
         raise ValueError("Expected a staged application and an .app destination")
+    # Recheck after build/signing: a linked bundle could have appeared since
+    # package_macos.sh preflight. Path.exists() misses dangling symlinks.
+    if destination.is_symlink():
+        raise FileExistsError("Refusing symlinked .app destination")
     if destination.exists() and destination != default_destination:
         raise FileExistsError("Refusing to replace an existing custom output")
     if staged.stat().st_dev != destination.parent.stat().st_dev:
