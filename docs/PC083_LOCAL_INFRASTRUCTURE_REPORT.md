@@ -114,3 +114,18 @@ acceptance. Native Swift/Python/lint/config/security CI, Greptile
 current-SHA technical review, independent GitHub human approval and
 Mac human QA remain separate. This is a DRAFT stacked PR; no protected
 main merge, notarization, public binary or network privilege granted.
+
+## QA84 follow-up: menu-bar parity fix
+
+During PC-083 acceptance the menu-bar popover was found to omit the
+optional infrastructure monitor, although the notch detail supplied it.
+The menu-bar host now injects the same monitor into the shared detail
+composition, and native XCTest prevents a future omission.
+Build the new **QA84** from a clean checkout of this exact reviewed commit,
+using `scripts/qa_preview_macos.sh --qa-number 84 --no-open`. Keep the
+working QA83 app unchanged until QA84 code-signing, exact-commit checks,
+local smoke tests and launch verification complete. Only then may the
+verified, stopped QA83 bundle be moved to recoverable Trash.
+
+Greptile technical review and independent human approval are still
+required for merge; Mac verification does not satisfy those gates.

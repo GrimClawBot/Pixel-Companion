@@ -42,6 +42,20 @@ final class CompanionSharedNavigationTests: XCTestCase {
         XCTAssertEqual(nextModel.selectedDetailTab, .overview)
     }
 
+    func testMenuBarDetailRetainsOptionalInfrastructureSource() {
+        let suite = "PixelCompanionInfraBindingTests." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let model = AppModel(settings: SettingsStore(defaults: defaults))
+        let menuBarView = MenuBarPopoverView(model: model, openSettings: {})
+        XCTAssertTrue(
+            menuBarView.detailContent.localInfrastructureMonitor === model.localInfrastructureMonitor,
+            "Menu-bar fallback must carry the same infrastructure source as the notch."
+        )
+        XCTAssertFalse(model.localInfrastructureMonitor.enabled)
+    }
+
     func testOverviewShortcutsRouteToVisibleExistingTabs() {
         XCTAssertEqual(CompanionOverviewShortcut.allCases.count, 3)
         XCTAssertEqual(CompanionOverviewShortcut.agents.target, .agents)
