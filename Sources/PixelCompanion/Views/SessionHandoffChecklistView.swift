@@ -47,7 +47,7 @@ struct SessionHandoffChecklistView: View {
                         } else {
                             ForEach(evidence.assignedTasks, id: \.sourceID) { task in
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text((task.identifier ?? task.sourceID) + " · " + task.title)
+                                    Text(task.displayTitle)
                                         .font(.caption)
                                         .fixedSize(horizontal: false, vertical: true)
                                     Text("Reported state · " + task.status)
