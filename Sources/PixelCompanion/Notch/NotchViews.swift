@@ -130,6 +130,10 @@ struct NotchRootView: View {
 
 /// Shows the true source status even when a prior working mood has gone stale.
 enum CompactBarPresentation {
+    static func displayMood(mood: CharacterMood, feedFreshness: FeedFreshness) -> CharacterMood {
+        feedFreshness.canPresentAsLive ? mood : .offline
+    }
+
     static func status(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
         switch feedFreshness {
         case .connecting: return "Connecting"
@@ -162,7 +166,10 @@ struct CompactBar: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            CharacterView(mood: mood, pixelSize: 2.6)
+            CharacterView(
+                mood: CompactBarPresentation.displayMood(mood: mood, feedFreshness: feedFreshness),
+                pixelSize: 2.6
+            )
                 .accessibilityHidden(showsStatusText)
             if showsStatusText {
                 Text(label)
