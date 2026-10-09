@@ -6,6 +6,7 @@ struct AgentReportingRow: Identifiable {
     let session: AgentSessionSnapshot
     let depth: Int
     let managerName: String?
+    let directReportCount: Int
     let note: String?
 
     var id: String { session.agentID }
@@ -80,7 +81,9 @@ enum AgentReportingHierarchy {
             let parentName = parents[session.agentID].flatMap { byID[$0]?.agentName }
             result.append(AgentReportingRow(
                 session: session, depth: depth,
-                managerName: parentName, note: notes[session.agentID]
+                managerName: parentName,
+                directReportCount: children[session.agentID]?.count ?? 0,
+                note: notes[session.agentID]
             ))
             for child in children[session.agentID] ?? [] {
                 appendTree(child, depth: depth + 1)
@@ -88,6 +91,25 @@ enum AgentReportingHierarchy {
         }
         for session in ordered where parents[session.agentID] == nil {
             appendTree(session, depth: 0)
+        }
+        return result
+    }
+
+    /// Collapse only source-verified descendant edges. Every root is always visible.
+    /// Flat rows are pre-ordered, so a bounded depth stack handles nested disclosure.
+    static func visibleRows(
+        _ rows: [AgentReportingRow], collapsedManagerIDs: Set<String>
+    ) -> [AgentReportingRow] {
+        var hiddenByDepth: [Bool] = []
+        var result: [AgentReportingRow] = []
+        for row in rows {
+            let depth = min(row.depth, hiddenByDepth.count)
+            if hiddenByDepth.count > depth {
+                hiddenByDepth.removeLast(hiddenByDepth.count - depth)
+            }
+            let hidden = hiddenByDepth.last ?? false
+            if !hidden { result.append(row) }
+            hiddenByDepth.append(hidden || collapsedManagerIDs.contains(row.session.agentID))
         }
         return result
     }
