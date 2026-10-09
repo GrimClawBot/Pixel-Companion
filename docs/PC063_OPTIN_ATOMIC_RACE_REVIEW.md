@@ -53,3 +53,17 @@ exact final head are required. The app is QA-only and the existing
 signed QA57 stays running until a QA58 replacement is verified healthy.
 No main merge or public release is authorized. AlphaGrimStalker
 will not be requested until the owner specifically asks.
+
+## Greptile follow-up — permission readiness in AppModel regression
+
+Greptile run 59f7f0a9-cd43-4c63-973c-f948a38333d1 reviewed
+the first PC-063 commit with confidence 4 and one P2 test concern:
+waiting for an arbitrary 100 Task.yield calls does not guarantee the
+async fake notification permission request has finished.
+
+The AppModel regression tests now subscribe to the published
+notification permission status and await the actual permission-ready
+state through XCTest's async expectation (with a bounded timeout).
+The subscription also captures a ready state already published
+before observation. The production app code is unchanged by this
+follow-up. This is not equivalent to a human protected-main approval.
