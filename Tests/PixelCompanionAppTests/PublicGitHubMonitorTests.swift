@@ -67,9 +67,12 @@ final class PublicGitHubMonitorTests: XCTestCase {
             GitHubPublicRunsResponse.self,
             from: Data((
                 #"{"workflow_runs":["# +
-                #"{"id":52,"name":"CI","status":"completed","conclusion":"success","head_branch":"feature/new-branch"},"# +
-                #"{"id":53,"name":"Build","status":"in_progress","conclusion":null,"head_branch":null},"# +
-                #"{"id":54,"name":"Other","status":"completed","conclusion":"failure","head_branch":"  \n branch\tlabel  "}]}"#
+                #"{"id":52,"name":"CI","status":"completed","# +
+                #""conclusion":"success","head_branch":"feature/new-branch"},"# +
+                #"{"id":53,"name":"Build","status":"in_progress","# +
+                #""conclusion":null,"head_branch":null},"# +
+                #"{"id":54,"name":"Other","status":"completed","# +
+                #""conclusion":"failure","head_branch":"  \n branch\tlabel  "}]}"#
             ).utf8)
         )
         XCTAssertEqual(
