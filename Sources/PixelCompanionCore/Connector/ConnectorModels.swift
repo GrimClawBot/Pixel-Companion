@@ -149,6 +149,8 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     public let agentTitle: String?
     /// Optional role exactly reported by the source; never an inferred department.
     public let agentRole: String?
+    /// Structured reporting parent ID from the connected runtime, never inferred from role.
+    public let managerAgentID: String?
     public let agentStatus: String
     public let runID: String?
     public let runState: RunState
@@ -177,6 +179,7 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         agentName: String,
         agentTitle: String? = nil,
         agentRole: String? = nil,
+        managerAgentID: String? = nil,
         agentStatus: String,
         runID: String? = nil,
         runState: RunState,
@@ -201,6 +204,7 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         self.agentName = agentName
         self.agentTitle = agentTitle
         self.agentRole = agentRole
+        self.managerAgentID = managerAgentID
         self.agentStatus = agentStatus
         self.runID = runID
         self.runState = runState
