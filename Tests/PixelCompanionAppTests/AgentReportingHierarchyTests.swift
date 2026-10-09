@@ -102,6 +102,74 @@ final class AgentReportingHierarchyTests: XCTestCase {
         XCTAssertNil(rows[2].note)
     }
 
+    func testVerifiedDirectReportCountsDoNotIncludeGrandchildrenOrMissingParents() {
+        let rows = AgentReportingHierarchy.rows([
+            agent("leaf", manager: "lead"),
+            agent("ceo"), agent("lead", manager: "ceo"),
+            agent("direct", manager: "ceo"),
+            agent("orphan", manager: "filtered-out")
+        ])
+        XCTAssertEqual(rows.map(\.session.agentID), [
+            "ceo", "lead", "leaf", "direct", "orphan"
+        ])
+        XCTAssertEqual(rows.map(\.directReportCount), [2, 1, 0, 0, 0])
+        XCTAssertEqual(rows.last?.note, "Manager not in this view")
+    }
+
+    func testCollapsingManagerHidesOnlyVerifiedDescendantsAndKeepsOtherRoots() {
+        let rows = AgentReportingHierarchy.rows([
+            agent("leaf", manager: "lead"),
+            agent("ceo"), agent("lead", manager: "ceo"),
+            agent("direct", manager: "ceo"),
+            agent("orphan", manager: "absent")
+        ])
+        XCTAssertEqual(AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: []
+        ).map(\.id), ["ceo", "lead", "leaf", "direct", "orphan"])
+        XCTAssertEqual(AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: ["ceo"]
+        ).map(\.id), ["ceo", "orphan"])
+        XCTAssertEqual(AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: ["lead"]
+        ).map(\.id), ["ceo", "lead", "direct", "orphan"])
+    }
+
+    func testNestedCollapseRemainsLocalWhenParentReopens() {
+        let rows = AgentReportingHierarchy.rows([
+            agent("ceo"), agent("lead", manager: "ceo"),
+            agent("worker", manager: "lead")
+        ])
+        let fullyCollapsed = AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: ["ceo", "lead"]
+        )
+        XCTAssertEqual(fullyCollapsed.map(\.id), ["ceo"])
+        let parentReopened = AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: ["lead"]
+        )
+        XCTAssertEqual(parentReopened.map(\.id), ["ceo", "lead"])
+        XCTAssertEqual(AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: []
+        ).map(\.id), ["ceo", "lead", "worker"])
+    }
+
+    func testDisclosureCannotHideInvalidOrUnverifiedReportingLinks() {
+        let rows = AgentReportingHierarchy.rows([
+            agent("a", manager: "b"), agent("b", manager: "a"),
+            agent("missing-parent", manager: "ghost"),
+            agent("role-only", role: "CEO")
+        ])
+        XCTAssertTrue(rows.allSatisfy { $0.directReportCount == 0 })
+        XCTAssertEqual(AgentReportingHierarchy.visibleRows(
+            rows, collapsedManagerIDs: Set(rows.map(\.id))
+        ).map(\.id), rows.map(\.id))
+    }
+
+    func testEmptyDisclosureDoesNotProducePhantomRows() {
+        XCTAssertTrue(AgentReportingHierarchy.visibleRows(
+            [], collapsedManagerIDs: ["nonexistent"]
+        ).isEmpty)
+    }
+
     func testNoAgentsReturnsEmptyRows() {
         XCTAssertTrue(AgentReportingHierarchy.rows([]).isEmpty)
     }
