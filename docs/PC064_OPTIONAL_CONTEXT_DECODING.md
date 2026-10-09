@@ -26,3 +26,19 @@ locally launched and verified; there is no automatic main merge,
 human approval, notarization or public release. Greptile can audit
 the exact head, but a bot verdict never substitutes for the
 independent protected-branch approval held until owner request.
+
+## Greptile follow-up — mixed validity and explicit null
+
+Greptile run fc5d694e-5b12-406c-a2b4-4ab0db13d5c5
+reviewed the initial PC-064 code with confidence 4 and one P2
+test coverage issue: both invalid at once did not demonstrate
+preservation of the other, valid field. A parameterized regression
+now covers each metric independently malformed while its counterpart
+is valid, and explicit null for either context metric. It asserts
+valid metrics survive unmodified through JSON decoding and
+PaperclipMapper, the offending metric is nil, and the agent run
+and real usage counts are still intact.
+
+This follow-up is tests and documentation only. It does not change
+the installed application source, and does not constitute
+independent human approval.
