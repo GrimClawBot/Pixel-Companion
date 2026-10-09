@@ -12,6 +12,40 @@ enum GitHubPublicPresentation {
         return conclusion.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
+    /// GitHub branch names are untrusted presentation text. In particular,
+    /// bidi control characters can visually reorder a source branch.
+    static func branchLabel(_ run: GitHubPublicRun) -> String? {
+        guard let name = run.headBranch else { return nil }
+        let spaced = name.replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+        let bidi = CharacterSet(charactersIn:
+            "\u{061C}\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}" +
+            "\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}"
+        )
+        let sanitized = spaced.unicodeScalars
+            .filter { !bidi.contains($0) && !CharacterSet.controlCharacters.contains($0) }
+            .map(String.init)
+            .joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return sanitized.isEmpty ? nil : sanitized
+    }
+
+    static func runAccessibilityLabel(_ run: GitHubPublicRun) -> String {
+        var parts = [
+            "Open public GitHub workflow " + workflowLabel(run),
+            "Status " + status(run)
+        ]
+        if let branch = branchLabel(run) {
+            parts.append("Branch " + branch)
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    static func pullAccessibilityLabel(_ pull: GitHubPublicPull) -> String {
+        "Open public GitHub PR #\(pull.number), " + pull.title
+    }
+
     static func symbol(_ run: GitHubPublicRun) -> String {
         if run.status != "completed" { return "clock" }
         switch run.conclusion {
@@ -24,6 +58,10 @@ enum GitHubPublicPresentation {
 
 struct PublicGitHubPulseView: View {
     let state: GitHubPublicState
+
+    private var sourceRepository: PublicGitHubRepository? {
+        PublicGitHubRepository(state.repository)
+    }
 
     var body: some View {
         if state.phase != .off {
@@ -68,35 +106,91 @@ struct PublicGitHubPulseView: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(state.runs) { run in
-                        HStack(spacing: 7) {
-                            Image(systemName: GitHubPublicPresentation.symbol(run))
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(GitHubPublicPresentation.workflowLabel(run))
-                                    .font(.caption.weight(.medium))
-                                    .lineLimit(1)
-                                Text(GitHubPublicPresentation.status(run))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                        if let destination = sourceRepository?.publicRunPage(id: run.id) {
+                            Link(destination: destination) {
+                                runRow(run, isLink: true)
                             }
-                            Spacer(minLength: 0)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(GitHubPublicPresentation.runAccessibilityLabel(run))
+                            .accessibilityHint("Opens the public workflow on github.com in a browser")
+                            .accessibilityIdentifier("companion.github.public-run-link")
+                        } else {
+                            runRow(run, isLink: false)
                         }
-                        .accessibilityElement(children: .combine)
                     }
                     Text("Open pull requests · \(state.openPulls.count) shown")
                         .font(.caption.weight(.semibold))
                     ForEach(state.openPulls) { pull in
-                        Text("#\(pull.number) · \(pull.title)")
-                            .font(.caption2)
-                            .lineLimit(2)
+                        if let destination = sourceRepository?.publicPullPage(number: pull.number) {
+                            Link(destination: destination) {
+                                pullRow(pull, isLink: true)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(GitHubPublicPresentation.pullAccessibilityLabel(pull))
+                            .accessibilityHint("Opens the public pull request on github.com in a browser")
+                            .accessibilityIdentifier("companion.github.public-pr-link")
+                        } else {
+                            pullRow(pull, isLink: false)
+                        }
+                    }
+                    if let sourceRepository {
+                        Link("View public repository", destination: sourceRepository.publicRepositoryPage())
+                            .font(.caption2.weight(.medium))
+                            .accessibilityIdentifier("companion.github.public-repo-link")
                     }
                 }
-                Text("Public repositories only · No private GitHub access")
+                Text("Public repositories only · Browser links open on request. No private GitHub access.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
             .companionCard()
             .accessibilityIdentifier("companion.github.public-ci")
         }
+    }
+
+    private func runRow(_ run: GitHubPublicRun, isLink: Bool) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: GitHubPublicPresentation.symbol(run))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(GitHubPublicPresentation.workflowLabel(run))
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                Text(GitHubPublicPresentation.status(run))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if let branch = GitHubPublicPresentation.branchLabel(run) {
+                    Text("Branch · " + branch)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            Spacer(minLength: 0)
+            if isLink {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func pullRow(_ pull: GitHubPublicPull, isLink: Bool) -> some View {
+        HStack(spacing: 7) {
+            Text("#\(pull.number) · \(pull.title)")
+                .font(.caption2)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            if isLink {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
