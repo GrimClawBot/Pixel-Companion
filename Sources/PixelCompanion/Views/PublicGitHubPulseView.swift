@@ -12,6 +12,14 @@ enum GitHubPublicPresentation {
         return conclusion.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
+    static func branchLabel(_ run: GitHubPublicRun) -> String? {
+        guard let name = run.headBranch?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return nil }
+        return name.replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+    }
+
     static func symbol(_ run: GitHubPublicRun) -> String {
         if run.status != "completed" { return "clock" }
         switch run.conclusion {
@@ -24,6 +32,10 @@ enum GitHubPublicPresentation {
 
 struct PublicGitHubPulseView: View {
     let state: GitHubPublicState
+
+    private var sourceRepository: PublicGitHubRepository? {
+        PublicGitHubRepository(state.repository)
+    }
 
     var body: some View {
         if state.phase != .off {
@@ -68,35 +80,92 @@ struct PublicGitHubPulseView: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(state.runs) { run in
-                        HStack(spacing: 7) {
-                            Image(systemName: GitHubPublicPresentation.symbol(run))
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(GitHubPublicPresentation.workflowLabel(run))
-                                    .font(.caption.weight(.medium))
-                                    .lineLimit(1)
-                                Text(GitHubPublicPresentation.status(run))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                        if let destination = sourceRepository?.publicRunPage(id: run.id) {
+                            Link(destination: destination) {
+                                runRow(run, isLink: true)
                             }
-                            Spacer(minLength: 0)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                "Open public GitHub workflow " +
+                                GitHubPublicPresentation.workflowLabel(run)
+                            )
+                            .accessibilityIdentifier("companion.github.public-run-link")
+                        } else {
+                            runRow(run, isLink: false)
                         }
-                        .accessibilityElement(children: .combine)
                     }
                     Text("Open pull requests · \(state.openPulls.count) shown")
                         .font(.caption.weight(.semibold))
                     ForEach(state.openPulls) { pull in
-                        Text("#\(pull.number) · \(pull.title)")
-                            .font(.caption2)
-                            .lineLimit(2)
+                        if let destination = sourceRepository?.publicPullPage(number: pull.number) {
+                            Link(destination: destination) {
+                                pullRow(pull, isLink: true)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Open public GitHub PR #\(pull.number)")
+                            .accessibilityIdentifier("companion.github.public-pr-link")
+                        } else {
+                            pullRow(pull, isLink: false)
+                        }
+                    }
+                    if let sourceRepository {
+                        Link("View public repository", destination: sourceRepository.publicRepositoryPage())
+                            .font(.caption2.weight(.medium))
+                            .accessibilityIdentifier("companion.github.public-repo-link")
                     }
                 }
-                Text("Public repositories only · No private GitHub access")
+                Text("Public repositories only · Browser links open on request. No private GitHub access.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
             .companionCard()
             .accessibilityIdentifier("companion.github.public-ci")
         }
+    }
+
+    private func runRow(_ run: GitHubPublicRun, isLink: Bool) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: GitHubPublicPresentation.symbol(run))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(GitHubPublicPresentation.workflowLabel(run))
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                Text(GitHubPublicPresentation.status(run))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if let branch = GitHubPublicPresentation.branchLabel(run) {
+                    Text("Branch · " + branch)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            Spacer(minLength: 0)
+            if isLink {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func pullRow(_ pull: GitHubPublicPull, isLink: Bool) -> some View {
+        HStack(spacing: 7) {
+            Text("#\(pull.number) · \(pull.title)")
+                .font(.caption2)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            if isLink {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
