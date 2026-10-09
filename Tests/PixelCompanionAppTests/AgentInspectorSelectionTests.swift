@@ -105,6 +105,10 @@ final class AgentInspectorSelectionTests: XCTestCase {
             taskID: "task-1", agentID: "agent-a",
             tasks: [assigned, assigned], isLive: true
         ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a",
+            tasks: [assigned, reassigned], isLive: true
+        ))
     }
 
     func testMissingOrBlankTaskAndAgentIDsCannotOpenDetails() {
