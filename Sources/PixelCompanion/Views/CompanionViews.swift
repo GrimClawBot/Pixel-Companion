@@ -6,6 +6,8 @@ import SwiftUI
 struct SummaryHeader: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
+    var feedFreshness: FeedFreshness = .notApplicable
+    var lastSuccessfulSync: Date?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -17,12 +19,25 @@ struct SummaryHeader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let lastSuccessfulSync {
+                    HStack(spacing: 3) {
+                        Text("Last synced")
+                        Text(lastSuccessfulSync, style: .relative)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                }
             }
             Spacer(minLength: 0)
         }
     }
 
     private var statusLine: String {
+        switch feedFreshness {
+        case .stale: return "Paperclip · Updates delayed"
+        case .unavailable: return "Paperclip · Connection unavailable"
+        case .connecting, .current, .notApplicable: break
+        }
         if let error = snapshot.lastError {
             return "\(snapshot.connectorName) · \(error)"
         }
@@ -35,6 +50,14 @@ struct SnapshotContent: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
     var approvalLimit: Int? = 2
+    var feedFreshness: FeedFreshness = .notApplicable
+    var agentFeedFreshness: FeedFreshness = .notApplicable
+    var lastSuccessfulSync: Date?
+    var showsHeader = true
+
+    private var verifiedSessions: [AgentSessionSnapshot] {
+        agentFeedFreshness.canPresentAsLive ? snapshot.agentSessions : []
+    }
 
     private var visibleApprovals: [ApprovalRequest] {
         ApprovalPresentation.visible(snapshot.pendingApprovals, limit: approvalLimit)
@@ -42,10 +65,36 @@ struct SnapshotContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SummaryHeader(snapshot: snapshot, mood: mood)
+            if showsHeader {
+                SummaryHeader(
+                    snapshot: snapshot, mood: mood, feedFreshness: feedFreshness,
+                    lastSuccessfulSync: lastSuccessfulSync
+                )
+                if let warning = feedFreshness.warning {
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if feedFreshness.canPresentAsLive,
+                   let warning = agentFeedFreshness.warning {
+                    Text("Agent telemetry: " + warning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if feedFreshness.canPresentAsLive {
+                liveContent
+            }
+        }
+    }
+
+    private var liveContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
             switch AgentSessionPresentation.snapshotPrimary(
                 activity: snapshot.currentActivity,
-                sessions: snapshot.agentSessions
+                sessions: verifiedSessions
             ) {
             case let .activity(activity):
                 SectionTitle(text: "Now")
@@ -70,76 +119,6 @@ struct SnapshotContent: View {
                 UsageBar(usage: usage)
             }
         }
-    }
-}
-
-/// Everything: snapshot, activity feed, recent messages and app controls.
-struct DetailContent: View {
-    let snapshot: ConnectorSnapshot
-    let mood: CharacterMood
-    let openSettings: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SnapshotContent(snapshot: snapshot, mood: mood, approvalLimit: 0)
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    if !snapshot.agentSessions.isEmpty {
-                        SectionTitle(text: AgentSessionPresentation.sectionTitle(snapshot.agentSessions))
-                        ForEach(snapshot.agentSessions) { session in
-                            AgentSessionRow(session: session)
-                        }
-                        Divider()
-                    }
-                    if !snapshot.pendingApprovals.isEmpty {
-                        HStack {
-                            SectionTitle(text: "Pending approvals")
-                            Spacer()
-                            ApprovalCountBadge(count: snapshot.pendingApprovals.count)
-                        }
-                        ForEach(snapshot.pendingApprovals) { approval in
-                            ApprovalRow(approval: approval)
-                        }
-                        Divider()
-                    }
-                    SectionTitle(text: "Recent activity")
-                    let history = ActivityPresentation.history(
-                        snapshot.recentActivity,
-                        currentActivity: AgentSessionPresentation.highlightedActivity(
-                            activity: snapshot.currentActivity,
-                            sessions: snapshot.agentSessions
-                        )
-                    )
-                    if history.isEmpty {
-                        Placeholder(text: "No additional activity yet")
-                    }
-                    ForEach(history) { event in
-                        ActivityRow(event: event)
-                    }
-                    if !snapshot.recentMessages.isEmpty {
-                        SectionTitle(text: "Messages").padding(.top, 4)
-                        ForEach(snapshot.recentMessages) { message in
-                            MessageRow(message: message)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            footer
-        }
-    }
-
-    private var footer: some View {
-        HStack {
-            Label("Read-only", systemImage: "eye")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("Settings…", action: openSettings)
-            Button("Quit") { NSApp.terminate(nil) }
-        }
-        .controlSize(.small)
     }
 }
 

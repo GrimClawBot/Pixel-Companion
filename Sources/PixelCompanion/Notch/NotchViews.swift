@@ -46,13 +46,21 @@ struct NotchRootView: View {
             if state.surface == .compact {
                 Color.clear
                     .frame(height: state.notchSize.height)
-                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                CompactBar(
+                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                )
                     .frame(height: NotchLayout.compactBarHeight)
                     .padding(.horizontal, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
             } else {
-                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                CompactBar(
+                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                )
                     .frame(height: state.notchSize.height)
                     .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
                 expandedContent
             }
         }
@@ -61,8 +69,6 @@ struct NotchRootView: View {
             UnevenRoundedRectangle(bottomLeadingRadius: cornerRadius, bottomTrailingRadius: cornerRadius)
                 .fill(Color.black)
         )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onClick)
     }
 
     @ViewBuilder private var expandedContent: some View {
@@ -70,11 +76,51 @@ struct NotchRootView: View {
         case .compact:
             EmptyView()
         case .snapshot:
-            SnapshotContent(snapshot: model.snapshot, mood: model.mood)
+            SnapshotContent(
+                snapshot: model.snapshot, mood: model.mood,
+                feedFreshness: model.feedFreshness,
+                    agentFeedFreshness: model.agentFeedFreshness,
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+            )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onClick)
         case .detail:
-            DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
+            DetailContent(
+                snapshot: model.snapshot, mood: model.mood,
+                openSettings: openSettings, feedFreshness: model.feedFreshness,
+                agentFeedFreshness: model.agentFeedFreshness,
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+                publicGitHubState: model.publicGitHubState,
+                focusTimerEnabled: model.focusTimerEnabled,
+                focusTimer: model.focusTimer,
+                batteryHUDEnabled: model.batteryHUDEnabled,
+                batteryMonitor: model.batteryMonitor,
+                outputVolumeHUDEnabled: model.outputVolumeHUDEnabled,
+                outputVolumeMonitor: model.outputVolumeMonitor,
+                displayBrightnessHUDEnabled: model.displayBrightnessHUDEnabled,
+                displayBrightnessMonitor: model.displayBrightnessMonitor,
+                downloadHUDEnabled: model.downloadHUDEnabled,
+                downloadMonitor: model.downloadMonitor,
+                fileShelfEnabled: model.fileShelfEnabled,
+                fileShelf: model.fileShelf,
+                clipboardHistoryEnabled: model.clipboardHistoryEnabled,
+                clipboardHistory: model.clipboardHistory,
+                localAgentFeed: model.localAgentFeed,
+                codexProcessMonitor: model.codexProcessMonitor,
+                codexTurnMonitor: model.codexTurnMonitor,
+                claudeHookMonitor: model.claudeHookMonitor,
+                localActivityTimeline: model.localActivityTimeline,
+                localAgentAttention: model.localAgentAttention,
+                calendarWidgetEnabled: model.calendarWidgetEnabled,
+                calendarShowTitles: model.calendarShowTitles,
+                calendarMonitor: model.calendarMonitor,
+                musicWidgetEnabled: model.musicWidgetEnabled,
+                musicShowTrackDetails: model.musicShowTrackDetails,
+                musicMonitor: model.musicMonitor,
+                selectedTab: $model.selectedDetailTab
+            )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
         }
@@ -85,6 +131,7 @@ struct NotchRootView: View {
 struct CompactBar: View {
     let snapshot: ConnectorSnapshot
     let mood: CharacterMood
+    var feedFreshness: FeedFreshness = .notApplicable
 
     var body: some View {
         HStack {
@@ -95,7 +142,7 @@ struct CompactBar: View {
     }
 
     @ViewBuilder private var trailingIndicator: some View {
-        if !snapshot.pendingApprovals.isEmpty {
+        if feedFreshness.canPresentAsLive && !snapshot.pendingApprovals.isEmpty {
             Text("\(snapshot.pendingApprovals.count)")
                 .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(.black)

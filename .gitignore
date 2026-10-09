@@ -21,3 +21,6 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Local app bundles (never commit signed binaries)
+dist/

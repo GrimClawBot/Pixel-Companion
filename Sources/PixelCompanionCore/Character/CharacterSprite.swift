@@ -26,7 +26,15 @@ public struct CharacterSprite: Equatable, Sendable {
 
     /// Animation frames for `mood`, played in order and looped.
     public static func frames(for mood: CharacterMood) -> [CharacterSprite] {
-        (rows[mood] ?? []).map(CharacterSprite.init(rows:))
+        let fallback: CharacterMood
+        switch mood {
+        case .thinking, .coding, .testing, .reviewing: fallback = .working
+        case .success: fallback = .idle
+        case .budgetWarning: fallback = .waitingForApproval
+        case .infrastructureAlert, .securityAlert: fallback = .error
+        default: fallback = mood
+        }
+        return (rows[fallback] ?? []).map(CharacterSprite.init(rows:))
     }
 
     private static let feetApart = "..BB....BB.."

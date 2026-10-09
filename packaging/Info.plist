@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleDisplayName</key><string>Pixel Companion</string>
+<key>CFBundleExecutable</key><string>PixelCompanion</string>
+<key>CFBundleIconFile</key><string>PixelCompanion</string>
+<key>CFBundleIdentifier</key><string>io.github.grimclawbot.PixelCompanion</string>
+<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+<key>CFBundleName</key><string>PixelCompanion</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.1.0</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSUIElement</key><true/>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>Pixel Companion can show your next calendar event when you explicitly enable Calendar and grant read access. Events are not saved or shared.</string>
+<key>NSAppleEventsUsageDescription</key><string>When you press Connect to Apple Music, Pixel Companion can read the current song and playback status from the Music app. It never changes playback or saves listening history.</string>
+</dict></plist>

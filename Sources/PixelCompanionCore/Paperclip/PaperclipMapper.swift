@@ -9,7 +9,8 @@ enum PaperclipMapper {
             activity: activity(input),
             approvals: approvals(input.approvals),
             usage: usage(input.dashboard),
-            agentSessions: agentSessions(input)
+            agentSessions: agentSessions(input),
+            tasks: tasks(input.issues)
         )
     }
 
@@ -41,7 +42,9 @@ enum PaperclipMapper {
             kind: issueKind(issue.status),
             title: issue.title,
             detail: details.joined(separator: " · "),
-            timestamp: timestamp
+            timestamp: timestamp,
+            signal: issueSignal(issue.status),
+            sourceID: "paperclip", entityID: issue.id
         )
     }
 
@@ -54,8 +57,26 @@ enum PaperclipMapper {
             kind: kind,
             title: "\(agent.name) · \(agent.status)",
             detail: agent.title,
-            timestamp: date(agent.updatedAt) ?? date(agent.lastHeartbeatAt) ?? .distantPast
+            timestamp: date(agent.updatedAt) ?? date(agent.lastHeartbeatAt) ?? .distantPast,
+            signal: kind == .failed ? .agentFailure : (status == "running" ? .working : nil),
+            sourceID: "paperclip", entityID: agent.id
         )
+    }
+
+    private static func tasks(_ issues: [PaperclipIssueResponse]) -> [TaskSnapshot] {
+        issues.map { issue in
+            TaskSnapshot(
+                id: issue.id, identifier: issue.identifier, title: issue.title,
+                status: issue.status, assigneeAgentID: issue.assigneeAgentId,
+                updatedAt: date(issue.lastActivityAt) ?? date(issue.updatedAt)
+                    ?? date(issue.createdAt)
+            )
+        }
+        .sorted { lhs, rhs in
+            let left = lhs.updatedAt ?? .distantPast
+            let right = rhs.updatedAt ?? .distantPast
+            return left == right ? lhs.id < rhs.id : left > right
+        }
     }
 
     private static func agentSessions(_ input: PaperclipMappingInput) -> [AgentSessionSnapshot] {
@@ -68,40 +89,7 @@ enum PaperclipMapper {
         }
 
         return agentsByID.values.map { agent in
-            let runs = (runsByAgent[agent.id] ?? []).sorted { runTimestamp($0) > runTimestamp($1) }
-            let selectedRun = preferredRun(from: runs)
-            let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
-            let usage = selectedRun?.usageJson
-            let taskTitle = issue.map { issue in
-                if let identifier = issue.identifier, !identifier.isEmpty {
-                    return "\(identifier) · \(issue.title)"
-                }
-                return issue.title
-            }
-            return AgentSessionSnapshot(
-                id: "paperclip-agent-session-\(agent.id)",
-                agentID: agent.id,
-                agentName: agent.name,
-                agentTitle: agent.title,
-                agentStatus: agent.status,
-                runID: selectedRun?.id,
-                runState: runState(selectedRun?.status, agentStatus: agent.status),
-                taskTitle: taskTitle,
-                model: usage?.model ?? agent.adapterConfig?.model,
-                provider: usage?.provider ?? agent.runtimeConfig?.aiConnection?.provider,
-                sessionID: usage?.persistedSessionId
-                    ?? selectedRun?.sessionIdAfter
-                    ?? selectedRun?.sessionIdBefore,
-                inputTokens: nonnegative(usage?.inputTokens),
-                cachedInputTokens: nonnegative(usage?.cachedInputTokens),
-                outputTokens: nonnegative(usage?.outputTokens),
-                startedAt: date(selectedRun?.startedAt),
-                finishedAt: date(selectedRun?.finishedAt),
-                updatedAt: date(selectedRun?.updatedAt)
-                    ?? date(selectedRun?.createdAt)
-                    ?? date(agent.updatedAt)
-                    ?? date(agent.lastHeartbeatAt)
-            )
+            session(for: agent, runs: runsByAgent[agent.id] ?? [], issuesByID: issuesByID)
         }
         .sorted { lhs, rhs in
             if lhs.isActive != rhs.isActive { return lhs.isActive }
@@ -109,6 +97,87 @@ enum PaperclipMapper {
             let rightDate = rhs.updatedAt ?? .distantPast
             if leftDate != rightDate { return leftDate > rightDate }
             return lhs.agentName.localizedCaseInsensitiveCompare(rhs.agentName) == .orderedAscending
+        }
+    }
+
+    private static func session(
+        for agent: PaperclipAgentResponse,
+        runs: [PaperclipHeartbeatRunResponse],
+        issuesByID: [String: PaperclipIssueResponse]
+    ) -> AgentSessionSnapshot {
+        let runs = runs.sorted { runTimestamp($0) > runTimestamp($1) }
+        let selectedRun = preferredRun(from: runs)
+        let issue = selectedRun?.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
+        let usage = selectedRun?.usageJson
+        let taskTitle = issue.map { issue in
+            if let identifier = issue.identifier, !identifier.isEmpty {
+            return "\(identifier) · \(issue.title)"
+            }
+            return issue.title
+        }
+        return AgentSessionSnapshot(
+            id: "paperclip-agent-session-\(agent.id)",
+            agentID: agent.id,
+            agentName: agent.name,
+            agentTitle: agent.title,
+            agentRole: agent.role,
+            agentStatus: agent.status,
+            runID: selectedRun?.id,
+            runState: runState(selectedRun?.status, agentStatus: agent.status),
+            taskTitle: taskTitle,
+            model: usage?.model ?? agent.adapterConfig?.model,
+            provider: usage?.provider ?? agent.runtimeConfig?.aiConnection?.provider,
+            sessionID: usage?.persistedSessionId
+            ?? selectedRun?.sessionIdAfter
+            ?? selectedRun?.sessionIdBefore,
+            inputTokens: nonnegative(usage?.inputTokens),
+            cachedInputTokens: nonnegative(usage?.cachedInputTokens),
+            outputTokens: nonnegative(usage?.outputTokens),
+            monthlySpendCents: nonnegative(agent.spentMonthlyCents),
+            monthlyBudgetCents: nonnegative(agent.budgetMonthlyCents),
+            contextUsedTokens: nonnegative(usage?.contextUsedTokens),
+            contextWindowTokens: positive(usage?.contextWindowTokens),
+            recentRuns: recentRuns(runs, issuesByID: issuesByID),
+            startedAt: date(selectedRun?.startedAt),
+            finishedAt: date(selectedRun?.finishedAt),
+            updatedAt: date(selectedRun?.updatedAt)
+            ?? date(selectedRun?.createdAt)
+            ?? date(agent.updatedAt)
+            ?? date(agent.lastHeartbeatAt)
+        )
+    }
+
+    /// This is a bounded sample, not a complete run audit log. Run IDs are authoritative;
+    /// issue titles describe their current state and may have changed since the run.
+    private static func recentRuns(
+        _ runs: [PaperclipHeartbeatRunResponse],
+        issuesByID: [String: PaperclipIssueResponse]
+    ) -> [AgentRunSnapshot] {
+        var seen = Set<String>()
+        let unique = runs.sorted { lhs, rhs in
+            let left = runTimestamp(lhs)
+            let right = runTimestamp(rhs)
+            return left == right ? lhs.id < rhs.id : left > right
+        }.filter { seen.insert($0.id).inserted }
+
+        return unique.prefix(5).map { run in
+            let issue = run.contextSnapshot?.issueId.flatMap { issuesByID[$0] }
+            let task = issue.map { value in
+                [value.identifier, value.title].compactMap { $0 }.joined(separator: " · ")
+            }
+            return AgentRunSnapshot(
+                id: run.id,
+                state: runState(run.status, agentStatus: ""),
+                taskTitle: task,
+                model: run.usageJson?.model,
+                provider: run.usageJson?.provider,
+                inputTokens: nonnegative(run.usageJson?.inputTokens),
+                cachedInputTokens: nonnegative(run.usageJson?.cachedInputTokens),
+                outputTokens: nonnegative(run.usageJson?.outputTokens),
+                startedAt: date(run.startedAt),
+                finishedAt: date(run.finishedAt),
+                updatedAt: date(run.updatedAt) ?? date(run.createdAt) ?? date(run.startedAt)
+            )
         }
     }
 
@@ -125,7 +194,13 @@ enum PaperclipMapper {
     }
 
     private static func nonnegative(_ value: Int?) -> Int? {
-        value.map { max($0, 0) }
+        guard let value, value >= 0 else { return nil }
+        return value
+    }
+
+    private static func positive(_ value: Int?) -> Int? {
+        guard let value, value > 0 else { return nil }
+        return value
     }
 
     private static func isActiveRun(_ status: String) -> Bool {
@@ -156,14 +231,6 @@ enum PaperclipMapper {
         case "cancelled", "canceled": return .cancelled
         default: return .unknown
         }
-    }
-
-    private static func issueKind(_ rawStatus: String) -> ActivityEvent.Kind {
-        let status = rawStatus.lowercased()
-        if ["done", "completed", "closed"].contains(status) { return .completed }
-        if ["failed", "error", "cancelled"].contains(status) { return .failed }
-        if ["in_progress", "running", "started"].contains(status) { return .running }
-        return .note
     }
 
     private static func approvals(_ responses: [PaperclipApprovalResponse]) -> [ApprovalRequest] {
