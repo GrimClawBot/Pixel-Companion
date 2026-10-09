@@ -121,6 +121,7 @@ struct AgentInspectorView: View {
             SessionHandoffChecklistView(
                 session: session, assignedTasks: assignedTasks, isLive: isLive
             )
+            .id(SessionHandoffSelectionIdentity(session: session))
             .companionCard()
             if !assignedTasks.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {
