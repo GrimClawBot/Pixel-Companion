@@ -53,6 +53,15 @@ struct AgentsDirectoryView: View {
     @State private var query = ""
     @State private var scope: AgentUsageScope = .all
     @State private var layout: AgentDirectoryLayout = .list
+    @State private var collapsedManagerIDs: Set<String> = []
+
+    private var reportingRows: [AgentReportingRow] {
+        AgentReportingHierarchy.rows(visible)
+    }
+
+    private var reportingManagerIDs: Set<String> {
+        Set(reportingRows.filter { $0.directReportCount > 0 }.map(\.id))
+    }
 
     private var visible: [AgentSessionSnapshot] {
         AgentsDirectoryFilter.results(sessions, query: query, scope: scope, isLive: isLive)
@@ -86,7 +95,15 @@ struct AgentsDirectoryView: View {
             }
         }
         .onChange(of: isLive) { _, live in
-            if !live { selectedAgentID = nil }
+            if !live {
+                selectedAgentID = nil
+                collapsedManagerIDs = []
+            }
+        }
+        // A changed source/manager or search scope should not inherit a prior
+        // disclosure decision from another reporting-tree arrangement.
+        .onChange(of: visible.map { [$0.agentID, $0.managerAgentID ?? ""].joined(separator: "|") }) { _, _ in
+            collapsedManagerIDs = []
         }
     }
 
@@ -129,10 +146,27 @@ struct AgentsDirectoryView: View {
                     total: sessions.count, scope: scope, query: query, isLive: isLive
                 ))
             } else if layout == .reporting {
-                Text("Reporting lines · verified agent IDs only")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                ForEach(AgentReportingHierarchy.rows(visible)) { entry in
+                HStack(spacing: 8) {
+                    Text("Verified reporting lines")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    if !reportingManagerIDs.isEmpty {
+                        Button(collapsedManagerIDs.isEmpty ? "Collapse all" : "Expand all") {
+                            if collapsedManagerIDs.isEmpty {
+                                collapsedManagerIDs = reportingManagerIDs
+                            } else {
+                                collapsedManagerIDs = []
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .accessibilityIdentifier("companion.agent.reporting.all")
+                    }
+                }
+                ForEach(AgentReportingHierarchy.visibleRows(
+                    reportingRows, collapsedManagerIDs: collapsedManagerIDs
+                )) { entry in
                     VStack(alignment: .leading, spacing: 4) {
                         if let manager = entry.managerName {
                             Label("Reports to " + manager, systemImage: "arrow.turn.down.right")
@@ -144,7 +178,30 @@ struct AgentsDirectoryView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.orange)
                         }
-                        selectableAgentRow(entry.session)
+                        HStack(spacing: 6) {
+                            selectableAgentRow(entry.session)
+                            if entry.directReportCount > 0 {
+                                Button {
+                                    if collapsedManagerIDs.contains(entry.id) {
+                                        collapsedManagerIDs.remove(entry.id)
+                                    } else {
+                                        collapsedManagerIDs.insert(entry.id)
+                                    }
+                                } label: {
+                                    Image(systemName: collapsedManagerIDs.contains(entry.id)
+                                          ? "chevron.right" : "chevron.down")
+                                        .font(.callout.weight(.medium))
+                                        .frame(minWidth: 32, minHeight: 40)
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel(
+                                    (collapsedManagerIDs.contains(entry.id) ? "Expand" : "Collapse") +
+                                    " reports of " + entry.session.agentName
+                                )
+                                .accessibilityValue("\(entry.directReportCount) direct reports")
+                                .accessibilityIdentifier("companion.agent.reporting.toggle")
+                            }
+                        }
                     }
                     .padding(.leading, CGFloat(min(entry.depth, 4)) * 10)
                     .accessibilityIdentifier("companion.agent.reporting-row")
