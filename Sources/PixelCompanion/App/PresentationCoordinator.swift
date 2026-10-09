@@ -7,8 +7,9 @@ extension NSScreen {
         NotchGeometry(
             screenFrame: frame,
             safeAreaTop: safeAreaInsets.top,
-            leftAuxiliaryWidth: auxiliaryTopLeftArea?.width,
-            rightAuxiliaryWidth: auxiliaryTopRightArea?.width
+            leftAuxiliaryArea: auxiliaryTopLeftArea,
+            rightAuxiliaryArea: auxiliaryTopRightArea,
+            backingScaleFactor: backingScaleFactor
         )
     }
 }
