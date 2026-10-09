@@ -7,7 +7,7 @@ PLIST="$ROOT/packaging/Info.plist"
 QA="72"
 
 usage() {
-  echo "Usage: scripts/qa_preview_macos.sh [--qa-number 72|74|76|77|78|80|81|82] [--no-open] [--print-plan]"
+  echo "Usage: scripts/qa_preview_macos.sh [--qa-number 72|74|76|77|78|80|81|82|83] [--no-open] [--print-plan]"
 }
 OPEN_APP=1
 PRINT_PLAN=0
@@ -22,8 +22,8 @@ while (( $# )); do
 done
 # Only known, reviewed QA numbers may be bundled; never manufacture release IDs.
 case "$QA" in
-  72|74|76|77|78|80|81|82) ;;
-  *) echo "Unsupported QA number: $QA (allowed: 72, 74, 76, 77, 78, 80, 81, 82)" >&2; exit 2 ;;
+  72|74|76|77|78|80|81|82|83) ;;
+  *) echo "Unsupported QA number: $QA (allowed: 72, 74, 76, 77, 78, 80, 81, 82, 83)" >&2; exit 2 ;;
 esac
 APP="$HOME/Applications/Pixel Companion QA Update $QA.app"
 if [[ "$PRINT_PLAN" == 1 ]]; then
