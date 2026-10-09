@@ -49,6 +49,23 @@ public struct ContextHealth: Hashable, Sendable {
     /// Independently reported signals contributing to the recommendation.
     public let reasons: [String]
 
+    /// Read-only guidance: the connected runtime owns creation and handoff.
+    /// A recommendation never implies Pixel Companion can open a new chat.
+    public var nextStep: String? {
+        switch recommendation {
+        case .unavailable, .healthy:
+            return nil
+        case .watch:
+            return "Monitor context as the session continues."
+        case .freshSessionRecommended:
+            return "Consider a fresh session in the connected runtime " +
+                "after preserving goals, decisions, and active work."
+        case .stronglyFreshSessionRecommended:
+            return "Plan a fresh session soon in the connected runtime; " +
+                "preserve goals, decisions, and active work first."
+        }
+    }
+
     public init(
         reportedUsed: Int?,
         reportedWindow: Int?,

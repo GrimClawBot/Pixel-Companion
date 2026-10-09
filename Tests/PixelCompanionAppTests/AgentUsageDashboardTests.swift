@@ -89,6 +89,43 @@ extension AgentUsageDashboardTests {
         XCTAssertTrue(AgentUsageScope.active.sessions([idle]).isEmpty)
     }
 
+    func testKeepWorkingAcknowledgementIsLocalToAgentRunAndReportedEvidence() {
+        let fresh = ContextHealth(
+            reportedUsed: 850, reportedWindow: 1_000, confidence: .providerReported
+        )
+        let base = ContextGuidanceAcknowledgement.evidenceKey(
+            health: fresh, sourceID: "agent-a:run-1"
+        )
+        XCTAssertNotNil(base)
+        XCTAssertEqual(base, ContextGuidanceAcknowledgement.evidenceKey(
+            health: fresh, sourceID: "agent-a:run-1"
+        ))
+        XCTAssertNotEqual(base, ContextGuidanceAcknowledgement.evidenceKey(
+            health: fresh, sourceID: "agent-b:run-1"
+        ))
+        XCTAssertNotEqual(base, ContextGuidanceAcknowledgement.evidenceKey(
+            health: fresh, sourceID: "agent-a:run-2"
+        ))
+        let changed = ContextHealth(
+            reportedUsed: 860, reportedWindow: 1_000, confidence: .providerReported
+        )
+        XCTAssertNotEqual(base, ContextGuidanceAcknowledgement.evidenceKey(
+            health: changed, sourceID: "agent-a:run-1"
+        ))
+        let unavailable = ContextHealth(
+            reportedUsed: nil, reportedWindow: nil, confidence: .unknown
+        )
+        XCTAssertNil(ContextGuidanceAcknowledgement.evidenceKey(
+            health: unavailable, sourceID: "agent-a:run-1"
+        ))
+        let healthy = ContextHealth(
+            reportedUsed: 500, reportedWindow: 1_000, confidence: .providerReported
+        )
+        XCTAssertNil(ContextGuidanceAcknowledgement.evidenceKey(
+            health: healthy, sourceID: "agent-a:run-1"
+        ))
+    }
+
     func testMonthlyBudgetProgressUsesOnlyRealMonthlyNumbers() {
         XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture()))
         XCTAssertNil(AgentUsagePresentation.monthlyBudgetFraction(fixture(spend: 500)))

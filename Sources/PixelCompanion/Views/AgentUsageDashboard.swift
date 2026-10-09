@@ -141,7 +141,8 @@ struct AgentUsageCard: View {
                 }
                 ContextHealthSummaryView(
                     reportedUsed: session.contextUsedTokens,
-                    reportedWindow: session.contextWindowTokens
+                    reportedWindow: session.contextWindowTokens,
+                    evidenceID: session.agentID + ":" + (session.runID ?? "")
                 )
             }
         }
