@@ -68,6 +68,15 @@ extension AppModel {
             localAgentFeed.configure(enabled: newValue)
         }
     }
+    var localInfrastructureEnabled: Bool {
+        get { settings.localInfrastructureEnabled }
+        set {
+            guard newValue != settings.localInfrastructureEnabled else { return }
+            objectWillChange.send()
+            settings.localInfrastructureEnabled = newValue
+            localInfrastructureMonitor.configure(enabled: newValue)
+        }
+    }
     var codexPresenceEnabled: Bool {
         get { settings.codexPresenceEnabled }
         set {
