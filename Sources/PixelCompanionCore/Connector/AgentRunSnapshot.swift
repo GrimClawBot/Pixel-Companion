@@ -5,6 +5,8 @@ import Foundation
 public struct AgentRunSnapshot: Identifiable, Hashable, Sendable {
     public let id: String
     public let state: AgentSessionSnapshot.RunState
+    /// Structured issue ID reported on the run, not guessed from the title.
+    public let issueID: String?
     public let taskTitle: String?
     public let model: String?
     public let provider: String?
@@ -18,6 +20,7 @@ public struct AgentRunSnapshot: Identifiable, Hashable, Sendable {
     public init(
         id: String,
         state: AgentSessionSnapshot.RunState,
+        issueID: String? = nil,
         taskTitle: String? = nil,
         model: String? = nil,
         provider: String? = nil,
@@ -30,6 +33,7 @@ public struct AgentRunSnapshot: Identifiable, Hashable, Sendable {
     ) {
         self.id = id
         self.state = state
+        self.issueID = issueID
         self.taskTitle = taskTitle
         self.model = model
         self.provider = provider

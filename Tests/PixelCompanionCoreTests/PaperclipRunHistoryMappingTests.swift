@@ -91,6 +91,7 @@ final class PaperclipRunHistoryMappingTests: XCTestCase {
         let run = try XCTUnwrap(agent("a", in: input).recentRuns.first)
         XCTAssertEqual(run.id, "attributed")
         XCTAssertEqual(run.taskTitle, "PX-22 · Ship card")
+        XCTAssertEqual(run.issueID, "issue-1")
         XCTAssertEqual(run.model, "run-model")
         XCTAssertEqual(run.provider, "provider")
         XCTAssertEqual(run.inputTokens, 450)
@@ -119,7 +120,34 @@ final class PaperclipRunHistoryMappingTests: XCTestCase {
         XCTAssertNil(unconfirmed.updatedAt)
         let empty = try XCTUnwrap(history.first { $0.id == "no-usage" })
         XCTAssertNil(empty.taskTitle)
+        XCTAssertNil(empty.issueID)
         XCTAssertNil(empty.model)
+    }
+
+    func testRawIssueIdRemainsAvailableEvenIfCurrentIssueIsNotInSample() throws {
+        let value = try input(runs: [
+            """
+            {"id":"historical","agentId":"a","status":"completed",
+             "contextSnapshot":{"issueId":"issue-outside-bounded-issues"}}
+            """
+        ])
+        let evidence = try XCTUnwrap(agent("a", in: value).recentRuns.first)
+        XCTAssertEqual(evidence.issueID, "issue-outside-bounded-issues")
+        XCTAssertNil(evidence.taskTitle)
+    }
+
+    func testRunWithOnlyTitleLikeMetadataDoesNotInventIssueId() throws {
+        let value = try input(runs: [
+            """
+            {"id":"not-associated","agentId":"a","status":"completed",
+             "contextSnapshot":{"taskId":"issue-1"}}
+            """
+        ], issues: [
+            #"{"id":"issue-1","title":"Same words","status":"done"}"#
+        ])
+        let evidence = try XCTUnwrap(agent("a", in: value).recentRuns.first)
+        XCTAssertNil(evidence.issueID)
+        XCTAssertNil(evidence.taskTitle)
     }
 
     func testNoRunsOrUnmatchedRunDoesNotInventHistory() throws {
