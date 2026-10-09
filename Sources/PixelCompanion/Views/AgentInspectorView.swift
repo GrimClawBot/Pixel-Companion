@@ -18,6 +18,7 @@ enum AgentInspectorSelection {
 struct AgentInspectorView: View {
     let session: AgentSessionSnapshot
     var assignedTasks: [TaskSnapshot] = []
+    var verifiedTasks: [TaskSnapshot] = []
     var isLive = false
     var peerSessions: [AgentSessionSnapshot] = []
     var onSelectAgent: ((String) -> Void)?
@@ -139,7 +140,10 @@ struct AgentInspectorView: View {
                 }
                 .accessibilityIdentifier("companion.agent.assigned-tasks")
             }
-            AgentRunHistoryView(runs: session.recentRuns)
+            AgentRunHistoryView(
+                runs: session.recentRuns, verifiedTasks: verifiedTasks, isLive: isLive
+            )
+            .id(session.agentID)
             Text("Read-only · Fields not supplied by the runtime remain unavailable")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
