@@ -67,3 +67,27 @@ state through XCTest's async expectation (with a bounded timeout).
 The subscription also captures a ready state already published
 before observation. The production app code is unchanged by this
 follow-up. This is not equivalent to a human protected-main approval.
+
+## Final Greptile follow-up — concurrent test scheduling handshake
+
+Greptile run 45c274b9-9a20-412e-b925-b12c5391e664
+reviewed PC-063 head 88b0e0f with confidence 5 and one
+non-blocking P2 test flake: a reader could be paused until all
+background generations had finished, so the original requirement
+to observe more than one generation was not guaranteed.
+
+The writer now pauses after publishing generation 2, until the reader
+explicitly acknowledges it through a bounded DispatchSemaphore.
+The test also reads generation 1 before starting the concurrent writer,
+then requires generation 2 to be observed and every captured
+session/timestamp pair to match the independently locked ledger.
+A stuck acknowledgement ends the writer without publishing the
+expected final generation, making the test fail clearly instead of
+silently passing. The reader/writer checks were extracted into a
+private helper to preserve all existing SwiftLint limits. This
+follow-up touches ONLY tests/docs, not runtime application code.
+
+The full Swift, lint, build, tooling, and security gate must still pass
+at the exact committed SHA, followed by fresh Greptile review.
+AI technical review findings closure does NOT authorize protected-main
+merge, human approval, or public distribution.
