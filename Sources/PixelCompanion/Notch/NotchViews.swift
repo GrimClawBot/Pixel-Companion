@@ -143,6 +143,31 @@ enum CompactBarPresentation {
         }
     }
 
+    /// Show no duplicate icon for ordinary work: the visible label already says Working.
+    /// Important alerts, approvals and freshness warnings keep their own symbols.
+    static func needsCompactIndicator(
+        mood: CharacterMood, feedFreshness: FeedFreshness
+    ) -> Bool {
+        if !feedFreshness.canPresentAsLive { return true }
+        switch mood {
+        case .error, .offline, .waitingForApproval, .success,
+             .budgetWarning, .infrastructureAlert, .securityAlert:
+            return true
+        case .idle, .working, .thinking, .coding, .testing, .reviewing:
+            return false
+        }
+    }
+
+    /// Center the quiet everyday state so the character and label read as one unit.
+    /// Alerts and approvals retain the left/status/right-badge hierarchy.
+    static func centersCompactStatus(
+        mood: CharacterMood, feedFreshness: FeedFreshness, hasPendingApprovals: Bool
+    ) -> Bool {
+        !hasPendingApprovals && !needsCompactIndicator(
+            mood: mood, feedFreshness: feedFreshness
+        )
+    }
+
     static func indicator(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
         switch feedFreshness {
         case .connecting: return "arrow.triangle.2.circlepath"
@@ -165,23 +190,31 @@ struct CompactBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .center, spacing: 6) {
+            if showsStatusText && CompactBarPresentation.centersCompactStatus(
+                mood: mood, feedFreshness: feedFreshness,
+                hasPendingApprovals: !snapshot.pendingApprovals.isEmpty
+            ) {
+                Spacer(minLength: 0)
+            }
             CharacterView(
                 mood: CompactBarPresentation.displayMood(mood: mood, feedFreshness: feedFreshness),
                 pixelSize: 2.6
             )
-                .accessibilityHidden(showsStatusText)
+            .accessibilityHidden(showsStatusText)
             if showsStatusText {
                 Text(label)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.98))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.75)
+                    .layoutPriority(1)
                     .accessibilityLabel("Companion status: " + label)
             }
             Spacer(minLength: 0)
             trailingIndicator
         }
+        .frame(maxHeight: .infinity, alignment: .center)
     }
 
     @ViewBuilder private var trailingIndicator: some View {
@@ -192,12 +225,15 @@ struct CompactBar: View {
                 .padding(.horizontal, 6)
                 .background(Capsule().fill(Color.orange))
                 .accessibilityLabel("\(snapshot.pendingApprovals.count) waiting for approval")
-        } else {
+        } else if !showsStatusText || CompactBarPresentation.needsCompactIndicator(
+            mood: mood, feedFreshness: feedFreshness
+        ) {
             Image(systemName: CompactBarPresentation.indicator(
                 mood: mood, feedFreshness: feedFreshness
             ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(showsStatusText)
                 .accessibilityLabel(label)
         }
     }

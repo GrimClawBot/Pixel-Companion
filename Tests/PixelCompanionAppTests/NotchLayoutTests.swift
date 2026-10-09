@@ -73,6 +73,60 @@ final class NotchLayoutTests: XCTestCase {
         )
     }
 
+    func testCompactNormalMoodsOmitRedundantTrailingIcons() {
+        for mood in [
+            CharacterMood.idle, .working, .thinking, .coding, .testing, .reviewing
+        ] {
+            XCTAssertFalse(CompactBarPresentation.needsCompactIndicator(
+                mood: mood, feedFreshness: .current
+            ))
+            XCTAssertFalse(CompactBarPresentation.needsCompactIndicator(
+                mood: mood, feedFreshness: .notApplicable
+            ))
+        }
+    }
+
+    func testCompactImportantEventsRetainVisibleSymbols() {
+        for mood in [
+            CharacterMood.error, .offline, .waitingForApproval, .success,
+            .budgetWarning, .infrastructureAlert, .securityAlert
+        ] {
+            XCTAssertTrue(CompactBarPresentation.needsCompactIndicator(
+                mood: mood, feedFreshness: .current
+            ))
+        }
+    }
+
+    func testDelayedFeedsKeepWarningSymbolEvenWithNormalWorkingMood() {
+        for freshness in [FeedFreshness.connecting, .stale, .unavailable] {
+            XCTAssertTrue(CompactBarPresentation.needsCompactIndicator(
+                mood: .working, feedFreshness: freshness
+            ))
+            XCTAssertEqual(
+                CompactBarPresentation.displayMood(mood: .working, feedFreshness: freshness),
+                .offline
+            )
+        }
+    }
+
+    func testQuietCompactPairCentersOnlyWithoutAlertsOrApproval() {
+        XCTAssertTrue(CompactBarPresentation.centersCompactStatus(
+            mood: .working, feedFreshness: .current, hasPendingApprovals: false
+        ))
+        XCTAssertTrue(CompactBarPresentation.centersCompactStatus(
+            mood: .idle, feedFreshness: .notApplicable, hasPendingApprovals: false
+        ))
+        XCTAssertFalse(CompactBarPresentation.centersCompactStatus(
+            mood: .working, feedFreshness: .current, hasPendingApprovals: true
+        ))
+        XCTAssertFalse(CompactBarPresentation.centersCompactStatus(
+            mood: .securityAlert, feedFreshness: .current, hasPendingApprovals: false
+        ))
+        XCTAssertFalse(CompactBarPresentation.centersCompactStatus(
+            mood: .working, feedFreshness: .stale, hasPendingApprovals: false
+        ))
+    }
+
     func testSnapshotExpandsBelowAndBeyondNotchOnlyDuringInteraction() {
         XCTAssertEqual(
             NotchLayout.size(for: .snapshot, notchSize: notchSize),
