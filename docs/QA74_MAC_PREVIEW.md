@@ -36,6 +36,8 @@ git clone --depth 1 --branch pc-075/local-qa74-preview \
 bash "$HOME/Developer/Pixel-Companion-QA74/scripts/qa_preview_macos.sh" --qa-number 74
 ```
 
+Before building, you may run `bash scripts/qa_preview_macos.sh --qa-number 74 --print-plan` inside the clean preview clone to show the planned QA number, app path and marker **without** touching files or installing anything.
+
 If `~/Developer/Pixel-Companion-QA74` already exists, Git safely refuses
 to clone over it. Do not blindly remove or overwrite working directories.
 Building requires macOS 14+, Xcode/Swift toolchain, the standard macOS
