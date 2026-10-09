@@ -18,17 +18,20 @@ PR/CI drilldown without a private GitHub integration.
   credentials, slashes, whitespace and unsafe components.
 - Each public workflow run links to
   `https://github.com/<owner>/<repo>/actions/runs/<positive-run-id>`.
-  A reported branch is shown as text only, never interpolated into the
-  destination URL. Missing branch stays omitted.
+  A reported branch is shown as text only, after stripping bidi and control
+  characters, never interpolated into the destination URL. Missing branch
+  stays omitted.
 - Each public PR links to
   `https://github.com/<owner>/<repo>/pull/<positive-pr-number>`.
   There is also an explicit **View public repository** link.
 - URLs are constructed exclusively from the validated repository and
   positive numeric IDs. **API-provided html_url is ignored**, preventing
   an API response from redirecting an in-app control to an unrelated
-  host. Invalid or absent IDs show noninteractive rows.
+  host. Zero or negative IDs show noninteractive rows. Missing IDs
+  make the public source unavailable because they fail strict JSON decoding.
 - Linking requires an explicit click/tap via a native SwiftUI `Link`;
-  Pixel Companion does not open a browser automatically.
+  Pixel Companion does not open a browser automatically. VoiceOver labels
+  include the workflow result/branch or PR title; a hint explains the browser action.
 - The existing freshness contract remains: loading, unavailable,
   rate-limited or disabled source states never show stale green CI or
   previously cached actionable links. At most three current runs/PRs
