@@ -1,93 +1,30 @@
-# Architecture
+# Pixel Companion architecture (integrated read-only Alpha)
 
-Pixel Companion is a single Swift package with no third-party dependencies.
-
-```
-Package.swift
-├── Sources/PixelCompanionCore   library, Foundation + CoreGraphics only (no AppKit; headless-testable)
-│   ├── Connector/               connector protocols, models, snapshot, registry
-│   ├── Mock/                    MockConnector and MockScript
-│   ├── Character/               CharacterMood, CharacterStateMachine, CharacterSprite
-│   ├── Settings/                SettingsStore (UserDefaults)
-│   └── Presentation/            NotchGeometry, PresentationMode, NotchInteraction
-├── Sources/PixelCompanion       AppKit + SwiftUI app shell
-├── Tests/PixelCompanionCoreTests
-└── Tests/PixelCompanionAppTests
-```
-
-The package now includes both the platform-neutral core and the native macOS app shell.
-
-All decisions live in `PixelCompanionCore` as plain values and pure functions, so they can be
-unit-tested without a display. The app target only adapts AppKit inputs (screens, mouse,
-`UserDefaults`, timers) to the core and renders the result.
+Pixel Companion is a generic standalone macOS front door, not the Pixel HQ server. The public core contains no private Pixel HQ organization, backend credentials, server addresses, agent commands or third-party character assets. Coucou, AgentPeek and SuperIsland inspire character, agent visibility and extensibility respectively; no dependency on their code/assets or silent-approval behavior is introduced.
 
 ## Data flow
 
-```
-SettingsStore ──► ConnectorRegistry.makeConnector ──► any Connector (MockConnector)
-                                                          │ refresh() every step interval
-                                                          ▼
-                                             ConnectorSnapshot (immutable)
-                                                          │
-                                      CharacterStateMachine.update(with:)
-                                                          ▼
-                              mood + snapshot ──► notch panel / menu-bar views
-```
+1. Local non-secret SettingsStore selects None, deterministic MockConnector, or the optional Paperclip connector.
+2. The Paperclip adapter uses GET-only URLSession requests for health, company, dashboard, agents, issues, approvals, recent heartbeat runs and live runs. It maps narrow DTOs into sanitized read-only models.
+3. Connector state is synchronized, with generation fencing for telemetry and bounded recent-run data. Snapshot capture produces the immutable ConnectorSnapshot.
+4. AppModel computes recent successful-sync freshness and mood, and supplies views for native notch/menu bar, Live Operations, Agents, Usage, Activity and Settings.
+5. Existing opt-in notification detector deduplicates newly observed approvals and run outcomes and passes privacy-safe generic banners to macOS. In-app Attention cards are a separate visual digest and never submit duplicate OS notifications.
 
-1. `SettingsStore` holds the chosen connector, presentation preference, simulated connection state
-   and mock step interval.
-2. `ConnectorRegistry` builds the connector, or none: the app runs without one.
-3. On each step the app calls `refresh()` and captures a `ConnectorSnapshot`.
-4. `CharacterStateMachine` turns the snapshot into one of five moods: `idle`, `working`,
-   `waitingForApproval`, `error`, `offline`. Precedence: not connected → offline, connection error
-   → error, pending approval → waiting, failed activity → error, running activity → working, else
-   idle.
-5. Views render the snapshot and animate the mood's `CharacterSprite` frames.
+The public connector protocols support optional AuthProvider, ActivitySource, ApprovalProvider, UsageProvider, AgentSessionSource, TaskSource, and read-only ChatBackend capabilities. New providers can be added behind these interfaces without requiring a Pixel HQ installation.
 
-See [CONNECTORS.md](CONNECTORS.md) for the connector protocols.
+A separately configured optional public GitHub CI side source uses a sanitized owner/repo identifier and fixed api.github.com HTTPS GET endpoints for bounded public Actions runs and PRs; no account, tokens or arbitrary network URLs. Its three-minute polling and failure state are independent of Paperclip; private repos, CI mutation and privileged GitHub integrations are not supported by this source.
 
-## Presentation
+Run association is based on structured Paperclip agentId; assigned tasks use structured assigneeAgentId. Never infer ownership from free-form issue text, or treat input/output token totals as context occupancy. Bounded recent runs are not a full audit log. An unknown or delayed backend refresh cannot be shown as confirmed current information: agent detail, tasks, operations and warnings are suppressed until the feed is live. Existing cached event history is labeled.
 
-`PresentationMode.resolve(preference:notchAvailable:)` picks where the companion lives:
+## Native behaviors
 
-| Preference  | Notch display present | Result    |
-|-------------|-----------------------|-----------|
-| Automatic   | yes / no              | notch / menu bar |
-| Notch       | yes / no              | notch / menu bar (fallback) |
-| Menu bar    | either                | menu bar  |
+NSScreen notch geometry determines notch versus menu bar fallback. SwiftUI provides original Pixel character, compact snapshot, four-tab detail, agent/task/run drilldown and shortcuts. Mac Reduce Motion disables tab transitions and loading spinners. Launch at Login uses the explicit ServiceManagement OS API only on an installed non-QA app; no custom launch agents. Notifications require opt-in and user/macOS permission.
 
-`NotchGeometry` finds the camera housing from `NSScreen.safeAreaInsets.top` and the widths of
-`auxiliaryTopLeftArea` / `auxiliaryTopRightArea`. A screen without a top inset or without both
-auxiliary areas has no notch, which covers older Macs, external displays and a closed lid.
+## Security boundaries
 
-`NotchInteraction` is the hover and click state machine for the notch panel:
+- Paperclip non-loopback URLs require HTTPS. HTTP loopback supports an existing user-managed localhost SSH forward only; URL-embedded credentials/query/fragment are refused.
+- No source-side API can approve, reject, deploy, send commands, run SSH or mutate Paperclip. UI Read-only is not a substitute for a trusted backend authorization layer.
+- Future private connectors, Touch ID/Keychain/Secure Enclave, device trust, Atlas chat, approvals and other controls need explicit scoped APIs and human security review. No credentials or hardcoded Pixel org details in the OSS repo.
+- Build/entitlement/auth/public API changes require a named human/security review even when GitHub Actions succeeds. A bot status without an actual submitted review is not approval.
 
-| Surface   | Shows                                    | Enter                    | Leave                          |
-|-----------|------------------------------------------|--------------------------|--------------------------------|
-| compact   | character and status beside the notch    | start, dismiss           | pointer enters, click          |
-| snapshot  | current activity, approvals, usage       | pointer enters (compact) | pointer exits, click, dismiss  |
-| detail    | activity feed, chat, settings, quit      | click                    | dismiss (Esc, click outside)   |
-
-## App shell
-
-| Type                       | Role |
-|----------------------------|------|
-| `PixelCompanionMain`       | Entry point; sets the accessory activation policy (no Dock icon). |
-| `AppModel`                 | Owns the connector and step timer; publishes snapshot and mood; reads and writes settings. |
-| `PresentationCoordinator`  | Resolves notch vs. menu bar on launch, display changes, wake and settings changes. |
-| `NotchPanelController`     | Borderless non-activating `NSPanel` at status-bar level on all Spaces; resizes per `NotchSurface`; hover via an `.activeAlways` tracking area; Esc and outside clicks dismiss. |
-| `StatusItemController`     | `NSStatusItem` with the mood symbol, tooltip snapshot and a detail popover. |
-| `SettingsWindowController` | SwiftUI settings form in a reusable window. |
-
-## Character art
-
-`CharacterSprite` holds original 12 × 10 pixel art drawn for this project: a small round blob whose
-eyes, mouth, accent and feet change per mood, with two animation frames each. The menu bar uses
-the mood's SF Symbol instead. No third-party character assets are used.
-
-## Boundaries
-
-- Read-only: no protocol can change state on a backing service.
-- No credentials, keychain, endpoints, deployment or org structure in the app.
-- No `Info.plist` or entitlements: the app runs as a SwiftPM executable and sets its accessory
-  activation policy (no Dock icon) at launch.
+For human interaction acceptance and release holds see docs/QA_TEST_PLAN.md and docs/QUALITY_GATE.md.

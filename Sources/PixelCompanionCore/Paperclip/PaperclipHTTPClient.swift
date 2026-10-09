@@ -41,11 +41,14 @@ final class PaperclipHTTPClient {
         }
     }
 
-    private func request(
+    func request(
         baseURL: URL,
         path: String,
         queryItems: [URLQueryItem]
     ) -> Result<URLRequest, Error> {
+        guard PaperclipNetworkPolicy.validRelativePath(path) else {
+            return .failure(PaperclipServiceError.invalidConfiguration)
+        }
         let pathURL = path.split(separator: "/").reduce(baseURL) { partial, component in
             partial.appendingPathComponent(String(component))
         }
@@ -58,6 +61,7 @@ final class PaperclipHTTPClient {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.httpShouldHandleCookies = false
         request.timeoutInterval = 8
         request.cachePolicy = .reloadIgnoringLocalCacheData
         return .success(request)

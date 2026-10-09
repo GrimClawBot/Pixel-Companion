@@ -124,6 +124,38 @@ final class PaperclipConnectorTests: XCTestCase {
         XCTAssertEqual(service.fetchCount, 2)
     }
 
+    func testLastSuccessfulRefreshTimeTracksOnlyConfirmedCoreSuccess() {
+        let service = DeferredPaperclipService()
+        let connector = PaperclipConnector(
+            configuration: PaperclipConfiguration(
+                baseURLString: "https://paperclip.example", companyID: "company-1"
+            ),
+            service: service
+        )
+        XCTAssertNil(connector.lastSuccessfulRefreshAt)
+        connector.refresh()
+        service.finishCore(.success(PaperclipRemoteState(
+            companies: [], companyID: "company-1", companyName: "QA",
+            activity: [], approvals: [], usage: nil, agentSessions: []
+        )))
+        let lastGood = connector.lastSuccessfulRefreshAt
+        XCTAssertNotNil(lastGood)
+
+        // Optional telemetry completing later must not move the core refresh time.
+        service.finishSessions(.success([]))
+        XCTAssertEqual(connector.lastSuccessfulRefreshAt, lastGood)
+        connector.refresh()
+        service.finishCore(.failure(URLError(.timedOut)))
+        XCTAssertEqual(connector.connectionState, .error)
+        XCTAssertEqual(connector.lastSuccessfulRefreshAt, lastGood)
+        // A new instance/company must never inherit a previous connector's timestamp.
+        let separate = PaperclipConnector(
+            configuration: PaperclipConfiguration(baseURLString: "https://paperclip.example"),
+            service: DeferredPaperclipService()
+        )
+        XCTAssertNil(separate.lastSuccessfulRefreshAt)
+    }
+
     func testURLServiceReportsHTTPFailure() {
         let service = makeService()
         StubURLProtocol.handler = { _ in (503, Data("{}".utf8)) }

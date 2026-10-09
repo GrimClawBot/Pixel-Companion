@@ -14,7 +14,12 @@ public struct PaperclipConfiguration: Equatable, Sendable {
         guard !baseURLString.isEmpty else { return nil }
         guard var components = URLComponents(string: baseURLString) else { return nil }
         guard let scheme = components.scheme?.lowercased() else { return nil }
-        guard ["http", "https"].contains(scheme), components.host?.isEmpty == false else { return nil }
+        guard ["http", "https"].contains(scheme),
+              let host = components.host?.lowercased(), !host.isEmpty else { return nil }
+        // Keep local SSH-forward HTTP working; require TLS for any remote server.
+        if scheme == "http" && !["localhost", "127.0.0.1", "[::1]", "::1"].contains(host) {
+            return nil
+        }
         guard components.user == nil, components.password == nil else { return nil }
         guard components.query == nil, components.fragment == nil else { return nil }
 
@@ -29,7 +34,8 @@ public struct PaperclipConfiguration: Equatable, Sendable {
     public var validationError: String? {
         if baseURLString.isEmpty { return nil }
         if baseURL == nil {
-            return "Enter a valid http:// or https:// Paperclip base URL without credentials, query, or fragment."
+            return "Use HTTPS for remote Paperclip servers, or HTTP only for localhost. " +
+                "Do not include credentials, query, or fragment."
         }
         return nil
     }
@@ -55,6 +61,7 @@ struct PaperclipRemoteState {
     let approvals: [ApprovalRequest]
     let usage: UsageSnapshot?
     let agentSessions: [AgentSessionSnapshot]
+    var tasks: [TaskSnapshot] = []
 }
 
 enum PaperclipServiceError: LocalizedError {
