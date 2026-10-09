@@ -283,6 +283,39 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
 }
 
 extension PaperclipTelemetryGenerationTests {
+    private func assertConcurrentReads(
+        connector: PaperclipConnector,
+        ledger: SessionTimestampLedger,
+        writer: DispatchGroup,
+        secondGenerationObserved: DispatchSemaphore
+    ) {
+        var seen: Set<String> = ["generation-1"]
+        var confirmedSecond = false
+        var incoherentRows = 0
+        let deadline = Date().addingTimeInterval(6)
+        repeat {
+            let captured = connector.capturePresentation()
+            if let session = captured.snapshot.agentSessions.first {
+                seen.insert(session.agentID)
+                if session.agentID == "generation-2", !confirmedSecond {
+                    confirmedSecond = true
+                    secondGenerationObserved.signal()
+                }
+                let valid = captured.sessionsAt.map {
+                    ledger.matches(agentID: session.agentID, timestamp: $0)
+                } ?? false
+                if !valid { incoherentRows += 1 }
+            }
+            Thread.sleep(forTimeInterval: 0.00005)
+            if writer.wait(timeout: .now()) == .success { break }
+        } while Date() < deadline
+
+        XCTAssertEqual(writer.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(incoherentRows, 0, "Each capture must bind its row to its session timestamp")
+        XCTAssertTrue(confirmedSecond, "Reader must acknowledge generation 2 before writer continues")
+        XCTAssertGreaterThan(seen.count, 1, "The reader must overlap more than one published run")
+    }
+
     func testAtomicCaptureMatchesSessionRowsAndTimesDuringConcurrentWrites() {
         let service = GenerationDeferredService()
         let connector = PaperclipConnector(
@@ -298,10 +331,16 @@ extension PaperclipTelemetryGenerationTests {
             agentID: "generation-1", timestamp: connector.capturePresentation().coreAt!
         )
         service.finishSessions(.success([session(id: "generation-1")]), fetch: 1)
+        let initial = connector.capturePresentation()
+        XCTAssertEqual(initial.snapshot.agentSessions.first?.agentID, "generation-1")
+        // Keep the writer at generation 2 until the reader actually observes
+        // it. Sleeps or scheduler yields cannot guarantee overlap on busy CI.
+        let secondGenerationObserved = DispatchSemaphore(value: 0)
 
         let group = DispatchGroup()
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
+            defer { group.leave() }
             for index in 2..<140 {
                 connector.refresh()
                 service.finishCore(.success(self.coreState()), fetch: index)
@@ -311,31 +350,19 @@ extension PaperclipTelemetryGenerationTests {
                     service.finishSessions(
                         .success([self.session(id: identity)]), fetch: index
                     )
+                    if index == 2,
+                       secondGenerationObserved.wait(timeout: .now() + 5) != .success {
+                        return
+                    }
                 }
                 Thread.sleep(forTimeInterval: 0.00012)
             }
-            group.leave()
         }
 
-        var seen = Set<String>()
-        var incoherentRows = 0
-        let deadline = Date().addingTimeInterval(6)
-        repeat {
-            let captured = connector.capturePresentation()
-            if let session = captured.snapshot.agentSessions.first {
-                seen.insert(session.agentID)
-                let valid = captured.sessionsAt.map {
-                    ledger.matches(agentID: session.agentID, timestamp: $0)
-                } ?? false
-                if !valid { incoherentRows += 1 }
-            }
-            Thread.sleep(forTimeInterval: 0.00005)
-            if group.wait(timeout: .now()) == .success { break }
-        } while Date() < deadline
-
-        XCTAssertEqual(group.wait(timeout: .now() + 2), .success)
-        XCTAssertEqual(incoherentRows, 0, "Each capture must bind its row to its session timestamp")
-        XCTAssertGreaterThan(seen.count, 1, "The reader must overlap more than one published run")
+        assertConcurrentReads(
+            connector: connector, ledger: ledger, writer: group,
+            secondGenerationObserved: secondGenerationObserved
+        )
         let final = connector.capturePresentation()
         XCTAssertEqual(final.snapshot.agentSessions.first?.agentID, "generation-139")
         XCTAssertEqual(final.sessionsAt, connector.lastSuccessfulSessionRefreshAt)
