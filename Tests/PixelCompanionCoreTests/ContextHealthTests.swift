@@ -80,6 +80,24 @@ final class ContextHealthTests: XCTestCase {
         XCTAssertEqual(sample(700, 1_000, toolOutput: -100).recommendation, .watch)
     }
 
+    func testReadOnlyNextStepNeverPretendsToCreateOrHandoffAChat() {
+        XCTAssertNil(sample(nil, nil).nextStep)
+        XCTAssertNil(sample(600, 1_000).nextStep)
+
+        let watch = sample(700, 1_000)
+        XCTAssertTrue(watch.nextStep?.contains("Monitor context") == true)
+        XCTAssertFalse(watch.nextStep?.contains("new chat") == true)
+
+        let fresh = sample(850, 1_000)
+        XCTAssertTrue(fresh.nextStep?.contains("connected runtime") == true)
+        XCTAssertTrue(fresh.nextStep?.contains("preserving goals") == true)
+
+        let strong = sample(950, 1_000)
+        XCTAssertTrue(strong.nextStep?.contains("soon") == true)
+        XCTAssertTrue(strong.nextStep?.contains("connected runtime") == true)
+        XCTAssertNotEqual(fresh.nextStep, strong.nextStep)
+    }
+
     func testDerivedReasonsAreGroundedOnlyInMeasuredInputs() {
         let item = sample(710, 1_000, compactions: 2, changed: true, toolOutput: 300)
         XCTAssertEqual(item.recommendation, .freshSessionRecommended)
