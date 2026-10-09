@@ -1,10 +1,12 @@
 """Checks that the local QA preview is safe and executable without network delivery."""
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "qa_preview_macos.sh"
+PACKAGER = ROOT / "scripts" / "package_macos.sh"
 
 
 class LocalQAPreviewTests(unittest.TestCase):
@@ -45,19 +47,52 @@ class LocalQAPreviewTests(unittest.TestCase):
         self.assertNotIn("defaults delete", src)
         self.assertIn("OLD_QA61_UNTOUCHED=yes", src)
 
-    def test_plist_restoration_is_installed_before_mutation(self):
+    def test_private_plist_is_the_only_metadata_input_to_signing(self):
         src = self.source
-        self.assertIn('trap restore_plist EXIT', src)
-        self.assertIn('cp "$TEMP_PLIST" "$PLIST"', src)
-        self.assertLess(src.index('trap restore_plist EXIT'), src.index('Add :PCQAUpdateNumber'))
+        self.assertIn('cp "$PLIST" "$TEMP_PLIST"', src)
+        self.assertIn('trap cleanup_plist EXIT', src)
+        self.assertIn('Add :PCQAUpdateNumber string $QA" "$TEMP_PLIST"', src)
+        self.assertIn('--info-plist "$TEMP_PLIST"', src)
+        self.assertNotIn('Add :PCQAUpdateNumber string $QA" "$PLIST"', src)
+        self.assertNotIn('cp "$TEMP_PLIST" "$PLIST"', src)
+        package = PACKAGER.read_text(encoding="utf-8")
+        self.assertIn('--info-plist)', package)
+        self.assertIn('plutil -lint "$INFO_PLIST"', package)
+        self.assertIn('cp "$INFO_PLIST" "$APP/Contents/Info.plist"', package)
+        self.assertNotIn('cp packaging/Info.plist "$APP/Contents/Info.plist"', package)
+        subprocess.run(["bash", "-n", str(PACKAGER)], check=True)
 
     def test_installer_refuses_dirty_checkout_and_supports_non_launch_mode(self):
         src = self.source
         self.assertIn('git diff --quiet', src)
         self.assertIn('git diff --cached --quiet', src)
+        self.assertIn('git status --porcelain --untracked-files=all -- Sources Tests scripts packaging Package.swift', src)
+        self.assertIn('git ls-files --others --ignored --exclude-standard -- Sources Tests packaging', src)
         self.assertIn("--no-open", src)
         self.assertIn('if [[ "$OPEN_APP" == 1 ]]', src)
         self.assertIn('git rev-parse HEAD', src)
+
+    def test_untracked_and_ignored_swift_sources_fail_clean_input_checks(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            sources = root / "Sources"
+            sources.mkdir()
+            unexpected = sources / "Injected.swift"
+            unexpected.write_text("print(\"unexpected\")", encoding="utf-8")
+            found = subprocess.check_output(
+                ["git", "status", "--porcelain", "--untracked-files=all",
+                 "--", "Sources", "Tests", "scripts", "packaging", "Package.swift"],
+                cwd=root, text=True
+            )
+            self.assertIn("Injected.swift", found)
+            (root / ".gitignore").write_text("Sources/Injected.swift\n", encoding="utf-8")
+            ignored = subprocess.check_output(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard",
+                 "--", "Sources", "Tests", "packaging"],
+                cwd=root, text=True
+            )
+            self.assertIn("Sources/Injected.swift", ignored)
 
 
 if __name__ == "__main__":
