@@ -175,6 +175,48 @@ final class AppModelPaperclipEvidenceTests: XCTestCase {
         )
     }
 
+    func testOptInAfterRunAlreadyFinishedDoesNotReplayOldCompletion() async {
+        let fixtureState = fixture(notifications: false)
+        defer { fixtureState.defaults.removePersistentDomain(forName: fixtureState.suite) }
+
+        fixtureState.service.core(core(), fetch: 1)
+        fixtureState.service.sessions([agent("old")], fetch: 1)
+        fixtureState.model.refreshConnector()
+        XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .running)
+
+        // An old run completes in the connector while AppModel has not yet
+        // received the queued onChange publication. Toggling alerts now
+        // MUST baseline the terminal state, never the old published running row.
+        fixtureState.service.core(core(), fetch: 2)
+        fixtureState.service.sessions([agent("old", state: .completed)], fetch: 2)
+        XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .running)
+        XCTAssertEqual(
+            fixtureState.connector.capturePresentation().snapshot.agentSessions.first?.runState,
+            .completed
+        )
+
+        fixtureState.model.notificationsEnabled = true
+        XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .completed)
+        for _ in 0..<100 where fixtureState.model.notificationStatus.contains("Checking") {
+            await Task.yield()
+        }
+        fixtureState.model.refreshConnector()
+        XCTAssertFalse(fixtureState.center.notices.contains(.completedRuns(1)))
+        XCTAssertFalse(fixtureState.center.notices.contains(.failedRuns(1)))
+
+        // A new run observed only AFTER opting in may notify once.
+        fixtureState.service.core(core(), fetch: 3)
+        fixtureState.service.sessions([agent("new")], fetch: 3)
+        fixtureState.model.refreshConnector()
+        fixtureState.service.core(core(), fetch: 4)
+        fixtureState.service.sessions([agent("new", state: .completed)], fetch: 4)
+        fixtureState.model.refreshConnector()
+        fixtureState.model.refreshConnector()
+        XCTAssertEqual(
+            fixtureState.center.notices.filter { $0 == .completedRuns(1) }.count, 1
+        )
+    }
+
     func testNotificationOptOutDoesNotGenerateRunAlertsOnActualAppModel() {
         let fixtureState = fixture(notifications: false)
         defer { fixtureState.defaults.removePersistentDomain(forName: fixtureState.suite) }

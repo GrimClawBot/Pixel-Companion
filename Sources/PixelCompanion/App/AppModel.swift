@@ -129,10 +129,13 @@ final class AppModel: ObservableObject {
         set {
             guard newValue != notificationManager.enabled else { return }
             objectWillChange.send()
+            // Update the published snapshot from the latest atomic connector
+            // evidence BEFORE enabling and establishing the notification baseline.
+            // The previous UI snapshot may still show a run that ended while an
+            // onChange callback was queued; that must not replay on opt-in.
+            if newValue && isPaperclipConnector { capture() }
             notificationManager.setEnabled(newValue)
-            notificationManager.observe(
-                snapshot, isPaperclip: isPaperclipConnector
-            )
+            notificationManager.observe(snapshot, isPaperclip: isPaperclipConnector)
         }
     }
 
