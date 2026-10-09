@@ -55,6 +55,80 @@ final class AgentInspectorSelectionTests: XCTestCase {
         ))
     }
 
+    func testAssignedTaskDrilldownAcceptsOnlyUniqueCurrentLiveAssignment() {
+        let matching = TaskSnapshot(
+            id: "task-1", identifier: "PX-1", title: "Verified objective",
+            status: "in_progress", assigneeAgentID: "agent-a"
+        )
+        let otherAgent = TaskSnapshot(
+            id: "task-2", title: "Another task",
+            status: "in_progress", assigneeAgentID: "agent-b"
+        )
+        XCTAssertEqual(
+            AgentAssignedTaskSelection.resolve(
+                taskID: "task-1", agentID: "agent-a",
+                tasks: [matching, otherAgent], isLive: true
+            )?.title,
+            "Verified objective"
+        )
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-b",
+            tasks: [matching, otherAgent], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-2", agentID: "agent-a",
+            tasks: [matching, otherAgent], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a",
+            tasks: [matching, otherAgent], isLive: false
+        ))
+    }
+
+    func testTaskReassignmentOrSourceRemovalImmediatelyRevokesSelection() {
+        let assigned = TaskSnapshot(
+            id: "task-1", title: "Task", status: "active", assigneeAgentID: "agent-a"
+        )
+        let reassigned = TaskSnapshot(
+            id: "task-1", title: "Task", status: "active", assigneeAgentID: "agent-b"
+        )
+        XCTAssertNotNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a", tasks: [assigned], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a", tasks: [reassigned], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a", tasks: [], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a",
+            tasks: [assigned, assigned], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "task-1", agentID: "agent-a",
+            tasks: [assigned, reassigned], isLive: true
+        ))
+    }
+
+    func testMissingOrBlankTaskAndAgentIDsCannotOpenDetails() {
+        let blank = TaskSnapshot(
+            id: "", title: "No backend ID", status: "todo", assigneeAgentID: "a"
+        )
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "", agentID: "a", tasks: [blank], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: nil, agentID: "a", tasks: [blank], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "", agentID: "", tasks: [blank], isLive: true
+        ))
+        XCTAssertNil(AgentAssignedTaskSelection.resolve(
+            taskID: "id", agentID: "", tasks: [blank], isLive: true
+        ))
+    }
+
     func testSelectsOnlyRequestedAgent() {
         let sessions = [
             session(id: "1", agentID: "a"),

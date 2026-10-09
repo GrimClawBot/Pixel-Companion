@@ -87,6 +87,7 @@ struct AgentsDirectoryView: View {
                     onSelectAgent: { selectedAgentID = $0 },
                     back: { selectedAgentID = nil }
                 )
+                .id(selected.agentID)
             } else {
                 directory
             }

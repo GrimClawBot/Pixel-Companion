@@ -51,6 +51,7 @@ struct CompanyTaskEvidenceView: View {
     let isLive: Bool
     let onBack: () -> Void
     let onSelectAgent: (String) -> Void
+    var backLabel = "All tasks"
 
     @State private var selectedRunID: String?
 
@@ -76,7 +77,7 @@ struct CompanyTaskEvidenceView: View {
                 TaskRunEvidenceDetailView(task: task, link: selected)
             } else {
                 Button(action: onBack) {
-                    Label("All tasks", systemImage: "chevron.left")
+                    Label(backLabel, systemImage: "chevron.left")
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("companion.task.back")

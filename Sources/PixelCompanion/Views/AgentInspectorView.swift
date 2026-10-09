@@ -14,6 +14,23 @@ enum AgentInspectorSelection {
     }
 }
 
+/// The assigned-task drilldown is resolved afresh from *current* source
+/// evidence. IDs must be unique across the whole bounded task feed.
+/// A title, run text or old assignment never authorizes a link.
+enum AgentAssignedTaskSelection {
+    static func resolve(
+        taskID: String?,
+        agentID: String,
+        tasks: [TaskSnapshot],
+        isLive: Bool
+    ) -> TaskSnapshot? {
+        guard isLive, !agentID.isEmpty, let taskID, !taskID.isEmpty else { return nil }
+        let matches = tasks.filter { $0.id == taskID }
+        guard matches.count == 1, matches[0].assigneeAgentID == agentID else { return nil }
+        return matches[0]
+    }
+}
+
 /// Read-only, optional field-aware detail for the selected agent.
 struct AgentInspectorView: View {
     let session: AgentSessionSnapshot
@@ -23,6 +40,14 @@ struct AgentInspectorView: View {
     var peerSessions: [AgentSessionSnapshot] = []
     var onSelectAgent: ((String) -> Void)?
     let back: () -> Void
+    @State private var selectedAssignedTaskID: String?
+
+    private var selectedAssignedTask: TaskSnapshot? {
+        AgentAssignedTaskSelection.resolve(
+            taskID: selectedAssignedTaskID, agentID: session.agentID,
+            tasks: verifiedTasks, isLive: isLive
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -134,8 +159,34 @@ struct AgentInspectorView: View {
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
-                    ForEach(assignedTasks.prefix(5)) { task in
-                        ReadOnlyTaskRow(task: task)
+                    if let selectedAssignedTask {
+                        CompanyTaskEvidenceView(
+                            task: selectedAssignedTask, sessions: peerSessions,
+                            isLive: isLive, onBack: { selectedAssignedTaskID = nil },
+                            onSelectAgent: { onSelectAgent?($0) },
+                            backLabel: "Assigned tasks"
+                        )
+                        .id(selectedAssignedTask.id)
+                    } else {
+                        ForEach(assignedTasks.prefix(5)) { task in
+                            if AgentAssignedTaskSelection.resolve(
+                                taskID: task.id, agentID: session.agentID,
+                                tasks: verifiedTasks, isLive: isLive
+                            ) != nil {
+                                Button {
+                                    selectedAssignedTaskID = task.id
+                                } label: {
+                                    ReadOnlyTaskRow(task: task)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    "Inspect assigned task " + CompanyTaskPresentation.title(task)
+                                )
+                                .accessibilityIdentifier("companion.agent.assigned-task-select")
+                            } else {
+                                ReadOnlyTaskRow(task: task)
+                            }
+                        }
                     }
                 }
                 .accessibilityIdentifier("companion.agent.assigned-tasks")
@@ -148,6 +199,15 @@ struct AgentInspectorView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .onChange(of: isLive) { _, live in
+            if !live { selectedAssignedTaskID = nil }
+        }
+        .onChange(of: session.agentID) { _, _ in
+            selectedAssignedTaskID = nil
+        }
+        .onChange(of: verifiedTasks.map { [$0.id, $0.assigneeAgentID ?? ""].joined(separator: "|") }) { _, _ in
+            if selectedAssignedTask == nil { selectedAssignedTaskID = nil }
         }
         .accessibilityIdentifier("companion.agent.inspector")
     }
