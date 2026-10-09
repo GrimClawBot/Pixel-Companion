@@ -1,16 +1,13 @@
 import AppKit
 import PixelCompanionCore
 import SwiftUI
-
 /// Sections remain independent: switching tabs never changes the connector or refresh cadence.
 enum CompanionDetailTab: String, CaseIterable, Identifiable {
     case overview
     case agents
     case usage
     case activity
-
     var id: String { rawValue }
-
     /// Fixed keyboard shortcuts keep destinations predictable across display modes.
     var keyboardNumber: Character {
         switch self {
@@ -20,7 +17,6 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
         case .activity: return "4"
         }
     }
-
     /// Arrow navigation stops at either end rather than unexpectedly wrapping.
     func moving(by offset: Int) -> CompanionDetailTab {
         let tabs = Self.allCases
@@ -28,7 +24,6 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
         let target = min(max(index + offset, 0), tabs.count - 1)
         return tabs[target]
     }
-
     var label: String {
         switch self {
         case .overview: return "Overview"
@@ -37,7 +32,6 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
         case .activity: return "Activity"
         }
     }
-
     var symbol: String {
         switch self {
         case .overview: return "square.grid.2x2"
@@ -47,7 +41,6 @@ enum CompanionDetailTab: String, CaseIterable, Identifiable {
         }
     }
 }
-
 /// Data-independent shortcut routing; tiles never grant actions against Paperclip.
 enum CompanionOverviewShortcut: String, CaseIterable {
     case agents
