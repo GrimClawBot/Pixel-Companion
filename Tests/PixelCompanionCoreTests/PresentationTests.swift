@@ -67,6 +67,17 @@ final class PresentationTests: XCTestCase {
         XCTAssertEqual(huge, screen)
     }
 
+    func testLegacyFractionalNotchAlwaysFullyCoveredByTinyPanel() throws {
+        let legacy = try XCTUnwrap(notch())
+        XCTAssertEqual(legacy.notchRect.minX, 663.5)
+        let frame = legacy.panelFrame(for: CGSize(width: 20, height: 20))
+        XCTAssertEqual(frame.minX, legacy.notchRect.minX)
+        XCTAssertEqual(frame.maxX, legacy.notchRect.maxX)
+        XCTAssertEqual(frame.size.width, legacy.notchRect.width)
+        XCTAssertLessThanOrEqual(frame.minX, legacy.notchRect.minX)
+        XCTAssertGreaterThanOrEqual(frame.maxX, legacy.notchRect.maxX)
+    }
+
     func testAuxiliaryRectanglesAnchorFromTheirActualGlobalEdges() throws {
         let frame = CGRect(x: -1_600, y: 400, width: 1_512, height: 982)
         let left = CGRect(x: -1_590, y: 1_350, width: 630, height: 32)
