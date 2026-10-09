@@ -43,12 +43,14 @@ public struct SessionHandoffEvidence: Hashable, Sendable {
             task.assigneeAgentID == session.agentID &&
                 !task.id.isEmpty && !task.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
-        for task in verified where selected.count < 5 {
+        for task in verified {
             guard seen.insert(task.id).inserted else { continue }
-            selected.append(AssignedTask(
-                sourceID: task.id, identifier: nonEmpty(task.identifier),
-                title: task.title, status: task.status
-            ))
+            if selected.count < 5 {
+                selected.append(AssignedTask(
+                    sourceID: task.id, identifier: nonEmpty(task.identifier),
+                    title: task.title, status: task.status
+                ))
+            }
         }
         return SessionHandoffEvidence(
             agentID: session.agentID,
@@ -64,7 +66,7 @@ public struct SessionHandoffEvidence: Hashable, Sendable {
                 reportedWindow: session.contextWindowTokens,
                 confidence: .providerReported
             ),
-            evidenceIsBounded: verified.count > selected.count
+            evidenceIsBounded: seen.count > selected.count
         )
     }
 
