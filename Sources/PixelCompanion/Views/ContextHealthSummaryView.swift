@@ -22,14 +22,8 @@ struct ContextHealthSummaryView: View {
         )
     }
 
-    /// Local acknowledgement expires as soon as the run or reported values change.
-    /// An acknowledgement in one agent must not hide a different agent's warning.
     private var activeEvidenceKey: String? {
-        guard health.recommendation >= .freshSessionRecommended,
-              let used = health.usedTokens, let window = health.windowTokens else {
-            return nil
-        }
-        return "\(evidenceID)|\(used)|\(window)|\(health.recommendation.rawValue)"
+        ContextGuidanceAcknowledgement.evidenceKey(health: health, sourceID: evidenceID)
     }
 
     var body: some View {
@@ -88,5 +82,17 @@ struct ContextHealthSummaryView: View {
         // Keep the local acknowledgement button individually accessible.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("companion.context.health")
+    }
+}
+
+/// Acknowledgements are ephemeral to a single agent/run and the exact observed metric.
+/// Moving to another agent or receiving a new measurement restores the suggestion.
+enum ContextGuidanceAcknowledgement {
+    static func evidenceKey(health: ContextHealth, sourceID: String) -> String? {
+        guard health.recommendation >= .freshSessionRecommended,
+              let used = health.usedTokens, let window = health.windowTokens else {
+            return nil
+        }
+        return "\(sourceID)|\(used)|\(window)|\(health.recommendation.rawValue)"
     }
 }
