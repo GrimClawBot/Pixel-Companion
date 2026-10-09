@@ -1,5 +1,19 @@
 import Foundation
 
+/// Explicit SwiftUI disclosure identity. Agent changes must invalidate the
+/// checklist even if both agents have no session/run identifiers.
+public struct SessionHandoffSelectionIdentity: Hashable, Sendable {
+    public let agentID: String
+    public let sessionID: String?
+    public let runID: String?
+
+    public init(session: AgentSessionSnapshot) {
+        agentID = session.agentID
+        sessionID = session.sessionID
+        runID = session.runID
+    }
+}
+
 /// An intentionally incomplete, in-memory handoff *checklist*, not a generated
 /// prompt, transcript or transferable session. No fields come from raw logs.
 public struct SessionHandoffEvidence: Hashable, Sendable {
