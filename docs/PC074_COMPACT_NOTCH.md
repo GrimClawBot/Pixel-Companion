@@ -16,7 +16,8 @@ menu-bar fallback, settings, controls and original artwork.
   stretching into neighboring menu-bar items.
 - Real Paperclip freshness overrides cached moods: **Connecting**,
   **Updates delayed**, and **Disconnected** replace a stale Working/Testing
-  label and use source-appropriate SF Symbols. Live/standalone mock uses the
+  label and use source-appropriate SF Symbols. The character also turns
+  grey/offline for non-fresh Paperclip telemetry instead of appearing active. Live/standalone mock uses the
   already verified character mood.
 - Existing live pending-approval pill remains unchanged and never shows
   cached approvals when the Paperclip feed is stale.
