@@ -25,10 +25,9 @@ enum AgentAssignedTaskSelection {
         isLive: Bool
     ) -> TaskSnapshot? {
         guard isLive, !agentID.isEmpty, let taskID, !taskID.isEmpty else { return nil }
-        let matches = tasks.filter {
-            $0.id == taskID && $0.assigneeAgentID == agentID && !$0.id.isEmpty
-        }
-        return matches.count == 1 ? matches[0] : nil
+        let matches = tasks.filter { $0.id == taskID }
+        guard matches.count == 1, matches[0].assigneeAgentID == agentID else { return nil }
+        return matches[0]
     }
 }
 
@@ -207,8 +206,7 @@ struct AgentInspectorView: View {
         .onChange(of: session.agentID) { _, _ in
             selectedAssignedTaskID = nil
         }
-        .onChange(of: verifiedTasks.map { [$0.id, $0.assigneeAgentID ?? ""].joined(separator: "|") }) {
-            _, _ in
+        .onChange(of: verifiedTasks.map { [$0.id, $0.assigneeAgentID ?? ""].joined(separator: "|") }) { _, _ in
             if selectedAssignedTask == nil { selectedAssignedTaskID = nil }
         }
         .accessibilityIdentifier("companion.agent.inspector")
