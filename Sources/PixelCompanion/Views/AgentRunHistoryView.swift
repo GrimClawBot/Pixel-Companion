@@ -103,7 +103,9 @@ struct AgentRunHistoryView: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(runs) { run in
-                if isLive, !run.id.isEmpty {
+                if AgentRunInspection.resolve(
+                    runID: run.id, runs: runs, isLive: isLive
+                ) != nil {
                     Button {
                         selectedRunID = run.id
                     } label: {
