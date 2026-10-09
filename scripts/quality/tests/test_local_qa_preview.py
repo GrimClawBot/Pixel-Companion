@@ -1,4 +1,5 @@
 """Checks that the local QA preview is safe and executable without network delivery."""
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -101,6 +102,24 @@ class LocalQAPreviewTests(unittest.TestCase):
         self.assertIn('Add :PCQAUpdateNumber string $QA', src)
         self.assertIn('if [[ "$BUILT_MARKER" != "$QA" ]]', src)
         self.assertNotIn('APP="$HOME/Applications/Pixel Companion QA Update 72.app"', src)
+
+    def test_supported_qa_numbers_resolve_real_plans_without_touching_files(self):
+        with tempfile.TemporaryDirectory() as home:
+            for args, selected in (([], "72"), (["--qa-number", "72"], "72"),
+                                   (["--qa-number", "74"], "74")):
+                with self.subTest(args=args):
+                    selected_args = ["bash", str(SCRIPT), *args, "--print-plan"]
+                    result = subprocess.run(
+                        selected_args, capture_output=True, text=True, check=True,
+                        env={**os.environ, "HOME": home}
+                    )
+                    self.assertIn(f"PLANNED_QA_NUMBER={selected}", result.stdout)
+                    self.assertIn(f"PLANNED_QA_MARKER={selected}", result.stdout)
+                    expected = f"{home}/Applications/Pixel Companion QA Update {selected}.app"
+                    self.assertIn(f"PLANNED_APP={expected}", result.stdout)
+                    self.assertFalse((Path(home) / "Applications").exists())
+                    self.assertNotIn("VERIFIED_QA_NUMBER", result.stdout)
+                    self.assertNotIn("BUNDLE:", result.stdout)
 
     def test_untracked_and_ignored_swift_sources_fail_clean_input_checks(self):
         with tempfile.TemporaryDirectory() as work:
