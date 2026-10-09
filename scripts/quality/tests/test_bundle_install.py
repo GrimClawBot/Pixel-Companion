@@ -102,6 +102,31 @@ class BundleInstallationTests(unittest.TestCase):
             self.assertEqual((stage / "Previous.app" / "version").read_text(), "old")
             self.assertIn("WARNING: new app installed", stderr.getvalue())
 
+    def test_late_symlink_destination_is_refused_by_installer(self):
+        # A different local process can create a link during Swift build,
+        # after the shell's preflight but before install_bundle.py runs.
+        for dangling in (False, True):
+            with self.subTest(dangling=dangling), tempfile.TemporaryDirectory() as directory:
+                base = Path(directory)
+                destination = base / "Pixel Companion.app"
+                target = base / "elsewhere.app"
+                if not dangling:
+                    target.mkdir()
+                    (target / "marker").write_text("original")
+                destination.symlink_to(target, target_is_directory=True)
+                staged = base / "stage" / "New.app"
+                staged.mkdir(parents=True)
+                (staged / "version").write_text("new")
+                with self.assertRaisesRegex(FileExistsError, "symlinked"):
+                    install(staged, destination, destination)
+                self.assertTrue(destination.is_symlink())
+                self.assertEqual(destination.readlink(), target)
+                self.assertTrue(staged.exists())
+                if dangling:
+                    self.assertFalse(target.exists())
+                else:
+                    self.assertEqual((target / "marker").read_text(), "original")
+
     def test_custom_existing_output_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
@@ -152,6 +177,26 @@ class RealMacOSPackagingTests(unittest.TestCase):
             self.assertIn("Refusing symlinked .app destination", result.stderr)
             self.assertEqual((real_app / "marker").read_text(), "do not alter")
             self.assertTrue(alias_app.is_symlink())
+            self.assertFalse(list(base.glob(".pixel-companion-*.lock")))
+
+    def test_dangling_leaf_symlink_is_rejected_before_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            missing_target = base / "missing.app"
+            destination = base / "dangling.app"
+            destination.symlink_to(missing_target, target_is_directory=True)
+            self.assertFalse(destination.exists())
+            self.assertTrue(destination.is_symlink())
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug",
+                 "--output", str(destination)],
+                capture_output=True, text=True, timeout=15,
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("Refusing symlinked .app destination", result.stderr)
+            self.assertTrue(destination.is_symlink())
+            self.assertEqual(destination.readlink(), missing_target)
+            self.assertFalse(missing_target.exists())
             self.assertFalse(list(base.glob(".pixel-companion-*.lock")))
 
     def test_parent_symlink_alias_blocks_concurrent_packaging(self):
