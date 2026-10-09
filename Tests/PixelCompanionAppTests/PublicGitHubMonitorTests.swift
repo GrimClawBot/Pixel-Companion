@@ -65,7 +65,12 @@ final class PublicGitHubMonitorTests: XCTestCase {
     func testSourceBranchIsDisplayOnlyAndCannotChangeDestination() throws {
         let runs = try JSONDecoder().decode(
             GitHubPublicRunsResponse.self,
-            from: Data(#"{"workflow_runs":[{"id":52,"name":"CI","status":"completed","conclusion":"success","head_branch":"feature/new-branch"},{"id":53,"name":"Build","status":"in_progress","conclusion":null,"head_branch":null},{"id":54,"name":"Other","status":"completed","conclusion":"failure","head_branch":"  \n branch\tlabel  "}]}"#.utf8)
+            from: Data((
+                #"{"workflow_runs":["# +
+                #"{"id":52,"name":"CI","status":"completed","conclusion":"success","head_branch":"feature/new-branch"},"# +
+                #"{"id":53,"name":"Build","status":"in_progress","conclusion":null,"head_branch":null},"# +
+                #"{"id":54,"name":"Other","status":"completed","conclusion":"failure","head_branch":"  \n branch\tlabel  "}]}"#
+            ).utf8)
         )
         XCTAssertEqual(
             GitHubPublicPresentation.branchLabel(runs.workflowRuns[0]),
@@ -86,7 +91,10 @@ final class PublicGitHubMonitorTests: XCTestCase {
     func testAPISuppliedArbitraryHTMLURLIsNeverUsedAsBrowserDestination() throws {
         let run = try JSONDecoder().decode(
             GitHubPublicRunsResponse.self,
-            from: Data(#"{"workflow_runs":[{"id":9,"name":"Run","status":"completed","conclusion":"success","head_branch":"main","html_url":"https://malicious.example/auth"}]}"#.utf8)
+            from: Data((
+                #"{"workflow_runs":[{"id":9,"name":"Run","status":"completed","conclusion":"success","# +
+                #""head_branch":"main","html_url":"https://malicious.example/auth"}]}"#
+            ).utf8)
         )
         let repo = try XCTUnwrap(PublicGitHubRepository("public-owner/public-repo"))
         XCTAssertEqual(
