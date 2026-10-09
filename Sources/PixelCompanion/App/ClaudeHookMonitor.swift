@@ -64,17 +64,19 @@ enum ClaudeHookParser {
 @MainActor
 final class ClaudeHookMonitor: ObservableObject {
     @Published private(set) var status: ClaudeHookStatus = .off
-    private let read: (URL) -> Data?
+    private let read: @Sendable (URL) -> Data?
     private let now: () -> Date
     private var fileURL: URL?
     private var timer: Timer?
+    private var readTask: Task<Void, Never>?
+    private var revision: UInt64 = 0
     private(set) var enabled = false
 
     static let eventFilename = "pixel-companion-claude-event.json"
     static let refreshInterval: TimeInterval = 15
 
     init(
-        read: @escaping (URL) -> Data? = LocalAgentFeedFileReader.read,
+        read: @escaping @Sendable (URL) -> Data? = { LocalAgentFeedFileReader.read($0) },
         now: @escaping () -> Date = Date.init
     ) {
         self.read = read
@@ -82,6 +84,8 @@ final class ClaudeHookMonitor: ObservableObject {
     }
 
     var isConnected: Bool { enabled && fileURL != nil }
+    /// Exposes in-flight state for deterministic, source-switched UI tests.
+    var isRefreshing: Bool { readTask != nil }
 
     func configure(enabled newValue: Bool) {
         guard enabled != newValue else { return }
@@ -91,9 +95,10 @@ final class ClaudeHookMonitor: ObservableObject {
     }
 
     func connectDirectory(_ directory: URL) {
-        guard enabled, directory.isFileURL,
-              (try? directory.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
-        else { return }
+        // File metadata on a cloud/network mount may block the main actor.
+        // The owner-selected folder is validated by the native picker; the
+        // read-only file reader safely reports unavailable for bad paths.
+        guard enabled, directory.isFileURL else { return }
         fileURL = directory.standardizedFileURL.appendingPathComponent(Self.eventFilename)
         restart()
     }
@@ -104,16 +109,44 @@ final class ClaudeHookMonitor: ObservableObject {
     }
 
     func refresh() {
-        guard enabled, let fileURL else { return }
-        guard let data = read(fileURL) else { status = .unavailable; return }
-        status = ClaudeHookParser.parse(data, now: now())
+        guard enabled, let fileURL, readTask == nil else { return }
+        let generation = revision
+        let read = self.read
+        readTask = Task.detached(priority: .utility) { [weak self] in
+            let data = read(fileURL)
+            guard !Task.isCancelled else { return }
+            await self?.finishRead(data, from: fileURL, generation: generation)
+        }
+    }
+
+    /// Explicit verification must capture its baseline only after a completed
+    /// owner-selected source read. This never blocks the MainActor.
+    func refreshedStatusForVerification() async -> ClaudeHookStatus? {
+        guard enabled, let source = fileURL else { return nil }
+        let generation = revision
+        if let existing = readTask { await existing.value }
+        guard enabled, revision == generation, fileURL == source else { return nil }
+        refresh()
+        if let pending = readTask { await pending.value }
+        guard enabled, revision == generation, fileURL == source else { return nil }
+        return status
+    }
+
+    private func finishRead(_ data: Data?, from file: URL, generation: UInt64) {
+        guard enabled, revision == generation, fileURL == file else { return }
+        readTask = nil
+        status = data.map { ClaudeHookParser.parse($0, now: now()) } ?? .unavailable
     }
 
     private func restart() {
         timer?.invalidate()
         timer = nil
+        revision &+= 1
+        readTask?.cancel()
+        readTask = nil
         guard enabled else { status = .off; return }
         guard fileURL != nil else { status = .unconnected; return }
+        status = .unavailable
         refresh()
         let ticker = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }

@@ -126,7 +126,7 @@ final class LocalAgentActivityTimelineTests: XCTestCase {
         XCTAssertTrue(timeline.visible(at: epoch.addingTimeInterval(31)).isEmpty == false)
     }
 
-    func testRealMonitorSubscriptionsFollowOptInAndDisconnect() throws {
+    func testRealMonitorSubscriptionsFollowOptInAndDisconnect() async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PC44-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -151,6 +151,7 @@ final class LocalAgentActivityTimelineTests: XCTestCase {
         codex.connectDirectory(folder)
         claude.configure(enabled: true)
         claude.connectDirectory(folder)
+        await awaitLocalReport { timeline.events.count == 2 }
         XCTAssertEqual(timeline.events.count, 2)
         codex.refresh()
         claude.refresh()

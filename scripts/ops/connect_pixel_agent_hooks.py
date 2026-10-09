@@ -16,6 +16,10 @@ import shutil
 import stat
 import tempfile
 from datetime import datetime, timezone
+# Keep these limits in exact parity with codex_notify_fanout.py.
+# The script must work by absolute path from outside the repository root.
+MAX_ORIGINAL_ARGS = 32
+MAX_ORIGINAL_COMMAND_BYTES = 16_384
 
 try:
     import tomllib
@@ -81,10 +85,12 @@ def prepare_codex(blob: bytes) -> tuple[list[str], bytes]:
     content = blob.decode("utf-8")
     config = tomllib.loads(content)
     command = config.get("notify")
-    if (not isinstance(command, list) or not command or
-            not all(isinstance(arg, str) and len(arg) <= 4096 for arg in command) or
-            not Path(command[0]).is_absolute()):
-        raise ValueError("Existing Codex notification is not a safe argv array")
+    if (not isinstance(command, list) or
+            not (1 <= len(command) <= MAX_ORIGINAL_ARGS) or
+            not all(isinstance(arg, str) and 0 < len(arg) <= 4096 for arg in command) or
+            not Path(command[0]).is_absolute() or
+            len(json.dumps(command).encode("utf-8")) > MAX_ORIGINAL_COMMAND_BYTES):
+        raise ValueError("Existing Codex notification exceeds dispatcher's strict limits")
     if str(FANOUT) in command:
         raise ValueError("Pixel fanout already installed; refusing recursive nesting")
 

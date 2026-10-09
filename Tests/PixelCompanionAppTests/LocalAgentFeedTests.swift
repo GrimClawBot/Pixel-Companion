@@ -81,31 +81,29 @@ final class LocalAgentFeedTests: XCTestCase {
 
     @MainActor
     func testNoReadsBeforeOptInOrFileSelection() {
-        var reads = 0
-        let monitor = LocalAgentFeedMonitor(read: { _ in reads += 1; return nil })
+        let probe = LockedLocalReportReader()
+        let monitor = LocalAgentFeedMonitor(read: { probe.read($0) })
         monitor.refresh()
         XCTAssertEqual(monitor.status, .disabled)
         monitor.configure(enabled: true)
         XCTAssertEqual(monitor.status, .unconnected)
         monitor.refresh()
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.calls, 0)
         XCTAssertEqual(LocalAgentFeedMonitor.refreshInterval, 10)
         monitor.configure(enabled: false)
     }
 
     @MainActor
-    func testExplicitSelectionAndDisablePurgeConnection() {
-        var reads = 0
-        let monitor = LocalAgentFeedMonitor(read: { _ in
-            reads += 1
-            return Data(#"{"schemaVersion":1,"sessions":[]}"#.utf8)
-        })
+    func testExplicitSelectionAndDisablePurgeConnection() async {
+        let probe = LockedLocalReportReader(Data(#"{"schemaVersion":1,"sessions":[]}"#.utf8))
+        let monitor = LocalAgentFeedMonitor(read: { probe.read($0) })
         let file = URL(fileURLWithPath: "/tmp/local-session.json")
         monitor.connect(file)
         XCTAssertFalse(monitor.isConnected)
         monitor.configure(enabled: true)
         monitor.connect(file)
-        XCTAssertEqual(reads, 1)
+        await awaitLocalReport { monitor.status == .empty }
+        XCTAssertEqual(probe.calls, 1)
         XCTAssertEqual(monitor.status, .empty)
         monitor.configure(enabled: false)
         XCTAssertEqual(monitor.status, .disabled)
