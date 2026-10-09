@@ -42,3 +42,19 @@ review and owner approval. Greptile helps find flaws but cannot replace
 required independent GitHub approval. No changes to Paperclip production,
 Codex/Claude provider configs, Sky notifier forwarding or user login items
 occur during tests.
+
+## Greptile follow-up: system status changed before Cancel
+
+Greptile review e06b191b-5866-4f3e-b03a-4566626f2ee4 on initial
+PC-065 commit c8ccd82 returned confidence 4 and one P2 issue:
+Cancel pending request returned silently if macOS had approved or
+unregistered the login item before the click, leaving the UI
+incorrectly showing Pending and the now-irrelevant Cancel button.
+
+The Cancel action now refreshes authoritative macOS state when the
+status is no longer pending. A fake-service regression exercises both
+Pending -> Enabled and Pending -> Disabled external changes, verifies
+the display updates and no unintended unregister call occurs.
+This is a UI correctness fix, not a permission bypass or background
+registration. Test-only fake system service remains isolated from
+real macOS startup state.

@@ -123,7 +123,13 @@ final class LaunchAtLoginController: ObservableObject {
     }
 
     func cancelPendingApproval() {
-        guard canChange, service.state == .approvalRequired else { return }
+        guard canChange else { return }
+        guard service.state == .approvalRequired else {
+            // macOS can approve or remove the item after the pending UI
+            // rendered. Never leave a stale pending indicator or cancel button.
+            refresh()
+            return
+        }
         setEnabled(false)
     }
 }

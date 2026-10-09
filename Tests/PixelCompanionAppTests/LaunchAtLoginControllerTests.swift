@@ -74,6 +74,26 @@ final class LaunchAtLoginControllerTests: XCTestCase {
         XCTAssertFalse(controller.enabled)
     }
 
+    func testCancelAfterMacChangedStatusRefreshesWithoutUnregistering() {
+        let fake = FakeLoginItemService(.approvalRequired)
+        let controller = LaunchAtLoginController(service: fake, isSupportedOverride: true)
+        XCTAssertTrue(controller.pendingApproval)
+
+        fake.state = .enabled
+        controller.cancelPendingApproval()
+        XCTAssertFalse(controller.pendingApproval)
+        XCTAssertTrue(controller.enabled)
+        XCTAssertEqual(fake.unregisterCalls, 0)
+
+        fake.state = .approvalRequired
+        controller.refresh()
+        fake.state = .disabled
+        controller.cancelPendingApproval()
+        XCTAssertFalse(controller.pendingApproval)
+        XCTAssertFalse(controller.enabled)
+        XCTAssertEqual(fake.unregisterCalls, 0)
+    }
+
     func testPendingOnDoesNotReregisterAndRefreshTracksMacChanges() {
         let fake = FakeLoginItemService(.approvalRequired)
         let controller = LaunchAtLoginController(service: fake, isSupportedOverride: true)
