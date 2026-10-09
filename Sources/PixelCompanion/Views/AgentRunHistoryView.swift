@@ -200,6 +200,20 @@ struct AgentRunHistoryView: View {
             }
             Text(AgentRunHistoryPresentation.tokenLabel(run))
                 .font(.caption.monospacedDigit())
+            verifiedTaskEvidence(for: run)
+            Text("Logs unavailable — no verified redacted run logs were supplied.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text("Recent source evidence only · no backend actions")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .companionCard()
+        .accessibilityIdentifier("companion.agent.verified-run-detail")
+    }
+
+    @ViewBuilder
+    private func verifiedTaskEvidence(for run: AgentRunSnapshot) -> some View {
             if let task = AgentRunInspection.verifiedTask(
                 for: run, tasks: verifiedTasks, isLive: isLive
             ) {
@@ -221,15 +235,6 @@ struct AgentRunHistoryView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            Text("Logs unavailable — no verified redacted run logs were supplied.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text("Recent source evidence only · no backend actions")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .companionCard()
-        .accessibilityIdentifier("companion.agent.verified-run-detail")
     }
 
     private func symbol(_ state: AgentSessionSnapshot.RunState) -> String {
