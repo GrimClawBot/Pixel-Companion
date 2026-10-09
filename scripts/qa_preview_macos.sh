@@ -26,8 +26,10 @@ for cmd in swift git python3 codesign plutil; do
 done
 [[ -x /usr/libexec/PlistBuddy ]] || { echo "Missing PlistBuddy" >&2; exit 2; }
 cd "$ROOT"
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Refusing a dirty source tree: make a separate clean preview clone." >&2
+if ! git diff --quiet || ! git diff --cached --quiet || \
+   [[ -n "$(git status --porcelain --untracked-files=all -- Sources Tests scripts packaging Package.swift)" ]] || \
+   [[ -n "$(git ls-files --others --ignored --exclude-standard -- Sources Tests packaging)" ]]; then
+  echo "Refusing changed, untracked or ignored build inputs: use a clean preview clone." >&2
   exit 2
 fi
 
@@ -40,19 +42,18 @@ fi
 SOURCE_SHA="$(git rev-parse HEAD)"
 TEMP_PLIST="$(mktemp -t pixel-companion-qa72-plist.XXXXXXXX)"
 cp "$PLIST" "$TEMP_PLIST"
-restore_plist() {
-  cp "$TEMP_PLIST" "$PLIST"
-  rm -f "$TEMP_PLIST"
-}
-trap restore_plist EXIT
+cleanup_plist() { rm -f "$TEMP_PLIST"; }
+trap cleanup_plist EXIT
 
 # QA metadata prevents registration of Launch at Login in this temporary bundle.
-/usr/libexec/PlistBuddy -c "Add :PCQAUpdateNumber string $QA" "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Pixel Companion QA Update $QA" "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $QA" "$PLIST"
-plutil -lint "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :PCQAUpdateNumber string $QA" "$TEMP_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Pixel Companion QA Update $QA" "$TEMP_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $QA" "$TEMP_PLIST"
+plutil -lint "$TEMP_PLIST"
 
-"$ROOT/scripts/package_macos.sh" --release --output "$APP"
+# Packaging copies this isolated plist; concurrent builds cannot read QA metadata
+# from the shared checked-in packaging/Info.plist source file.
+"$ROOT/scripts/package_macos.sh" --release --output "$APP" --info-plist "$TEMP_PLIST"
 codesign --verify --strict --verbose=2 "$APP"
 BUILT_MARKER="$(/usr/libexec/PlistBuddy -c 'Print :PCQAUpdateNumber' "$APP/Contents/Info.plist")"
 if [[ "$BUILT_MARKER" != "$QA" ]]; then
