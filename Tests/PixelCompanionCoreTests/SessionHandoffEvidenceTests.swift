@@ -78,6 +78,36 @@ final class SessionHandoffEvidenceTests: XCTestCase {
         ))
         XCTAssertEqual(result.assignedTasks.map(\.sourceID), ["ok"])
         XCTAssertNil(result.assignedTasks.first?.identifier)
+        XCTAssertEqual(result.assignedTasks.first?.displayTitle, "ok · Real task")
+    }
+
+    func testReportedTaskIdentifierIsShownAndNeverReplacedByATitleGuess() throws {
+        let evidence = try XCTUnwrap(SessionHandoffEvidence.prepare(
+            session: session(), assignedTasks: [task("24")], isLive: true
+        ))
+        XCTAssertEqual(evidence.assignedTasks.first?.displayTitle, "PX-24 · Verified task 24")
+        XCTAssertEqual(evidence.agentID, "agent-a")
+    }
+
+    func testChangingAgentWithNilSessionAndRunResetsDisclosureIdentity() {
+        let first = SessionHandoffSelectionIdentity(session: session(
+            agentID: "agent-a", runID: nil, sessionID: nil
+        ))
+        let next = SessionHandoffSelectionIdentity(session: session(
+            agentID: "agent-b", runID: nil, sessionID: nil
+        ))
+        XCTAssertNotEqual(first, next)
+        XCTAssertEqual(first.agentID, "agent-a")
+        XCTAssertEqual(next.agentID, "agent-b")
+    }
+
+    func testChangingOnlySessionOrRunResetsDisclosureIdentity() {
+        let base = SessionHandoffSelectionIdentity(session: session())
+        let newRun = SessionHandoffSelectionIdentity(session: session(runID: "run-2"))
+        let newSession = SessionHandoffSelectionIdentity(session: session(sessionID: "session-2"))
+        XCTAssertNotEqual(base, newRun)
+        XCTAssertNotEqual(base, newSession)
+        XCTAssertEqual(base, SessionHandoffSelectionIdentity(session: session()))
     }
 
     func testCumulativeTokensCannotBeUsedToGuessContextOccupancy() throws {
