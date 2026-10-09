@@ -36,3 +36,25 @@ checkouts, or alter provider configuration.
 Remaining separate gates: Greptile exact-head P1/P2 review, real human
 VoiceOver/keyboard/360pt/440pt visual testing, independent GitHub APPROVED
 and explicit protected-main owner integration permission. No public release.
+
+## Second Greptile pass: asynchronous delivery verification boundary
+
+PR #167 identified a further P1 risk: asynchronous source reads meant
+AgentHookVerifier could arm before the baseline refresh had completed.
+The verification flow now awaits a fresh completed bounded source read
+before arming, treats all markers observed during that read as baseline,
+and invalidates pending arm tasks when stopped or retried. A marker
+already present at the arm boundary cannot be credited as new delivery.
+Two new native tests block initial Codex/Claude reads until after Start
+Check and prove no premature success, while later genuine markers pass.
+
+Existing verifier negative tests now await actual file delivery before
+asserting stale, repeated, timeout, or post-stop suppression. Provider
+tests cover accepted exact 32-argument, 4096-character and 16384-byte
+serialized command boundaries, along with strictly rejected values
+above those bounds. No real provider notification settings were changed.
+
+QA86 is an earlier preview of the same milestone; the new review head
+is allocated the isolated QA87 marker and must be built only after
+exact-head native CI and package safety gates. The old running preview
+remains until a verified replacement is available.

@@ -48,3 +48,42 @@ func awaitLocalReport(
     }
     XCTFail(message, file: file, line: line)
 }
+
+/// Simulates the initial read arriving after the user has pressed Start Check.
+final class DelayedBaselineReader: @unchecked Sendable {
+    private let lock = NSLock()
+    private let gate = DispatchSemaphore(value: 0)
+    private var payload: Data
+    private var firstRead = true
+    private var firstStarted = false
+
+    init(_ payload: Data) { self.payload = payload }
+
+    var started: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return firstStarted
+    }
+
+    func set(_ data: Data) {
+        lock.lock()
+        payload = data
+        lock.unlock()
+    }
+
+    func release() { gate.signal() }
+
+    func read(_ file: URL) -> Data? {
+        lock.lock()
+        let wait = firstRead
+        if firstRead {
+            firstRead = false
+            firstStarted = true
+        }
+        lock.unlock()
+        if wait { gate.wait() }
+        lock.lock()
+        defer { lock.unlock() }
+        return payload
+    }
+}

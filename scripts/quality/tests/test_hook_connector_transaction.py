@@ -64,6 +64,43 @@ class HookConnectorTransactionTests(unittest.TestCase):
         command, _ = installer.prepare_codex(self.codex_blob)
         self.assertEqual(command, ["/bin/echo", "original-handler"])
 
+    def test_supported_notifier_boundaries_are_replayable_without_loss(self):
+        self.original.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        near_limit = ["/bin/echo", "a" * 4096, "b" * 4096, "c" * 4096, "x"]
+        to_pad = dispatcher.MAX_ORIGINAL_COMMAND_BYTES - len(
+            json.dumps(near_limit).encode("utf-8")
+        )
+        self.assertTrue(0 <= to_pad < 4096)
+        near_limit[-1] += "z" * to_pad
+        self.assertEqual(
+            len(json.dumps(near_limit).encode("utf-8")),
+            dispatcher.MAX_ORIGINAL_COMMAND_BYTES,
+        )
+        maximum_args = ["/bin/echo"] + ["x"] * 31
+        maximum_arg = ["/bin/echo", "q" * 4096]
+        for command in (maximum_args, maximum_arg, near_limit):
+            with self.subTest(arguments=len(command), bytes=len(json.dumps(command))):
+                prior, updated = installer.prepare_codex(
+                    ("notify = " + json.dumps(command) + "\n").encode("utf-8")
+                )
+                self.assertEqual(prior, command)
+                self.assertIn(str(installer.FANOUT).encode("utf-8"), updated)
+                self.original.write_bytes(json.dumps(command).encode("utf-8"))
+                self.original.chmod(0o600)
+                self.assertEqual(dispatcher.load_previous_command(self.original), command)
+
+        # One byte past the serialized limit, still within each argv item limit.
+        too_long = near_limit.copy()
+        too_long[-1] += "z"
+        self.assertEqual(len(json.dumps(too_long).encode()), 16_385)
+        with self.assertRaises(ValueError):
+            installer.prepare_codex(
+                ("notify = " + json.dumps(too_long) + "\n").encode("utf-8")
+            )
+        self.original.write_bytes(json.dumps(too_long).encode("utf-8"))
+        self.original.chmod(0o600)
+        self.assertIsNone(dispatcher.load_previous_command(self.original))
+
     def test_dry_run_does_not_touch_configs_create_directories_or_backups(self):
         installer.run(apply=False)
         self.assertEqual(self.codex.read_bytes(), self.codex_blob)

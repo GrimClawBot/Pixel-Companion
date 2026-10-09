@@ -104,6 +104,19 @@ final class CodexTurnMonitor: ObservableObject {
         }
     }
 
+    /// Explicit verification must capture its baseline only after a completed
+    /// owner-selected source read. This never blocks the MainActor.
+    func refreshedStatusForVerification() async -> CodexTurnStatus? {
+        guard enabled, let source = fileURL else { return nil }
+        let generation = revision
+        if let existing = readTask { await existing.value }
+        guard enabled, revision == generation, fileURL == source else { return nil }
+        refresh()
+        if let pending = readTask { await pending.value }
+        guard enabled, revision == generation, fileURL == source else { return nil }
+        return status
+    }
+
     private func finishRead(_ data: Data?, from file: URL, generation: UInt64) {
         guard enabled, revision == generation, fileURL == file else { return }
         readTask = nil
