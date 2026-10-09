@@ -75,14 +75,9 @@ def evaluate_cut(
         if isinstance(check, dict) and check.get("name")
     ]
     check_names = {check["name"] for check in checks}
+    # A PR's status rollup can contain checks from other PRs which share the
+    # same immutable head SHA. Never count those unrelated runs as approval.
     # A passed CodeRabbit check is not a substitute for native-checks.
-    # Requiring any random successful check is a fail-open release gate.
-    results_by_name: dict[str, list[str | None]] = {}
-    for check in checks:
-        results_by_name.setdefault(check["name"], []).append(check.get("conclusion"))
-    statuses_all_successful = bool(checks) and all(
-        check.get("conclusion") == "SUCCESS" for check in checks
-    )
     review_rule = (
         (protection or {}).get("required_pull_request_reviews") or {}
     )
@@ -109,13 +104,10 @@ def evaluate_cut(
     }
     protected_checks = protected_checks and bool(required_names)
     missing_required = sorted(required_names - check_names)
-    passing_required = all(
-        len(results_by_name.get(name, [])) == 1
-        and results_by_name[name][0] == "SUCCESS"
-        for name in required_names
-    )
     # Branch protection pins each required workflow context to an App ID.
-    # Name-only matches may come from an unrelated check producer.
+    # Same-head commits can legitimately have multiple PR-specific CI runs.
+    # Scope each run to THIS PR and link it to the exact PR rollup entry,
+    # rather than accepting a passing check from a different PR.
     required_apps: dict[str, int] = {}
     for rule in (checks_rule.get("checks") or []):
         if not isinstance(rule, dict):
@@ -132,20 +124,42 @@ def evaluate_cut(
     producer_matches: dict[str, bool] = {}
     if trusted_producers:
         for name in sorted(required_names):
-            matches = [
+            associated = [
                 run for run in check_runs or []
                 if isinstance(run, dict) and run.get("name") == name
+                and isinstance(run.get("pull_requests"), list)
+                and any(
+                    isinstance(link, dict) and link.get("number") == pr.get("number")
+                    for link in run["pull_requests"]
+                )
             ]
+            matched_rollup = (
+                [
+                    check for check in checks
+                    if check.get("name") == name
+                    and check.get("detailsUrl") == associated[0].get("details_url")
+                ] if len(associated) == 1 else []
+            )
             producer_matches[name] = (
-                len(matches) == 1
-                and matches[0].get("head_sha") == git_head
-                and matches[0].get("status") == "completed"
-                and matches[0].get("conclusion") == "success"
-                and isinstance(matches[0].get("app"), dict)
-                and matches[0]["app"].get("id") == required_apps[name]
+                len(associated) == 1
+                and isinstance(associated[0].get("details_url"), str)
+                and bool(associated[0]["details_url"])
+                and len(matched_rollup) == 1
+                and matched_rollup[0].get("status") == "COMPLETED"
+                and matched_rollup[0].get("conclusion") == "SUCCESS"
+                and associated[0].get("head_sha") == git_head
+                and associated[0].get("status") == "completed"
+                and associated[0].get("conclusion") == "success"
+                and isinstance(associated[0].get("app"), dict)
+                and associated[0]["app"].get("id") == required_apps[name]
             )
     producers_verified = trusted_producers and all(producer_matches.values())
-    checks_successful = statuses_all_successful and passing_required and producers_verified
+    passing_required = producers_verified
+    other_named_checks_successful = all(
+        check.get("conclusion") == "SUCCESS"
+        for check in checks if check["name"] not in required_names
+    )
+    checks_successful = passing_required and other_named_checks_successful
     if not producers_verified:
         blockers.append("required native CI producer App identity not verified")
     admin_policy = (protection or {}).get("enforce_admins") or {}

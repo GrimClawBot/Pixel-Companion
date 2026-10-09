@@ -8,6 +8,9 @@ from scripts.quality.protected_cut_audit import (
 )
 
 
+DEFAULT_RUN_URL = "https://github.com/example/pixel/actions/runs/123/job/456"
+
+
 def pr(**overrides):
     result = {
         "number": 51, "baseRefName": "main",
@@ -16,7 +19,10 @@ def pr(**overrides):
         "author": {"login": "GrimClawBot"},
         "isDraft": False, "reviewDecision": "APPROVED",
         "mergeable": "MERGEABLE",
-        "statusCheckRollup": [{"name": "native-checks", "conclusion": "SUCCESS"}],
+        "statusCheckRollup": [{
+            "name": "native-checks", "conclusion": "SUCCESS",
+            "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL,
+        }],
     }
     result.update(overrides)
     return result
@@ -49,6 +55,8 @@ def audit_default_check_run():
         "name": "native-checks", "head_sha": "a" * 40,
         "status": "completed", "conclusion": "success",
         "app": {"id": 15368},
+        "details_url": DEFAULT_RUN_URL,
+        "pull_requests": [{"number": 51}],
     }
 
 
@@ -62,11 +70,7 @@ def audit(item=None, policy=PROTECTION, **overrides):
         "git_base_sha": "b" * 40,
         "live_base_sha": "b" * 40,
         "reviews": HUMAN_REVIEW,
-        "check_runs": [{
-            "name": "native-checks", "head_sha": "a" * 40,
-            "status": "completed", "conclusion": "success",
-            "app": {"id": 15368},
-        }],
+        "check_runs": [audit_default_check_run()],
     }
     defaults.update(overrides)
     return evaluate_cut(item or pr(), policy, **defaults)
@@ -268,15 +272,81 @@ class ProtectedCutAuditTests(unittest.TestCase):
         for status in ("NEUTRAL", "SKIPPED", "CANCELLED", ""):
             with self.subTest(status=status):
                 item = pr(statusCheckRollup=[
-                    {"name": "native-checks", "conclusion": status},
+                    {
+                        "name": "native-checks", "conclusion": status,
+                        "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL,
+                    },
                     {"name": "CodeRabbit", "conclusion": "SUCCESS"},
                 ])
                 self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
 
+    def test_same_sha_other_pr_check_does_not_block_current_pass(self):
+        old = {
+            **audit_default_check_run(),
+            "pull_requests": [{"number": 144}],
+            "details_url": "https://github.com/example/old/job/2",
+            "conclusion": "failure",
+        }
+        current = audit_default_check_run()
+        item = pr(statusCheckRollup=[
+            {
+                "name": "native-checks", "status": "COMPLETED",
+                "conclusion": "FAILURE", "detailsUrl": old["details_url"],
+            },
+            {
+                "name": "native-checks", "status": "COMPLETED",
+                "conclusion": "SUCCESS", "detailsUrl": current["details_url"],
+            },
+        ])
+        result = audit(item, check_runs=[old, current])
+        self.assertTrue(result["required_ci_producer_apps_verified"])
+        self.assertTrue(result["ready_for_explicit_human_merge_decision"])
+
+    def test_same_sha_other_pr_success_cannot_hide_pending_target_ci(self):
+        other = {
+            **audit_default_check_run(),
+            "pull_requests": [{"number": 144}],
+            "details_url": "https://github.com/example/old/job/2",
+        }
+        pending = {
+            **audit_default_check_run(),
+            "status": "in_progress", "conclusion": None,
+        }
+        item = pr(statusCheckRollup=[
+            {
+                "name": "native-checks", "status": "COMPLETED",
+                "conclusion": "SUCCESS", "detailsUrl": other["details_url"],
+            },
+            {
+                "name": "native-checks", "status": "IN_PROGRESS",
+                "conclusion": "", "detailsUrl": pending["details_url"],
+            },
+        ])
+        self.assertFalse(audit(item, check_runs=[other, pending])[
+            "ready_for_explicit_human_merge_decision"
+        ])
+
+    def test_same_pr_duplicate_ci_or_missing_provenance_fails_closed(self):
+        good = audit_default_check_run()
+        scenarios = [
+            [good, good],
+            [{**good, "pull_requests": [{"number": 144}]}],
+            [{**good, "pull_requests": []}],
+            [{**good, "details_url": "https://github.com/example/unmatched"}],
+            [{**good, "app": {"id": 999}}],
+        ]
+        for runs in scenarios:
+            with self.subTest(runs=runs):
+                self.assertFalse(audit(check_runs=runs)[
+                    "ready_for_explicit_human_merge_decision"
+                ])
+
     def test_duplicate_required_context_is_not_trusted(self):
         item = pr(statusCheckRollup=[
-            {"name": "native-checks", "conclusion": "SUCCESS"},
-            {"name": "native-checks", "conclusion": "FAILURE"},
+            {"name": "native-checks", "conclusion": "SUCCESS",
+             "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL},
+            {"name": "native-checks", "conclusion": "FAILURE",
+             "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL},
         ])
         self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
 
@@ -332,12 +402,16 @@ class ProtectedCutAuditTests(unittest.TestCase):
 
     def test_unfinished_check_with_empty_conclusion_is_pending(self):
         item = pr(statusCheckRollup=[
-            {"name": "native-checks", "conclusion": "", "status": "IN_PROGRESS"}
+            {"name": "native-checks", "conclusion": "", "status": "IN_PROGRESS",
+             "detailsUrl": DEFAULT_RUN_URL}
         ])
         self.assertFalse(audit(item)["ci_complete_and_successful"])
 
     def test_red_check_blocks_even_approved_pr(self):
-        item = pr(statusCheckRollup=[{"name": "native-checks", "conclusion": "FAILURE"}])
+        item = pr(statusCheckRollup=[{
+            "name": "native-checks", "conclusion": "FAILURE",
+            "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL,
+        }])
         self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
 
     def test_sha_mismatch_blocks(self):
