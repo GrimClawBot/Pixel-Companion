@@ -272,7 +272,10 @@ class ProtectedCutAuditTests(unittest.TestCase):
         for status in ("NEUTRAL", "SKIPPED", "CANCELLED", ""):
             with self.subTest(status=status):
                 item = pr(statusCheckRollup=[
-                    {"name": "native-checks", "conclusion": status},
+                    {
+                        "name": "native-checks", "conclusion": status,
+                        "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL,
+                    },
                     {"name": "CodeRabbit", "conclusion": "SUCCESS"},
                 ])
                 self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
@@ -340,8 +343,10 @@ class ProtectedCutAuditTests(unittest.TestCase):
 
     def test_duplicate_required_context_is_not_trusted(self):
         item = pr(statusCheckRollup=[
-            {"name": "native-checks", "conclusion": "SUCCESS"},
-            {"name": "native-checks", "conclusion": "FAILURE"},
+            {"name": "native-checks", "conclusion": "SUCCESS",
+             "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL},
+            {"name": "native-checks", "conclusion": "FAILURE",
+             "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL},
         ])
         self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
 
@@ -397,12 +402,16 @@ class ProtectedCutAuditTests(unittest.TestCase):
 
     def test_unfinished_check_with_empty_conclusion_is_pending(self):
         item = pr(statusCheckRollup=[
-            {"name": "native-checks", "conclusion": "", "status": "IN_PROGRESS"}
+            {"name": "native-checks", "conclusion": "", "status": "IN_PROGRESS",
+             "detailsUrl": DEFAULT_RUN_URL}
         ])
         self.assertFalse(audit(item)["ci_complete_and_successful"])
 
     def test_red_check_blocks_even_approved_pr(self):
-        item = pr(statusCheckRollup=[{"name": "native-checks", "conclusion": "FAILURE"}])
+        item = pr(statusCheckRollup=[{
+            "name": "native-checks", "conclusion": "FAILURE",
+            "status": "COMPLETED", "detailsUrl": DEFAULT_RUN_URL,
+        }])
         self.assertFalse(audit(item)["ready_for_explicit_human_merge_decision"])
 
     def test_sha_mismatch_blocks(self):
