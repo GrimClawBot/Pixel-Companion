@@ -73,6 +73,42 @@ final class NotchLayoutTests: XCTestCase {
         )
     }
 
+    func testCompactNormalMoodsOmitRedundantTrailingIcons() {
+        for mood in [
+            CharacterMood.idle, .working, .thinking, .coding, .testing, .reviewing
+        ] {
+            XCTAssertFalse(CompactBarPresentation.needsCompactIndicator(
+                mood: mood, feedFreshness: .current
+            ))
+            XCTAssertFalse(CompactBarPresentation.needsCompactIndicator(
+                mood: mood, feedFreshness: .notApplicable
+            ))
+        }
+    }
+
+    func testCompactImportantEventsRetainVisibleSymbols() {
+        for mood in [
+            CharacterMood.error, .offline, .waitingForApproval, .success,
+            .budgetWarning, .infrastructureAlert, .securityAlert
+        ] {
+            XCTAssertTrue(CompactBarPresentation.needsCompactIndicator(
+                mood: mood, feedFreshness: .current
+            ))
+        }
+    }
+
+    func testDelayedFeedsKeepWarningSymbolEvenWithNormalWorkingMood() {
+        for freshness in [FeedFreshness.connecting, .stale, .unavailable] {
+            XCTAssertTrue(CompactBarPresentation.needsCompactIndicator(
+                mood: .working, feedFreshness: freshness
+            ))
+            XCTAssertEqual(
+                CompactBarPresentation.displayMood(mood: .working, feedFreshness: freshness),
+                .offline
+            )
+        }
+    }
+
     func testSnapshotExpandsBelowAndBeyondNotchOnlyDuringInteraction() {
         XCTAssertEqual(
             NotchLayout.size(for: .snapshot, notchSize: notchSize),
