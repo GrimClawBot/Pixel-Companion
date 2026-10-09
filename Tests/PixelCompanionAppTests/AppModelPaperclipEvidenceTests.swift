@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 @testable import PixelCompanion
 @testable import PixelCompanionCore
@@ -100,6 +101,20 @@ final class AppModelPaperclipEvidenceTests: XCTestCase {
         )
     }
 
+    private func waitForNotificationPermissionReady(_ model: AppModel) async {
+        let ready = expectation(description: "Notification permission confirmed ready")
+        // A real publisher signal is more reliable than N Task.yield calls:
+        // queued main-actor permission tasks may finish after an arbitrary
+        // number of yields on loaded CI machines.
+        let observation = model.$notificationStatus.sink { status in
+            if status == "Enabled for new Paperclip events." {
+                ready.fulfill()
+            }
+        }
+        await fulfillment(of: [ready], timeout: 5)
+        observation.cancel()
+    }
+
     func testActualAppModelCapturesAll181AgentsWithoutOldDirectoryLimit() {
         let fixtureState = fixture()
         defer { fixtureState.defaults.removePersistentDomain(forName: fixtureState.suite) }
@@ -143,9 +158,7 @@ final class AppModelPaperclipEvidenceTests: XCTestCase {
     func testActualAppModelNotificationsDoNotConsumeUnverifiedRuns() async {
         let fixtureState = fixture(notifications: true)
         defer { fixtureState.defaults.removePersistentDomain(forName: fixtureState.suite) }
-        for _ in 0..<100 where fixtureState.model.notificationStatus.contains("Checking") {
-            await Task.yield()
-        }
+        await waitForNotificationPermissionReady(fixtureState.model)
         fixtureState.service.core(core(), fetch: 1)
         fixtureState.model.refreshConnector()
         XCTAssertTrue(fixtureState.model.snapshot.agentSessions.isEmpty)
@@ -169,6 +182,46 @@ final class AppModelPaperclipEvidenceTests: XCTestCase {
         fixtureState.service.sessions([agent("new", state: .completed)], fetch: 4)
         fixtureState.model.refreshConnector()
         XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .completed)
+        fixtureState.model.refreshConnector()
+        XCTAssertEqual(
+            fixtureState.center.notices.filter { $0 == .completedRuns(1) }.count, 1
+        )
+    }
+
+    func testOptInAfterRunAlreadyFinishedDoesNotReplayOldCompletion() async {
+        let fixtureState = fixture(notifications: false)
+        defer { fixtureState.defaults.removePersistentDomain(forName: fixtureState.suite) }
+
+        fixtureState.service.core(core(), fetch: 1)
+        fixtureState.service.sessions([agent("old")], fetch: 1)
+        fixtureState.model.refreshConnector()
+        XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .running)
+
+        // An old run completes in the connector while AppModel has not yet
+        // received the queued onChange publication. Toggling alerts now
+        // MUST baseline the terminal state, never the old published running row.
+        fixtureState.service.core(core(), fetch: 2)
+        fixtureState.service.sessions([agent("old", state: .completed)], fetch: 2)
+        XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .running)
+        XCTAssertEqual(
+            fixtureState.connector.capturePresentation().snapshot.agentSessions.first?.runState,
+            .completed
+        )
+
+        fixtureState.model.notificationsEnabled = true
+        XCTAssertEqual(fixtureState.model.snapshot.agentSessions.first?.runState, .completed)
+        await waitForNotificationPermissionReady(fixtureState.model)
+        fixtureState.model.refreshConnector()
+        XCTAssertFalse(fixtureState.center.notices.contains(.completedRuns(1)))
+        XCTAssertFalse(fixtureState.center.notices.contains(.failedRuns(1)))
+
+        // A new run observed only AFTER opting in may notify once.
+        fixtureState.service.core(core(), fetch: 3)
+        fixtureState.service.sessions([agent("new")], fetch: 3)
+        fixtureState.model.refreshConnector()
+        fixtureState.service.core(core(), fetch: 4)
+        fixtureState.service.sessions([agent("new", state: .completed)], fetch: 4)
+        fixtureState.model.refreshConnector()
         fixtureState.model.refreshConnector()
         XCTAssertEqual(
             fixtureState.center.notices.filter { $0 == .completedRuns(1) }.count, 1
