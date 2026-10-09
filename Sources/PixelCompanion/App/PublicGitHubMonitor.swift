@@ -22,6 +22,23 @@ struct PublicGitHubRepository: Equatable {
 
     var displayName: String { owner + "/" + name }
 
+    /// User-triggered browser links are constructed exclusively from the
+    /// validated repository slug and positive numeric GitHub IDs. Never trust
+    /// html_url or an arbitrary URL returned in the API payload.
+    func publicRunPage(id: Int) -> URL? {
+        guard id > 0 else { return nil }
+        return URL(string: "https://github.com/\(owner)/\(name)/actions/runs/\(id)")
+    }
+
+    func publicPullPage(number: Int) -> URL? {
+        guard number > 0 else { return nil }
+        return URL(string: "https://github.com/\(owner)/\(name)/pull/\(number)")
+    }
+
+    func publicRepositoryPage() -> URL {
+        URL(string: "https://github.com/\(owner)/\(name)")!
+    }
+
     func endpoint(_ resource: String) -> URL {
         // owner and name are restricted to unreserved ASCII characters.
         URL(string: "https://api.github.com/repos/\(owner)/\(name)/\(resource)")!
