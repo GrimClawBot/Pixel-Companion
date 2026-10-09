@@ -37,7 +37,7 @@ struct PaperclipAgentResponse: Sendable {
     let role: String?
     let title: String?
     /// Parent agent identifier from Paperclip's reportsTo field.
-    let reportsTo: String?
+    var reportsTo: String?
     let status: String
     let adapterType: String?
     let adapterConfig: PaperclipAgentAdapterConfig?
