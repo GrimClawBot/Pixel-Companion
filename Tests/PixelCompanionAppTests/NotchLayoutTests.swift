@@ -1,4 +1,5 @@
 import CoreGraphics
+import PixelCompanionCore
 @testable import PixelCompanion
 import XCTest
 
