@@ -33,10 +33,13 @@ refuses to clone over it. Use a separate empty directory; never blindly
 delete existing project files.
 
 - Builds only with the local macOS Swift toolchain. It refuses non-Mac,
-  dirty source trees and any pre-existing QA72 destination (including a
-  symlink). It uses existing `scripts/package_macos.sh` safeguards.
-- Temporarily adds QA metadata to the source plist, restores the source
-  plist on exit, packages an ad-hoc-signed app, verifies its code signature,
+  modified, untracked, or ignored build inputs and any pre-existing QA72
+  destination (including a symlink). It uses the existing
+  `scripts/package_macos.sh` safeguards.
+- Copies the checked-in Info.plist to a private temporary file, adds QA
+  metadata only to that copy, and passes it explicitly to the packager.
+  The tracked source plist is never changed or shared with other builds;
+  the temporary copy is cleaned on exit. Packaging verifies its signature,
   confirms the embedded QA marker and prints the exact source commit SHA.
 - Creates a **new** app at
   `~/Applications/Pixel Companion QA Update 72.app`; does NOT overwrite
