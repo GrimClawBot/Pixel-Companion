@@ -15,7 +15,8 @@ enum AgentInspectorSelection {
 }
 
 /// The assigned-task drilldown is resolved afresh from *current* source
-/// evidence. A title, run text or old assignment never authorizes a link.
+/// evidence. IDs must be unique across the whole bounded task feed.
+/// A title, run text or old assignment never authorizes a link.
 enum AgentAssignedTaskSelection {
     static func resolve(
         taskID: String?,
@@ -45,7 +46,7 @@ struct AgentInspectorView: View {
     private var selectedAssignedTask: TaskSnapshot? {
         AgentAssignedTaskSelection.resolve(
             taskID: selectedAssignedTaskID, agentID: session.agentID,
-            tasks: assignedTasks, isLive: isLive
+            tasks: verifiedTasks, isLive: isLive
         )
     }
 
@@ -171,7 +172,7 @@ struct AgentInspectorView: View {
                         ForEach(assignedTasks.prefix(5)) { task in
                             if AgentAssignedTaskSelection.resolve(
                                 taskID: task.id, agentID: session.agentID,
-                                tasks: assignedTasks, isLive: isLive
+                                tasks: verifiedTasks, isLive: isLive
                             ) != nil {
                                 Button {
                                     selectedAssignedTaskID = task.id
@@ -206,7 +207,7 @@ struct AgentInspectorView: View {
         .onChange(of: session.agentID) { _, _ in
             selectedAssignedTaskID = nil
         }
-        .onChange(of: assignedTasks.map { [$0.id, $0.assigneeAgentID ?? ""].joined(separator: "|") }) {
+        .onChange(of: verifiedTasks.map { [$0.id, $0.assigneeAgentID ?? ""].joined(separator: "|") }) {
             _, _ in
             if selectedAssignedTask == nil { selectedAssignedTaskID = nil }
         }
