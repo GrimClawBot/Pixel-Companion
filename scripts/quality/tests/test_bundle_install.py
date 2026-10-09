@@ -1,5 +1,7 @@
 """Behavioral checks for app-bundle replacement and macOS package generation."""
+import os
 import plistlib
+import time
 from contextlib import redirect_stderr
 from io import StringIO
 import shutil
@@ -120,8 +122,9 @@ class RealMacOSPackagingTests(unittest.TestCase):
             base = Path(directory)
             output = base / "Pixel Companion.app"
             import hashlib
-            digest = hashlib.sha256(str(output).encode()).hexdigest()[:32]
-            lock = base / (".pixel-companion-" + digest + ".lock")
+            physical_output = output.parent.resolve() / output.name
+            digest = hashlib.sha256(str(physical_output).encode()).hexdigest()[:32]
+            lock = physical_output.parent / (".pixel-companion-" + digest + ".lock")
             lock.mkdir()
             result = subprocess.run(
                 ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug", "--output", str(output)],
@@ -130,6 +133,84 @@ class RealMacOSPackagingTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
             self.assertIn("Packaging already in progress", result.stderr)
             self.assertTrue(lock.is_dir())
+            self.assertFalse(output.exists())
+
+    def test_symlinked_app_destination_is_rejected_without_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            real_app = base / "existing.app"
+            real_app.mkdir()
+            (real_app / "marker").write_text("do not alter")
+            alias_app = base / "alias.app"
+            alias_app.symlink_to(real_app, target_is_directory=True)
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug",
+                 "--output", str(alias_app)],
+                capture_output=True, text=True, timeout=15,
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("Refusing symlinked .app destination", result.stderr)
+            self.assertEqual((real_app / "marker").read_text(), "do not alter")
+            self.assertTrue(alias_app.is_symlink())
+            self.assertFalse(list(base.glob(".pixel-companion-*.lock")))
+
+    def test_parent_symlink_alias_blocks_concurrent_packaging(self):
+        # Stub only swift: the first invocation holds the lock at its build
+        # step, while the aliased second invocation must stop BEFORE build.
+        # Neither attempt can install or overwrite any .app bundle.
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            real = base / "actual"
+            real.mkdir()
+            alias = base / "alias"
+            alias.symlink_to(real, target_is_directory=True)
+            stub_dir = base / "bin"
+            stub_dir.mkdir()
+            started = base / "started"
+            release = base / "release"
+            stub = stub_dir / "swift"
+            stub.write_text(
+                "#!/bin/sh\n"
+                "printf ready > \"$PC_PACKAGE_STARTED\"\n"
+                "while [ ! -f \"$PC_PACKAGE_RELEASE\" ]; do sleep 0.05; done\n"
+                "exit 87\n"
+            )
+            stub.chmod(0o755)
+            env = {
+                **os.environ, "PATH": str(stub_dir) + os.pathsep + os.environ["PATH"],
+                "PC_PACKAGE_STARTED": str(started),
+                "PC_PACKAGE_RELEASE": str(release),
+            }
+            output = real / "unique.app"
+            first = subprocess.Popen(
+                ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug",
+                 "--output", str(output)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, env=env,
+            )
+            try:
+                for _ in range(200):
+                    if started.exists() or first.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                self.assertTrue(started.exists(), "first packager did not reach lock-protected build")
+                contender = subprocess.run(
+                    ["bash", str(ROOT / "scripts/package_macos.sh"), "--debug",
+                     "--output", str(alias / output.name)],
+                    capture_output=True, text=True, timeout=15, env=env,
+                )
+                self.assertEqual(contender.returncode, 2, contender.stdout + contender.stderr)
+                self.assertIn("Packaging already in progress", contender.stderr)
+                self.assertFalse(output.exists())
+            finally:
+                release.touch()
+                try:
+                    first.communicate(timeout=15)
+                except subprocess.TimeoutExpired:
+                    first.kill()
+                    first.communicate(timeout=5)
+            self.assertNotEqual(first.returncode, 0, "test stub must stop before installation")
+            self.assertFalse(list(real.glob(".pixel-companion-*.lock")))
             self.assertFalse(output.exists())
 
     def test_long_valid_app_name_has_short_lock_name(self):
