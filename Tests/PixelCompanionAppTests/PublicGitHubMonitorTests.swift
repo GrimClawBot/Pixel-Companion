@@ -116,7 +116,10 @@ final class PublicGitHubMonitorTests: XCTestCase {
         let run = try JSONDecoder().decode(
             GitHubPublicRunsResponse.self,
             from: Data(
-                #"{"workflow_runs":[{"id":52,"name":"Build","status":"completed","conclusion":"failure","head_branch":"release"}]}"#.utf8
+                (
+                    #"{"workflow_runs":[{"id":52,"name":"Build","status":"completed","# +
+                    #""conclusion":"failure","head_branch":"release"}]}"#
+                ).utf8
             )
         ).workflowRuns[0]
         XCTAssertEqual(
