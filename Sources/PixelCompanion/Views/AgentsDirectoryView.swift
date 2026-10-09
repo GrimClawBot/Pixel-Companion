@@ -102,8 +102,7 @@ struct AgentsDirectoryView: View {
         }
         // A changed source/manager or search scope should not inherit a prior
         // disclosure decision from another reporting-tree arrangement.
-        .onChange(of: visible.map { [$0.agentID, $0.managerAgentID ?? ""].joined(separator: "|") }) {
-            _, _ in
+        .onChange(of: visible.map { [$0.agentID, $0.managerAgentID ?? ""].joined(separator: "|") }) { _, _ in
             collapsedManagerIDs = []
         }
     }
