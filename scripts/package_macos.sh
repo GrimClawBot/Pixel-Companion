@@ -24,7 +24,21 @@ while (( $# )); do
 done
 [[ "$OUTPUT" == *.app ]] || { echo "Output must end in .app" >&2; exit 2; }
 [[ "$OUTPUT" == /* ]] || OUTPUT="$CALLER/$OUTPUT"
-OUTPUT="$(python3 -c 'import os,sys;print(os.path.abspath(sys.argv[1]))' "$OUTPUT")"
+# Create the requested parent first, then use its physical path for BOTH the
+# destination and the lock. An alias via a symlinked directory must not create
+# a second lock for the very same bundle (or evade the custom-output guard).
+mkdir -p "$(dirname "$OUTPUT")"
+canonical_bundle_path() {
+  python3 -c 'import os,sys; p=os.path.abspath(sys.argv[1]); print(os.path.join(os.path.realpath(os.path.dirname(p)), os.path.basename(p)))' "$1"
+}
+OUTPUT="$(canonical_bundle_path "$OUTPUT")"
+DEFAULT="$(canonical_bundle_path "$DEFAULT")"
+# Never treat a symlink at the .app leaf as a bundle to replace, including a
+# dangling symlink that [[ -e ]] alone would miss.
+if [[ -L "$OUTPUT" ]]; then
+  echo "Refusing symlinked .app destination: $OUTPUT" >&2
+  exit 2
+fi
 if [[ -e "$OUTPUT" && "$OUTPUT" != "$DEFAULT" ]]; then
   echo "Refusing to replace existing app at $OUTPUT" >&2
   exit 2
