@@ -24,9 +24,14 @@ final class LocalInfrastructureMonitorTests: XCTestCase {
     }
 
     private func data(_ rows: [[String: Any]], version: Int = 1) -> Data {
-        try! JSONSerialization.data(withJSONObject: [
-            "schemaVersion": version, "hosts": rows
-        ])
+        do {
+            return try JSONSerialization.data(withJSONObject: [
+                "schemaVersion": version, "hosts": rows
+            ])
+        } catch {
+            XCTFail("Invalid JSON fixture: \(error)")
+            return Data()
+        }
     }
 
     private func parsed(_ rows: [[String: Any]]) -> LocalInfrastructureStatus {
