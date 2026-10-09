@@ -91,6 +91,48 @@ final class PublicGitHubMonitorTests: XCTestCase {
         )
     }
 
+    func testExternalBranchBidiControlsCannotReorderDisplay() throws {
+        let run = try JSONDecoder().decode(
+            GitHubPublicRunsResponse.self,
+            from: Data((
+                #"{"workflow_runs":[{"id":5,"status":"completed","conclusion":"success","# +
+                #""head_branch":"safe\u202Ecod\u202C\u2066e\u2069"}]}"#
+            ).utf8)
+        ).workflowRuns[0]
+        XCTAssertEqual(GitHubPublicPresentation.branchLabel(run), "safecode")
+        XCTAssertEqual(
+            GitHubPublicPresentation.runAccessibilityLabel(run),
+            "Open public GitHub workflow Unnamed workflow, Status Success, Branch safecode"
+        )
+        XCTAssertNil(GitHubPublicPresentation.branchLabel(
+            try JSONDecoder().decode(
+                GitHubPublicRunsResponse.self,
+                from: Data(#"{"workflow_runs":[{"id":1,"status":"completed","head_branch":"\u202E"}]}"#.utf8)
+            ).workflowRuns[0]
+        ))
+    }
+
+    func testAccessibleRunAndPRLinksRetainStatusBranchAndTitle() throws {
+        let run = try JSONDecoder().decode(
+            GitHubPublicRunsResponse.self,
+            from: Data(
+                (
+                    #"{"workflow_runs":[{"id":52,"name":"Build","status":"completed","# +
+                    #""conclusion":"failure","head_branch":"release"}]}"#
+                ).utf8
+            )
+        ).workflowRuns[0]
+        XCTAssertEqual(
+            GitHubPublicPresentation.runAccessibilityLabel(run),
+            "Open public GitHub workflow Build, Status Failure, Branch release"
+        )
+        let pull = GitHubPublicPull(number: 42, title: "Fix authentication")
+        XCTAssertEqual(
+            GitHubPublicPresentation.pullAccessibilityLabel(pull),
+            "Open public GitHub PR #42, Fix authentication"
+        )
+    }
+
     func testAPISuppliedArbitraryHTMLURLIsNeverUsedAsBrowserDestination() throws {
         let run = try JSONDecoder().decode(
             GitHubPublicRunsResponse.self,
