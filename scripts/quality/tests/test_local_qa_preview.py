@@ -21,6 +21,7 @@ class LocalQAPreviewTests(unittest.TestCase):
             capture_output=True, text=True, check=True
         )
         self.assertIn("--no-open", completed.stdout)
+        self.assertIn("--qa-number 72|74", completed.stdout)
 
     def test_qa_marker_is_inserted_before_signed_packaging(self):
         src = self.source
@@ -37,7 +38,9 @@ class LocalQAPreviewTests(unittest.TestCase):
 
     def test_existing_preview_never_overwritten_and_qa61_preserved(self):
         src = self.source
-        self.assertIn('APP="$HOME/Applications/Pixel Companion QA Update 72.app"', src)
+        self.assertIn('APP="$HOME/Applications/Pixel Companion QA Update $QA.app"', src)
+        self.assertIn('case "$QA" in', src)
+        self.assertIn('72|74) ;;', src)
         self.assertIn('if [[ -e "$APP" || -L "$APP" ]]', src)
         self.assertIn("refusing", src.lower())
         self.assertNotIn("rm -rf", src)
@@ -45,7 +48,7 @@ class LocalQAPreviewTests(unittest.TestCase):
         self.assertNotIn("killall", src)
         self.assertNotIn("SMAppService", src)
         self.assertNotIn("defaults delete", src)
-        self.assertIn("OLD_QA61_UNTOUCHED=yes", src)
+        self.assertIn("OLDER_QA_BUILDS_UNTOUCHED=yes", src)
 
     def test_private_plist_is_the_only_metadata_input_to_signing(self):
         src = self.source
@@ -69,8 +72,35 @@ class LocalQAPreviewTests(unittest.TestCase):
         self.assertIn('git status --porcelain --untracked-files=all -- Sources Tests scripts packaging Package.swift', src)
         self.assertIn('git ls-files --others --ignored --exclude-standard -- Sources Tests packaging', src)
         self.assertIn("--no-open", src)
+        self.assertIn("--qa-number)", src)
         self.assertIn('if [[ "$OPEN_APP" == 1 ]]', src)
         self.assertIn('git rev-parse HEAD', src)
+
+    def test_only_known_qa_numbers_are_accepted_before_touching_files(self):
+        for invalid in ("", "73", "75", "../74", "74.app", "0", "074"):
+            with self.subTest(invalid=invalid):
+                proc = subprocess.run(
+                    ["bash", str(SCRIPT), "--qa-number", invalid, "--no-open"],
+                    capture_output=True, text=True, check=False
+                )
+                self.assertEqual(proc.returncode, 2)
+                self.assertIn("Unsupported QA number", proc.stderr)
+                self.assertNotIn("BUNDLE:", proc.stdout)
+        missing = subprocess.run(
+            ["bash", str(SCRIPT), "--qa-number"],
+            capture_output=True, text=True, check=False
+        )
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("Usage:", missing.stderr)
+
+    def test_local_preview_outputs_are_derived_after_number_validation(self):
+        src = self.source
+        self.assertLess(src.index('case "$QA" in'), src.index('APP="$HOME/Applications'))
+        self.assertLess(src.index('APP="$HOME/Applications'), src.index('if [[ -e "$APP" || -L "$APP" ]]'))
+        self.assertIn('Set :CFBundleVersion $QA', src)
+        self.assertIn('Add :PCQAUpdateNumber string $QA', src)
+        self.assertIn('if [[ "$BUILT_MARKER" != "$QA" ]]', src)
+        self.assertNotIn('APP="$HOME/Applications/Pixel Companion QA Update 72.app"', src)
 
     def test_untracked_and_ignored_swift_sources_fail_clean_input_checks(self):
         with tempfile.TemporaryDirectory() as work:
