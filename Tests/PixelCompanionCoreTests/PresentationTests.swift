@@ -67,6 +67,78 @@ final class PresentationTests: XCTestCase {
         XCTAssertEqual(huge, screen)
     }
 
+    func testAuxiliaryRectanglesAnchorFromTheirActualGlobalEdges() throws {
+        let frame = CGRect(x: -1_600, y: 400, width: 1_512, height: 982)
+        let left = CGRect(x: -1_590, y: 1_350, width: 630, height: 32)
+        let right = CGRect(x: -760, y: 1_350, width: 640, height: 32)
+        let geometry = try XCTUnwrap(NotchGeometry(
+            screenFrame: frame, safeAreaTop: 32,
+            leftAuxiliaryArea: left, rightAuxiliaryArea: right, backingScaleFactor: 2
+        ))
+        XCTAssertEqual(
+            geometry.notchRect, CGRect(x: -960, y: 1_350, width: 200, height: 32)
+        )
+        XCTAssertEqual(geometry.backingScaleFactor, 2)
+        let compact = geometry.panelFrame(for: CGSize(width: 200, height: 64))
+        XCTAssertEqual(compact, CGRect(x: -960, y: 1_318, width: 200, height: 64))
+    }
+
+    func testSubpointNotchEdgesAlignToRetinaPixelGrid() throws {
+        let left = CGRect(x: 0, y: 950, width: 663.1, height: 32)
+        let right = CGRect(x: 848.9, y: 950, width: 663.1, height: 32)
+        let geometry = try XCTUnwrap(NotchGeometry(
+            screenFrame: screen, safeAreaTop: 32,
+            leftAuxiliaryArea: left, rightAuxiliaryArea: right, backingScaleFactor: 2
+        ))
+        XCTAssertEqual(geometry.notchRect.minX, 663)
+        XCTAssertEqual(geometry.notchRect.maxX, 849)
+        XCTAssertEqual(geometry.notchRect.width, 186)
+        let frame = geometry.panelFrame(for: CGSize(width: 401, height: 220))
+        XCTAssertEqual((frame.minX * 2).truncatingRemainder(dividingBy: 1), 0)
+        XCTAssertEqual(frame.maxY, screen.maxY)
+    }
+
+    func testInvalidOrNotchlessTopAuxiliaryRectanglesFailClosed() {
+        let left = CGRect(x: 0, y: 950, width: sideWidth, height: 32)
+        let right = CGRect(x: screen.maxX - sideWidth, y: 950, width: sideWidth, height: 32)
+        func candidate(
+            top: CGFloat = 32, leftArea: CGRect?, rightArea: CGRect?, scale: CGFloat = 2
+        ) -> NotchGeometry? {
+            NotchGeometry(
+                screenFrame: screen, safeAreaTop: top,
+                leftAuxiliaryArea: leftArea, rightAuxiliaryArea: rightArea,
+                backingScaleFactor: scale
+            )
+        }
+        XCTAssertNil(candidate(top: 0, leftArea: left, rightArea: right))
+        XCTAssertNil(candidate(leftArea: nil, rightArea: right))
+        XCTAssertNil(candidate(leftArea: left, rightArea: nil))
+        XCTAssertNil(candidate(leftArea: left, rightArea: left))
+        XCTAssertNil(candidate(leftArea: left, rightArea: right, scale: 0))
+        XCTAssertNil(candidate(leftArea: left, rightArea: right, scale: .infinity))
+        XCTAssertNil(candidate(top: .nan, leftArea: left, rightArea: right))
+        XCTAssertNil(candidate(leftArea: left.offsetBy(dx: -30, dy: 0), rightArea: right))
+        XCTAssertNil(candidate(leftArea: left, rightArea: right.offsetBy(dx: 30, dy: 0)))
+        XCTAssertNil(candidate(leftArea: left.offsetBy(dx: 0, dy: -10), rightArea: right))
+        XCTAssertNil(candidate(leftArea: left, rightArea: right.offsetBy(dx: 0, dy: -10)))
+        XCTAssertNil(candidate(leftArea: left, rightArea: .zero))
+    }
+
+    func testValidMeasuredNotchDoesNotChangeExistingExpandedSizes() throws {
+        let left = CGRect(x: 0, y: 950, width: sideWidth, height: 32)
+        let right = CGRect(x: screen.maxX - sideWidth, y: 950, width: sideWidth, height: 32)
+        let actual = try XCTUnwrap(NotchGeometry(
+            screenFrame: screen, safeAreaTop: 32,
+            leftAuxiliaryArea: left, rightAuxiliaryArea: right, backingScaleFactor: 2
+        ))
+        let former = try XCTUnwrap(notch())
+        XCTAssertEqual(actual.notchRect, former.notchRect)
+        XCTAssertEqual(actual.panelFrame(for: CGSize(width: 400, height: 232)),
+                       former.panelFrame(for: CGSize(width: 400, height: 232)))
+        XCTAssertEqual(actual.panelFrame(for: CGSize(width: 440, height: 472)),
+                       former.panelFrame(for: CGSize(width: 440, height: 472)))
+    }
+
     func testPresentationResolution() {
         XCTAssertEqual(PresentationMode.resolve(preference: .automatic, notchAvailable: true), .notch)
         XCTAssertEqual(PresentationMode.resolve(preference: .automatic, notchAvailable: false), .menuBar)
