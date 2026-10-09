@@ -58,9 +58,11 @@ public struct ContextHealth: Hashable, Sendable {
         case .watch:
             return "Monitor context as the session continues."
         case .freshSessionRecommended:
-            return "Consider a fresh session in the connected runtime after preserving goals, decisions, and active work."
+            return "Consider a fresh session in the connected runtime " +
+                "after preserving goals, decisions, and active work."
         case .stronglyFreshSessionRecommended:
-            return "Plan a fresh session soon in the connected runtime; preserve goals, decisions, and active work first."
+            return "Plan a fresh session soon in the connected runtime; " +
+                "preserve goals, decisions, and active work first."
         }
     }
 
