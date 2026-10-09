@@ -22,7 +22,7 @@ class LocalQAPreviewTests(unittest.TestCase):
             capture_output=True, text=True, check=True
         )
         self.assertIn("--no-open", completed.stdout)
-        self.assertIn("--qa-number 72|74|76|77", completed.stdout)
+        self.assertIn("--qa-number 72|74|76|77|78", completed.stdout)
 
     def test_qa_marker_is_inserted_before_signed_packaging(self):
         src = self.source
@@ -41,7 +41,7 @@ class LocalQAPreviewTests(unittest.TestCase):
         src = self.source
         self.assertIn('APP="$HOME/Applications/Pixel Companion QA Update $QA.app"', src)
         self.assertIn('case "$QA" in', src)
-        self.assertIn('72|74|76|77) ;;', src)
+        self.assertIn('72|74|76|77|78) ;;', src)
         self.assertIn('if [[ -e "$APP" || -L "$APP" ]]', src)
         self.assertIn("refusing", src.lower())
         self.assertNotIn("rm -rf", src)
@@ -108,7 +108,8 @@ class LocalQAPreviewTests(unittest.TestCase):
             for args, selected in (([], "72"), (["--qa-number", "72"], "72"),
                                    (["--qa-number", "74"], "74"),
                                    (["--qa-number", "76"], "76"),
-                                   (["--qa-number", "77"], "77")):
+                                   (["--qa-number", "77"], "77"),
+                                   (["--qa-number", "78"], "78")):
                 with self.subTest(args=args):
                     selected_args = ["bash", str(SCRIPT), *args, "--print-plan"]
                     result = subprocess.run(
