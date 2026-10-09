@@ -36,6 +36,8 @@ struct PaperclipAgentResponse: Sendable {
     let name: String
     let role: String?
     let title: String?
+    /// Parent agent identifier from Paperclip's reportsTo field.
+    let reportsTo: String?
     let status: String
     let adapterType: String?
     let adapterConfig: PaperclipAgentAdapterConfig?
@@ -52,6 +54,7 @@ extension PaperclipAgentResponse: Decodable {
         case name
         case role
         case title
+        case reportsTo
         case status
         case adapterType
         case adapterConfig
@@ -70,6 +73,7 @@ extension PaperclipAgentResponse: Decodable {
 
         role = try? container.decode(String.self, forKey: .role)
         title = try? container.decode(String.self, forKey: .title)
+        reportsTo = try? container.decode(String.self, forKey: .reportsTo)
         adapterType = try? container.decode(String.self, forKey: .adapterType)
         adapterConfig = try? container.decode(PaperclipAgentAdapterConfig.self, forKey: .adapterConfig)
         runtimeConfig = try? container.decode(PaperclipAgentRuntimeConfig.self, forKey: .runtimeConfig)
