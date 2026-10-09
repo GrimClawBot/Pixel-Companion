@@ -214,28 +214,28 @@ struct AgentRunHistoryView: View {
 
     @ViewBuilder
     private func verifiedTaskEvidence(for run: AgentRunSnapshot) -> some View {
-            if let task = AgentRunInspection.verifiedTask(
-                for: run, tasks: verifiedTasks, isLive: isLive
-            ) {
-                Text("Verified linked task")
-                    .font(.caption.weight(.semibold))
-                LabeledContent("Task", value: task.identifier ?? task.id)
-                Text(task.title)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                LabeledContent("Task status", value: task.status)
-                Text("Linked by backend-reported issue ID · " + task.id)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            } else {
-                Text(run.issueID == nil
-                     ? "No task ID was reported for this run."
-                     : "Linked task not verified in the current bounded task feed.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-    }
+        if let task = AgentRunInspection.verifiedTask(
+            for: run, tasks: verifiedTasks, isLive: isLive
+        ) {
+            Text("Verified linked task")
+                .font(.caption.weight(.semibold))
+            LabeledContent("Task", value: task.identifier ?? task.id)
+            Text(task.title)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            LabeledContent("Task status", value: task.status)
+            Text("Linked by backend-reported issue ID · " + task.id)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        } else {
+            Text(run.issueID == nil
+                 ? "No task ID was reported for this run."
+                 : "Linked task not verified in the current bounded task feed.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+}
 
     private func symbol(_ state: AgentSessionSnapshot.RunState) -> String {
         AgentSessionPresentation.symbol(state)
