@@ -22,6 +22,12 @@ public struct SessionHandoffEvidence: Hashable, Sendable {
         public let identifier: String?
         public let title: String
         public let status: String
+
+        /// Always show an exact source identifier, even when a human-friendly
+        /// task identifier is missing from this runtime's response.
+        public var displayTitle: String {
+            (identifier ?? sourceID) + " · " + title
+        }
     }
 
     public let agentID: String
