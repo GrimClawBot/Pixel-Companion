@@ -23,6 +23,7 @@ struct SessionHandoffChecklistView: View {
                         Text("Observed source facts · not a generated handoff")
                             .font(.caption.weight(.medium))
                         LabeledContent("Agent", value: evidence.agentName)
+                        LabeledContent("Agent ID", value: evidence.agentID)
                         if let sessionID = evidence.sessionID {
                             LabeledContent("Session ID", value: sessionID)
                         }
@@ -46,7 +47,7 @@ struct SessionHandoffChecklistView: View {
                         } else {
                             ForEach(evidence.assignedTasks, id: \.sourceID) { task in
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text((task.identifier.map { $0 + " · " } ?? "") + task.title)
+                                    Text((task.identifier ?? task.sourceID) + " · " + task.title)
                                         .font(.caption)
                                         .fixedSize(horizontal: false, vertical: true)
                                     Text("Reported state · " + task.status)
@@ -86,6 +87,12 @@ struct SessionHandoffChecklistView: View {
         }
         .onChange(of: isLive) { _, live in
             if !live { isExpanded = false }
+        }
+        .onChange(of: session.agentID) { _, _ in
+            isExpanded = false
+        }
+        .onChange(of: session.sessionID) { _, _ in
+            isExpanded = false
         }
         .onChange(of: session.runID) { _, _ in
             isExpanded = false
