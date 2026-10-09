@@ -40,6 +40,65 @@ final class PublicGitHubMonitorTests: XCTestCase {
         XCTAssertEqual(prs.map(\.number), [24])
     }
 
+    func testBrowserLinksUseOnlyValidatedPublicRepoAndPositiveIdentifiers() throws {
+        let repo = try XCTUnwrap(PublicGitHubRepository("  octocat/Hello-World "))
+        XCTAssertEqual(
+            repo.publicRepositoryPage().absoluteString,
+            "https://github.com/octocat/Hello-World"
+        )
+        XCTAssertEqual(
+            repo.publicRunPage(id: 987)?.absoluteString,
+            "https://github.com/octocat/Hello-World/actions/runs/987"
+        )
+        XCTAssertEqual(
+            repo.publicPullPage(number: 24)?.absoluteString,
+            "https://github.com/octocat/Hello-World/pull/24"
+        )
+        for bad in [-100, -1, 0] {
+            XCTAssertNil(repo.publicRunPage(id: bad))
+            XCTAssertNil(repo.publicPullPage(number: bad))
+        }
+        XCTAssertNil(PublicGitHubRepository("evil.example/../redirect"))
+        XCTAssertNil(PublicGitHubRepository("octocat/Hello-World?token=x"))
+    }
+
+    func testSourceBranchIsDisplayOnlyAndCannotChangeDestination() throws {
+        let runs = try JSONDecoder().decode(
+            GitHubPublicRunsResponse.self,
+            from: Data(#"{"workflow_runs":[{"id":52,"name":"CI","status":"completed","conclusion":"success","head_branch":"feature/new-branch"},{"id":53,"name":"Build","status":"in_progress","conclusion":null,"head_branch":null},{"id":54,"name":"Other","status":"completed","conclusion":"failure","head_branch":"  \n branch\tlabel  "}]}"#.utf8)
+        )
+        XCTAssertEqual(
+            GitHubPublicPresentation.branchLabel(runs.workflowRuns[0]),
+            "feature/new-branch"
+        )
+        XCTAssertNil(GitHubPublicPresentation.branchLabel(runs.workflowRuns[1]))
+        XCTAssertEqual(
+            GitHubPublicPresentation.branchLabel(runs.workflowRuns[2]),
+            "branch label"
+        )
+        let repo = try XCTUnwrap(PublicGitHubRepository("test-org/public-repo"))
+        XCTAssertEqual(
+            repo.publicRunPage(id: runs.workflowRuns[0].id)?.absoluteString,
+            "https://github.com/test-org/public-repo/actions/runs/52"
+        )
+    }
+
+    func testAPISuppliedArbitraryHTMLURLIsNeverUsedAsBrowserDestination() throws {
+        let run = try JSONDecoder().decode(
+            GitHubPublicRunsResponse.self,
+            from: Data(#"{"workflow_runs":[{"id":9,"name":"Run","status":"completed","conclusion":"success","head_branch":"main","html_url":"https://malicious.example/auth"}]}"#.utf8)
+        )
+        let repo = try XCTUnwrap(PublicGitHubRepository("public-owner/public-repo"))
+        XCTAssertEqual(
+            repo.publicRunPage(id: run.workflowRuns[0].id)?.host,
+            "github.com"
+        )
+        XCTAssertEqual(
+            repo.publicRunPage(id: run.workflowRuns[0].id)?.path,
+            "/public-owner/public-repo/actions/runs/9"
+        )
+    }
+
     @MainActor
     func testRateLimitAndUnavailableErrorsAreExplicit() {
         XCTAssertTrue((GitHubPublicError.rateLimited.errorDescription ?? "").contains("rate limit"))
