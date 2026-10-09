@@ -20,6 +20,12 @@ struct AgentSessionRow: View {
                     Text(AgentSessionPresentation.stateLabel(session))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(AgentSessionPresentation.tint(session.runState))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(AgentSessionPresentation.tint(session.runState).opacity(0.13))
+                        )
+                        .lineLimit(1)
                 }
                 if let taskTitle = session.taskTitle {
                     Text(taskTitle)
@@ -50,14 +56,29 @@ struct AgentSessionRow: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
-            }
-            if let updatedAt = session.updatedAt {
-                Text(updatedAt, style: .relative)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                if let updatedAt = session.updatedAt {
+                    Text(updatedAt, style: .relative)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
         }
+        .modifier(AgentRowCardModifier(compact: compact))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Compact hover/overview rows stay slim; full Agents rows get consistent card spacing.
+private struct AgentRowCardModifier: ViewModifier {
+    let compact: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if compact {
+            content
+        } else {
+            content.companionCard()
+        }
     }
 }
 

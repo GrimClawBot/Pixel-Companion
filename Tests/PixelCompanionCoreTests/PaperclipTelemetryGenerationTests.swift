@@ -32,6 +32,25 @@ private final class GenerationDeferredService: PaperclipServiceProtocol {
     }
 }
 
+/// Only the writer updates the fake service. The reader shares immutable
+/// snapshots and expected timestamps protected by this separate test lock.
+private final class SessionTimestampLedger: @unchecked Sendable {
+    private let lock = NSLock()
+    private var evidence: [String: Date] = [:]
+
+    func record(agentID: String, timestamp: Date) {
+        lock.lock()
+        defer { lock.unlock() }
+        evidence[agentID] = timestamp
+    }
+
+    func matches(agentID: String, timestamp: Date) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return evidence[agentID] == timestamp
+    }
+}
+
 final class PaperclipTelemetryGenerationTests: XCTestCase {
     func testCoreRefreshReleasesPollingBeforeSessionEnrichment() {
         let service = GenerationDeferredService()
@@ -96,6 +115,143 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
         XCTAssertEqual(connector.connectionState, .error)
     }
 
+    func testSlowSessionsRemainEligibleAfterNewerCorePublishesForSameCompany() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        let slow = session(id: "slow-but-valid")
+        let latest = session(id: "newer")
+
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        let firstCoreTime = connector.lastSuccessfulRefreshAt
+        XCTAssertNotNil(firstCoreTime)
+        XCTAssertNil(connector.lastSuccessfulSessionRefreshAt)
+
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 2)
+        XCTAssertNil(connector.lastSuccessfulSessionRefreshAt)
+
+        // Older core generation does not make the response untrustworthy
+        // if this company has not yet published more recent session evidence.
+        service.finishSessions(.success([slow]), fetch: 1)
+        XCTAssertEqual(connector.agentSessions(limit: 10), [slow])
+        XCTAssertEqual(connector.lastSuccessfulSessionRefreshAt, firstCoreTime)
+
+        service.finishSessions(.success([latest]), fetch: 2)
+        XCTAssertEqual(connector.agentSessions(limit: 10), [latest])
+        XCTAssertEqual(
+            connector.lastSuccessfulSessionRefreshAt,
+            connector.lastSuccessfulRefreshAt
+        )
+    }
+
+    func testOlderDelayedSessionCannotOverrideNewerCompletedSession() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 2)
+        let current = session(id: "current")
+        service.finishSessions(.success([current]), fetch: 2)
+        let latestTime = connector.lastSuccessfulSessionRefreshAt
+        service.finishSessions(.success([session(id: "old")]), fetch: 1)
+        XCTAssertEqual(connector.agentSessions(limit: 8), [current])
+        XCTAssertEqual(connector.lastSuccessfulSessionRefreshAt, latestTime)
+    }
+
+    func testSlowPreviousCompanyCannotBecomeNewCompanyTelemetry() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        connector.refresh()
+        service.finishCore(.success(coreState(companyID: "company-2")), fetch: 2)
+        XCTAssertNil(connector.lastSuccessfulSessionRefreshAt)
+        service.finishSessions(.success([session(id: "wrong-company")]), fetch: 1)
+        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
+        XCTAssertNil(connector.lastSuccessfulSessionRefreshAt)
+        let current = session(id: "company-2-worker")
+        service.finishSessions(.success([current]), fetch: 2)
+        XCTAssertEqual(connector.agentSessions(limit: 8), [current])
+        XCTAssertNotNil(connector.lastSuccessfulSessionRefreshAt)
+    }
+
+    func testCoreHealthNeverRefreshesSuccessfulAgentSessionTimestamp() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        service.finishSessions(.success([session(id: "worker")]), fetch: 1)
+        let first = connector.lastSuccessfulSessionRefreshAt
+        XCTAssertNotNil(first)
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 2)
+        XCTAssertEqual(connector.lastSuccessfulSessionRefreshAt, first)
+        service.finishSessions(.failure(URLError(.timedOut)), fetch: 2)
+        XCTAssertNil(connector.lastSuccessfulSessionRefreshAt)
+        XCTAssertTrue(connector.agentSessions(limit: 8).isEmpty)
+        XCTAssertEqual(connector.connectionState, .connected)
+    }
+
+    func testAtomicPresentationCaptureKeepsSessionRowsAndEvidenceTogether() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        let before = connector.capturePresentation()
+        XCTAssertEqual(before.snapshot.connectionState, .connected)
+        XCTAssertNil(before.sessionsAt)
+        XCTAssertTrue(before.snapshot.agentSessions.isEmpty)
+
+        service.finishSessions(.success([session(id: "first")]), fetch: 1)
+        let first = connector.capturePresentation()
+        XCTAssertEqual(first.snapshot.agentSessions.map(\.agentID), ["first"])
+        XCTAssertEqual(first.sessionsAt, first.coreAt)
+
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 2)
+        let prior = connector.capturePresentation()
+        XCTAssertEqual(prior.snapshot.agentSessions.map(\.agentID), ["first"])
+        XCTAssertEqual(prior.sessionsAt, first.sessionsAt)
+
+        service.finishSessions(.success([session(id: "second")]), fetch: 2)
+        let second = connector.capturePresentation()
+        XCTAssertEqual(second.snapshot.agentSessions.map(\.agentID), ["second"])
+        XCTAssertEqual(second.sessionsAt, second.coreAt)
+    }
+
+    func testFullDirectoryCanCapturePastOldEightAnd128Limits() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        let agents = (0..<181).map { session(id: "agent-\($0)") }
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        service.finishSessions(.success(agents), fetch: 1)
+        XCTAssertEqual(
+            ConnectorSnapshot(capturing: connector, sessionLimit: Int.max)
+                .agentSessions.count,
+            181
+        )
+        XCTAssertEqual(connector.agentSessions(limit: Int.max).last?.agentID, "agent-180")
+        XCTAssertEqual(
+            ConnectorSnapshot(capturing: connector).agentSessions.count, 8,
+            "Small previews must explicitly remain separate from the full UI directory"
+        )
+    }
+
     private func selectedConfiguration() -> PaperclipConfiguration {
         PaperclipConfiguration(
             baseURLString: "https://paperclip.example",
@@ -103,10 +259,10 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
         )
     }
 
-    private func coreState() -> PaperclipRemoteState {
+    private func coreState(companyID: String = "company-1") -> PaperclipRemoteState {
         PaperclipRemoteState(
-            companies: [PaperclipCompany(id: "company-1", name: "Example Co", status: "active")],
-            companyID: "company-1",
+            companies: [PaperclipCompany(id: companyID, name: "Example Co", status: "active")],
+            companyID: companyID,
             companyName: "Example Co",
             activity: [],
             approvals: [],
@@ -123,5 +279,92 @@ final class PaperclipTelemetryGenerationTests: XCTestCase {
             agentStatus: "running",
             runState: .running
         )
+    }
+}
+
+extension PaperclipTelemetryGenerationTests {
+    private func assertConcurrentReads(
+        connector: PaperclipConnector,
+        ledger: SessionTimestampLedger,
+        writer: DispatchGroup,
+        secondGenerationObserved: DispatchSemaphore
+    ) {
+        var seen: Set<String> = ["generation-1"]
+        var confirmedSecond = false
+        var incoherentRows = 0
+        let deadline = Date().addingTimeInterval(6)
+        repeat {
+            let captured = connector.capturePresentation()
+            if let session = captured.snapshot.agentSessions.first {
+                seen.insert(session.agentID)
+                if session.agentID == "generation-2", !confirmedSecond {
+                    confirmedSecond = true
+                    secondGenerationObserved.signal()
+                }
+                let valid = captured.sessionsAt.map {
+                    ledger.matches(agentID: session.agentID, timestamp: $0)
+                } ?? false
+                if !valid { incoherentRows += 1 }
+            }
+            Thread.sleep(forTimeInterval: 0.00005)
+            if writer.wait(timeout: .now()) == .success { break }
+        } while Date() < deadline
+
+        XCTAssertEqual(writer.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(incoherentRows, 0, "Each capture must bind its row to its session timestamp")
+        XCTAssertTrue(confirmedSecond, "Reader must acknowledge generation 2 before writer continues")
+        XCTAssertGreaterThan(seen.count, 1, "The reader must overlap more than one published run")
+    }
+
+    func testAtomicCaptureMatchesSessionRowsAndTimesDuringConcurrentWrites() {
+        let service = GenerationDeferredService()
+        let connector = PaperclipConnector(
+            configuration: selectedConfiguration(), service: service
+        )
+        let ledger = SessionTimestampLedger()
+
+        // Establish a known first sample, then race background updates against
+        // presentation reads; a split snapshot/timestamp accessor can fail.
+        connector.refresh()
+        service.finishCore(.success(coreState()), fetch: 1)
+        ledger.record(
+            agentID: "generation-1", timestamp: connector.capturePresentation().coreAt!
+        )
+        service.finishSessions(.success([session(id: "generation-1")]), fetch: 1)
+        let initial = connector.capturePresentation()
+        XCTAssertEqual(initial.snapshot.agentSessions.first?.agentID, "generation-1")
+        // Keep the writer at generation 2 until the reader actually observes
+        // it. Sleeps or scheduler yields cannot guarantee overlap on busy CI.
+        let secondGenerationObserved = DispatchSemaphore(value: 0)
+
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { group.leave() }
+            for index in 2..<140 {
+                connector.refresh()
+                service.finishCore(.success(self.coreState()), fetch: index)
+                if let stamp = connector.capturePresentation().coreAt {
+                    let identity = "generation-\(index)"
+                    ledger.record(agentID: identity, timestamp: stamp)
+                    service.finishSessions(
+                        .success([self.session(id: identity)]), fetch: index
+                    )
+                    if index == 2,
+                       secondGenerationObserved.wait(timeout: .now() + 5) != .success {
+                        return
+                    }
+                }
+                Thread.sleep(forTimeInterval: 0.00012)
+            }
+        }
+
+        assertConcurrentReads(
+            connector: connector, ledger: ledger, writer: group,
+            secondGenerationObserved: secondGenerationObserved
+        )
+        let final = connector.capturePresentation()
+        XCTAssertEqual(final.snapshot.agentSessions.first?.agentID, "generation-139")
+        XCTAssertEqual(final.sessionsAt, connector.lastSuccessfulSessionRefreshAt)
     }
 }

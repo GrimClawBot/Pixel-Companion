@@ -34,6 +34,11 @@ public protocol AgentSessionSource: AnyObject {
     func agentSessions(limit: Int) -> [AgentSessionSnapshot]
 }
 
+/// Sanitized read-only tasks; assignment is sourced from structured agent identifiers.
+public protocol TaskSource: AnyObject {
+    func tasks(limit: Int) -> [TaskSnapshot]
+}
+
 /// Exposes recent conversation lines. Sending messages is out of scope.
 public protocol ChatBackend: AnyObject {
     /// Up to `limit` messages, oldest first.
@@ -54,6 +59,7 @@ public protocol Connector: AnyObject {
     var approvals: (any ApprovalProvider)? { get }
     var usage: (any UsageProvider)? { get }
     var sessions: (any AgentSessionSource)? { get }
+    var tasks: (any TaskSource)? { get }
     var chat: (any ChatBackend)? { get }
 
     /// Pulls the latest state from the source. Must not mutate the source.
@@ -67,6 +73,7 @@ public extension Connector {
     var approvals: (any ApprovalProvider)? { nil }
     var usage: (any UsageProvider)? { nil }
     var sessions: (any AgentSessionSource)? { nil }
+    var tasks: (any TaskSource)? { nil }
     var chat: (any ChatBackend)? { nil }
     func refresh() {}
 }

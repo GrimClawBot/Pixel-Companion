@@ -106,3 +106,7 @@ example a user-managed tunnel or private network address) and select the desired
 3. Add tests that the connector maps service states to `ConnectionState` and never mutates anything.
 4. Anything involving sign-in or stored secrets is a sensitive change under
    [QUALITY_GATE.md](QUALITY_GATE.md) and needs a named security reviewer.
+
+## Opt-in infrastructure JSON report (PC-083)
+
+A separate source-neutral local read-only report adapter can display up to eight host metric records (source CPU/RAM/disk/network/temperature/deployment) from **one explicitly selected local JSON file**. Off by default and local-file path held only in RAM; no host/IP/SSH discovery, credential collection, remote actions, filesystem scans or WAN requests. Malformed/missing reports fail closed, and stale host timestamps hide numeric metrics and deployment health. This is **not** a private authenticated infrastructure API or attestation of the producer; see [PC-083 schema](PC083_LOCAL_INFRASTRUCTURE_REPORT.md).

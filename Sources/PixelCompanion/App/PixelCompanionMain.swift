@@ -23,6 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
     private var coordinator: PresentationCoordinator?
 
+    func applicationWillTerminate(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func workspaceDidWake(_ notification: Notification) {
+        model?.didWake()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model?.refreshNotificationPermission()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let model = AppModel(settings: SettingsStore())
         let settingsWindow = SettingsWindowController(model: model)
@@ -33,6 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.settingsWindow = settingsWindow
         self.coordinator = coordinator
         model.start()
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(workspaceDidWake(_:)),
+            name: NSWorkspace.didWakeNotification, object: nil
+        )
         coordinator.start()
     }
 }

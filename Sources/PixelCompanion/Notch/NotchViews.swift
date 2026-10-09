@@ -4,7 +4,7 @@ import SwiftUI
 /// Panel sizes per surface. Compact mode stays within the physical notch width and adds a
 /// short status strip below the camera housing, so adjacent menu-bar items remain untouched.
 enum NotchLayout {
-    static let compactBarHeight: CGFloat = 24
+    static let compactBarHeight: CGFloat = 32
     static let snapshotSize = CGSize(width: 400, height: 200)
     static let detailSize = CGSize(width: 440, height: 440)
 
@@ -46,13 +46,22 @@ struct NotchRootView: View {
             if state.surface == .compact {
                 Color.clear
                     .frame(height: state.notchSize.height)
-                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                CompactBar(
+                    snapshot: model.snapshot, mood: model.mood,
+                    feedFreshness: model.feedFreshness, showsStatusText: true
+                )
                     .frame(height: NotchLayout.compactBarHeight)
                     .padding(.horizontal, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
             } else {
-                CompactBar(snapshot: model.snapshot, mood: model.mood)
+                CompactBar(
+                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                )
                     .frame(height: state.notchSize.height)
                     .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
                 expandedContent
             }
         }
@@ -61,8 +70,6 @@ struct NotchRootView: View {
             UnevenRoundedRectangle(bottomLeadingRadius: cornerRadius, bottomTrailingRadius: cornerRadius)
                 .fill(Color.black)
         )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onClick)
     }
 
     @ViewBuilder private var expandedContent: some View {
@@ -70,43 +77,165 @@ struct NotchRootView: View {
         case .compact:
             EmptyView()
         case .snapshot:
-            SnapshotContent(snapshot: model.snapshot, mood: model.mood)
+            SnapshotContent(
+                snapshot: model.snapshot, mood: model.mood,
+                feedFreshness: model.feedFreshness,
+                    agentFeedFreshness: model.agentFeedFreshness,
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync
+            )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onClick)
         case .detail:
-            DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
+            DetailContent(
+                snapshot: model.snapshot, mood: model.mood,
+                openSettings: openSettings, feedFreshness: model.feedFreshness,
+                agentFeedFreshness: model.agentFeedFreshness,
+                lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+                publicGitHubState: model.publicGitHubState,
+                focusTimerEnabled: model.focusTimerEnabled,
+                focusTimer: model.focusTimer,
+                batteryHUDEnabled: model.batteryHUDEnabled,
+                batteryMonitor: model.batteryMonitor,
+                outputVolumeHUDEnabled: model.outputVolumeHUDEnabled,
+                outputVolumeMonitor: model.outputVolumeMonitor,
+                displayBrightnessHUDEnabled: model.displayBrightnessHUDEnabled,
+                displayBrightnessMonitor: model.displayBrightnessMonitor,
+                downloadHUDEnabled: model.downloadHUDEnabled,
+                downloadMonitor: model.downloadMonitor,
+                fileShelfEnabled: model.fileShelfEnabled,
+                fileShelf: model.fileShelf,
+                clipboardHistoryEnabled: model.clipboardHistoryEnabled,
+                clipboardHistory: model.clipboardHistory,
+                localAgentFeed: model.localAgentFeed,
+                localInfrastructureMonitor: model.localInfrastructureMonitor,
+                codexProcessMonitor: model.codexProcessMonitor,
+                codexTurnMonitor: model.codexTurnMonitor,
+                claudeHookMonitor: model.claudeHookMonitor,
+                localActivityTimeline: model.localActivityTimeline,
+                localAgentAttention: model.localAgentAttention,
+                calendarWidgetEnabled: model.calendarWidgetEnabled,
+                calendarShowTitles: model.calendarShowTitles,
+                calendarMonitor: model.calendarMonitor,
+                musicWidgetEnabled: model.musicWidgetEnabled,
+                musicShowTrackDetails: model.musicShowTrackDetails,
+                musicMonitor: model.musicMonitor,
+                selectedTab: $model.selectedDetailTab
+            )
                 .padding([.horizontal, .bottom], 16)
                 .padding(.top, 8)
         }
     }
 }
 
-/// The compact status strip: character on the left, status on the right.
-struct CompactBar: View {
-    let snapshot: ConnectorSnapshot
-    let mood: CharacterMood
+/// Shows the true source status even when a prior working mood has gone stale.
+enum CompactBarPresentation {
+    static func displayMood(mood: CharacterMood, feedFreshness: FeedFreshness) -> CharacterMood {
+        feedFreshness.canPresentAsLive ? mood : .offline
+    }
 
-    var body: some View {
-        HStack {
-            CharacterView(mood: mood, pixelSize: 2)
-            Spacer()
-            trailingIndicator
+    static func status(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
+        switch feedFreshness {
+        case .connecting: return "Connecting"
+        case .stale: return "Updates delayed"
+        case .unavailable: return "Disconnected"
+        case .current, .notApplicable: return mood.title
         }
     }
 
+    /// Show no duplicate icon for ordinary work: the visible label already says Working.
+    /// Important alerts, approvals and freshness warnings keep their own symbols.
+    static func needsCompactIndicator(
+        mood: CharacterMood, feedFreshness: FeedFreshness
+    ) -> Bool {
+        if !feedFreshness.canPresentAsLive { return true }
+        switch mood {
+        case .error, .offline, .waitingForApproval, .success,
+             .budgetWarning, .infrastructureAlert, .securityAlert:
+            return true
+        case .idle, .working, .thinking, .coding, .testing, .reviewing:
+            return false
+        }
+    }
+
+    /// Center the quiet everyday state so the character and label read as one unit.
+    /// Alerts and approvals retain the left/status/right-badge hierarchy.
+    static func centersCompactStatus(
+        mood: CharacterMood, feedFreshness: FeedFreshness, hasPendingApprovals: Bool
+    ) -> Bool {
+        !hasPendingApprovals && !needsCompactIndicator(
+            mood: mood, feedFreshness: feedFreshness
+        )
+    }
+
+    static func indicator(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
+        switch feedFreshness {
+        case .connecting: return "arrow.triangle.2.circlepath"
+        case .stale: return "wifi.exclamationmark"
+        case .unavailable: return "wifi.slash"
+        case .current, .notApplicable: return mood.symbolName
+        }
+    }
+}
+
+/// The compact status strip: bigger pixel character with an honest status label.
+struct CompactBar: View {
+    let snapshot: ConnectorSnapshot
+    let mood: CharacterMood
+    var feedFreshness: FeedFreshness = .notApplicable
+    var showsStatusText = false
+
+    private var label: String {
+        CompactBarPresentation.status(mood: mood, feedFreshness: feedFreshness)
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            if showsStatusText && CompactBarPresentation.centersCompactStatus(
+                mood: mood, feedFreshness: feedFreshness,
+                hasPendingApprovals: !snapshot.pendingApprovals.isEmpty
+            ) {
+                Spacer(minLength: 0)
+            }
+            CharacterView(
+                mood: CompactBarPresentation.displayMood(mood: mood, feedFreshness: feedFreshness),
+                pixelSize: 2.6
+            )
+            .accessibilityHidden(showsStatusText)
+            if showsStatusText {
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.98))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .layoutPriority(1)
+                    .accessibilityLabel("Companion status: " + label)
+            }
+            Spacer(minLength: 0)
+            trailingIndicator
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
+    }
+
     @ViewBuilder private var trailingIndicator: some View {
-        if !snapshot.pendingApprovals.isEmpty {
+        if feedFreshness.canPresentAsLive && !snapshot.pendingApprovals.isEmpty {
             Text("\(snapshot.pendingApprovals.count)")
                 .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(.black)
                 .padding(.horizontal, 6)
                 .background(Capsule().fill(Color.orange))
                 .accessibilityLabel("\(snapshot.pendingApprovals.count) waiting for approval")
-        } else {
-            Image(systemName: mood.symbolName)
+        } else if !showsStatusText || CompactBarPresentation.needsCompactIndicator(
+            mood: mood, feedFreshness: feedFreshness
+        ) {
+            Image(systemName: CompactBarPresentation.indicator(
+                mood: mood, feedFreshness: feedFreshness
+            ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel(mood.title)
+                .accessibilityHidden(showsStatusText)
+                .accessibilityLabel(label)
         }
     }
 }
