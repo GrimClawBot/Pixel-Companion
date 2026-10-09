@@ -109,6 +109,24 @@ final class NotchLayoutTests: XCTestCase {
         }
     }
 
+    func testQuietCompactPairCentersOnlyWithoutAlertsOrApproval() {
+        XCTAssertTrue(CompactBarPresentation.centersCompactStatus(
+            mood: .working, feedFreshness: .current, hasPendingApprovals: false
+        ))
+        XCTAssertTrue(CompactBarPresentation.centersCompactStatus(
+            mood: .idle, feedFreshness: .notApplicable, hasPendingApprovals: false
+        ))
+        XCTAssertFalse(CompactBarPresentation.centersCompactStatus(
+            mood: .working, feedFreshness: .current, hasPendingApprovals: true
+        ))
+        XCTAssertFalse(CompactBarPresentation.centersCompactStatus(
+            mood: .securityAlert, feedFreshness: .current, hasPendingApprovals: false
+        ))
+        XCTAssertFalse(CompactBarPresentation.centersCompactStatus(
+            mood: .working, feedFreshness: .stale, hasPendingApprovals: false
+        ))
+    }
+
     func testSnapshotExpandsBelowAndBeyondNotchOnlyDuringInteraction() {
         XCTAssertEqual(
             NotchLayout.size(for: .snapshot, notchSize: notchSize),
