@@ -73,8 +73,9 @@ struct AgentsDirectoryView: View {
                         tasks, to: selected.agentID, isLive: isLive
                     ),
                     peerSessions: sessions,
-                    onSelectAgent: { selectedAgentID = $0 }
-                ) { selectedAgentID = nil }
+                    onSelectAgent: { selectedAgentID = $0 },
+                    back: { selectedAgentID = nil }
+                )
             } else {
                 directory
             }
