@@ -47,6 +47,45 @@ final class PaperclipUsageMappingTests: XCTestCase {
         XCTAssertNil(malformed.monthlyBudgetCents)
     }
 
+    func testMalformedOptionalContextCountsDoNotDropValidRun() throws {
+        let agent = #"{"id":"a","name":"Test","status":"running"}"#
+        let unusualUsage = """
+        {"id":"valid-run","agentId":"a","status":"running",
+         "usageJson":{"model":"runtime-model","provider":"runtime-provider",
+                      "inputTokens":230,"cachedInputTokens":21,"outputTokens":55,
+                      "contextUsedTokens":{"unexpected":"object"},
+                      "contextWindowTokens":"not-an-int"}}
+        """
+        let decoded = try JSONDecoder().decode(
+            PaperclipHeartbeatRunResponse.self, from: Data(unusualUsage.utf8)
+        )
+        XCTAssertEqual(decoded.id, "valid-run")
+        XCTAssertEqual(decoded.status, "running")
+        XCTAssertEqual(decoded.usageJson?.model, "runtime-model")
+        XCTAssertEqual(decoded.usageJson?.inputTokens, 230)
+        XCTAssertNil(decoded.usageJson?.contextUsedTokens)
+        XCTAssertNil(decoded.usageJson?.contextWindowTokens)
+
+        let session = try state(agent: agent, run: unusualUsage)
+        XCTAssertEqual(session.runID, "valid-run")
+        XCTAssertEqual(session.runState, .running)
+        XCTAssertEqual(session.inputTokens, 230)
+        XCTAssertEqual(session.cachedInputTokens, 21)
+        XCTAssertEqual(session.outputTokens, 55)
+        XCTAssertNil(session.contextUsedTokens)
+        XCTAssertNil(session.contextWindowTokens)
+    }
+
+    func testRequiredRunMetadataRemainsStrictWithMalformedContext() {
+        let malformed = """
+        {"id":"invalid","agentId":123,"status":"running",
+         "usageJson":{"inputTokens":200,"contextUsedTokens":"bad"}}
+        """
+        XCTAssertThrowsError(
+            try JSONDecoder().decode(PaperclipHeartbeatRunResponse.self, from: Data(malformed.utf8))
+        )
+    }
+
     func testRunUsageMappingSupportsExplicitContextCountsOnly() throws {
         let agent = #"{"id":"a","name":"Test","status":"running","spentMonthlyCents":0}"#
         let withContext = """
