@@ -12,12 +12,38 @@ enum GitHubPublicPresentation {
         return conclusion.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
+    /// GitHub branch names are untrusted presentation text. In particular,
+    /// bidi control characters can visually reorder a source branch.
     static func branchLabel(_ run: GitHubPublicRun) -> String? {
-        guard let name = run.headBranch?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !name.isEmpty else { return nil }
-        return name.replacingOccurrences(of: "\n", with: " ")
+        guard let name = run.headBranch else { return nil }
+        let spaced = name.replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\t", with: " ")
+        let bidi = CharacterSet(charactersIn:
+            "\u{061C}\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}" +
+            "\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}"
+        )
+        let sanitized = spaced.unicodeScalars
+            .filter { !bidi.contains($0) && !CharacterSet.controlCharacters.contains($0) }
+            .map(String.init)
+            .joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return sanitized.isEmpty ? nil : sanitized
+    }
+
+    static func runAccessibilityLabel(_ run: GitHubPublicRun) -> String {
+        var parts = [
+            "Open public GitHub workflow " + workflowLabel(run),
+            "Status " + status(run)
+        ]
+        if let branch = branchLabel(run) {
+            parts.append("Branch " + branch)
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    static func pullAccessibilityLabel(_ pull: GitHubPublicPull) -> String {
+        "Open public GitHub PR #\(pull.number), " + pull.title
     }
 
     static func symbol(_ run: GitHubPublicRun) -> String {
@@ -85,10 +111,8 @@ struct PublicGitHubPulseView: View {
                                 runRow(run, isLink: true)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                "Open public GitHub workflow " +
-                                GitHubPublicPresentation.workflowLabel(run)
-                            )
+                            .accessibilityLabel(GitHubPublicPresentation.runAccessibilityLabel(run))
+                            .accessibilityHint("Opens the public workflow on github.com in a browser")
                             .accessibilityIdentifier("companion.github.public-run-link")
                         } else {
                             runRow(run, isLink: false)
@@ -102,7 +126,8 @@ struct PublicGitHubPulseView: View {
                                 pullRow(pull, isLink: true)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Open public GitHub PR #\(pull.number)")
+                            .accessibilityLabel(GitHubPublicPresentation.pullAccessibilityLabel(pull))
+                            .accessibilityHint("Opens the public pull request on github.com in a browser")
                             .accessibilityIdentifier("companion.github.public-pr-link")
                         } else {
                             pullRow(pull, isLink: false)
