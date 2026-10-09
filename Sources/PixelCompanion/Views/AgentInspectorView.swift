@@ -18,6 +18,7 @@ enum AgentInspectorSelection {
 struct AgentInspectorView: View {
     let session: AgentSessionSnapshot
     var assignedTasks: [TaskSnapshot] = []
+    var isLive = false
     var peerSessions: [AgentSessionSnapshot] = []
     var onSelectAgent: ((String) -> Void)?
     let back: () -> Void
@@ -116,6 +117,11 @@ struct AgentInspectorView: View {
                 reportedWindow: session.contextWindowTokens,
                 evidenceID: session.agentID + ":" + (session.runID ?? "")
             )
+            .companionCard()
+            SessionHandoffChecklistView(
+                session: session, assignedTasks: assignedTasks, isLive: isLive
+            )
+            .id(SessionHandoffSelectionIdentity(session: session))
             .companionCard()
             if !assignedTasks.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {

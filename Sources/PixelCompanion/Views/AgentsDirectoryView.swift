@@ -81,6 +81,7 @@ struct AgentsDirectoryView: View {
                     assignedTasks: CompanyTaskPresentation.assigned(
                         tasks, to: selected.agentID, isLive: isLive
                     ),
+                    isLive: isLive,
                     peerSessions: sessions,
                     onSelectAgent: { selectedAgentID = $0 },
                     back: { selectedAgentID = nil }
