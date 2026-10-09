@@ -86,6 +86,7 @@ struct DetailContent: View {
     var clipboardHistoryEnabled = false
     var clipboardHistory: TransientClipboardHistory?
     var localAgentFeed: LocalAgentFeedMonitor?
+    var localInfrastructureMonitor: LocalInfrastructureMonitor?
     var codexProcessMonitor: CodexProcessMonitor?
     var codexTurnMonitor: CodexTurnMonitor?
     var claudeHookMonitor: ClaudeHookMonitor?
@@ -317,6 +318,9 @@ extension DetailContent {
                 }
             }
             PublicGitHubPulseView(state: publicGitHubState)
+            if let localInfrastructureMonitor, localInfrastructureMonitor.enabled {
+                LocalInfrastructureView(monitor: localInfrastructureMonitor)
+            }
             LiveOperationsPulseView(
                 sessions: liveSessions,
                 pendingApprovalCount: snapshot.pendingApprovals.count,
