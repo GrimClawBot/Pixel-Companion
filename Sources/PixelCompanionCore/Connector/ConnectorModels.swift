@@ -50,13 +50,29 @@ public struct ActivityEvent: Identifiable, Hashable, Sendable {
     public let title: String
     public let detail: String?
     public let timestamp: Date
+    /// Optional canonical signal from a source-provided status, never inferred from free text.
+    public let signal: CompanionSignalKind?
+    /// Exact connector and backend entity identifiers, when supplied.
+    public let sourceID: String?
+    public let entityID: String?
+    /// Explicit source-reported progress only; do not infer progress from tokens or elapsed time.
+    public let progress: CompanionReportedProgress?
 
-    public init(id: String, kind: Kind, title: String, detail: String? = nil, timestamp: Date) {
+    public init(
+        id: String, kind: Kind, title: String, detail: String? = nil,
+        timestamp: Date, signal: CompanionSignalKind? = nil,
+        sourceID: String? = nil, entityID: String? = nil,
+        progress: CompanionReportedProgress? = nil
+    ) {
         self.id = id
         self.kind = kind
         self.title = title
         self.detail = detail
         self.timestamp = timestamp
+        self.signal = signal
+        self.sourceID = sourceID
+        self.entityID = entityID
+        self.progress = progress
     }
 }
 
@@ -131,6 +147,10 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     public let agentID: String
     public let agentName: String
     public let agentTitle: String?
+    /// Optional role exactly reported by the source; never an inferred department.
+    public let agentRole: String?
+    /// Structured reporting parent ID from the connected runtime, never inferred from role.
+    public let managerAgentID: String?
     public let agentStatus: String
     public let runID: String?
     public let runState: RunState
@@ -141,6 +161,14 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
     public let inputTokens: Int?
     public let cachedInputTokens: Int?
     public let outputTokens: Int?
+    /// Paperclip agent monthly totals; these are not estimates of this run's cost.
+    public let monthlySpendCents: Int?
+    public let monthlyBudgetCents: Int?
+    /// Context occupancy is known only if the runtime reports both exact values.
+    public let contextUsedTokens: Int?
+    public let contextWindowTokens: Int?
+    /// At most five recent runs returned by the current bounded telemetry fetch.
+    public let recentRuns: [AgentRunSnapshot]
     public let startedAt: Date?
     public let finishedAt: Date?
     public let updatedAt: Date?
@@ -150,6 +178,8 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         agentID: String,
         agentName: String,
         agentTitle: String? = nil,
+        agentRole: String? = nil,
+        managerAgentID: String? = nil,
         agentStatus: String,
         runID: String? = nil,
         runState: RunState,
@@ -160,6 +190,11 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         inputTokens: Int? = nil,
         cachedInputTokens: Int? = nil,
         outputTokens: Int? = nil,
+        monthlySpendCents: Int? = nil,
+        monthlyBudgetCents: Int? = nil,
+        contextUsedTokens: Int? = nil,
+        contextWindowTokens: Int? = nil,
+        recentRuns: [AgentRunSnapshot] = [],
         startedAt: Date? = nil,
         finishedAt: Date? = nil,
         updatedAt: Date? = nil
@@ -168,6 +203,8 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         self.agentID = agentID
         self.agentName = agentName
         self.agentTitle = agentTitle
+        self.agentRole = agentRole
+        self.managerAgentID = managerAgentID
         self.agentStatus = agentStatus
         self.runID = runID
         self.runState = runState
@@ -178,6 +215,11 @@ public struct AgentSessionSnapshot: Identifiable, Hashable, Sendable {
         self.inputTokens = inputTokens
         self.cachedInputTokens = cachedInputTokens
         self.outputTokens = outputTokens
+        self.monthlySpendCents = monthlySpendCents
+        self.monthlyBudgetCents = monthlyBudgetCents
+        self.contextUsedTokens = contextUsedTokens
+        self.contextWindowTokens = contextWindowTokens
+        self.recentRuns = recentRuns
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.updatedAt = updatedAt

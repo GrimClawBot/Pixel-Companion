@@ -7,13 +7,16 @@ public final class PaperclipConnector:
     ActivitySource,
     ApprovalProvider,
     UsageProvider,
-    AgentSessionSource {
+    AgentSessionSource,
+    TaskSource {
     public let id: ConnectorID = .paperclip
     public let configuration: PaperclipConfiguration
 
     private struct Cache {
         var connectionState: ConnectionState
         var lastError: String?
+        var lastSuccessfulRefreshAt: Date?
+        var lastSuccessfulSessionRefreshAt: Date?
         var companyName: String?
         var companyID: String?
         var companies: [PaperclipCompany] = []
@@ -21,6 +24,7 @@ public final class PaperclipConnector:
         var approvals: [ApprovalRequest] = []
         var usage: UsageSnapshot?
         var agentSessions: [AgentSessionSnapshot] = []
+        var tasks: [TaskSnapshot] = []
         var inFlight = false
     }
 
@@ -29,6 +33,9 @@ public final class PaperclipConnector:
     private var cache: Cache
     private var refreshGeneration = 0
     private var publishedCoreGeneration = 0
+    private var publishedSessionGeneration = 0
+    /// Successful core publications whose slower session fetches may complete later.
+    private var pendingSessions: [Int: (companyID: String?, coreTime: Date)] = [:]
 
     /// Called on the main queue after cached state changes.
     public var onChange: (() -> Void)?
@@ -51,11 +58,18 @@ public final class PaperclipConnector:
 
     public var connectionState: ConnectionState { locked { cache.connectionState } }
     public var lastError: String? { locked { cache.lastError } }
+    /// Client-side time of the most recent successful core refresh; not server activity time.
+    public var lastSuccessfulRefreshAt: Date? { locked { cache.lastSuccessfulRefreshAt } }
+    /// Separate session evidence; a healthy core poll never refreshes stale agent telemetry.
+    public var lastSuccessfulSessionRefreshAt: Date? {
+        locked { cache.lastSuccessfulSessionRefreshAt }
+    }
     public var auth: (any AuthProvider)? { self }
     public var activity: (any ActivitySource)? { self }
     public var approvals: (any ApprovalProvider)? { self }
     public var usage: (any UsageProvider)? { self }
     public var sessions: (any AgentSessionSource)? { self }
+    public var tasks: (any TaskSource)? { self }
     public var authStatus: AuthStatus { .notRequired }
 
     public var currentActivity: ActivityEvent? {
@@ -84,6 +98,36 @@ public final class PaperclipConnector:
 
     public func agentSessions(limit: Int) -> [AgentSessionSnapshot] {
         locked { Array(cache.agentSessions.prefix(max(limit, 0))) }
+    }
+
+    public func tasks(limit: Int) -> [TaskSnapshot] {
+        locked { Array(cache.tasks.prefix(max(limit, 0))) }
+    }
+
+    /// Capture all presentation fields and both refresh timestamps under ONE lock.
+    /// Multiple ConnectorSnapshot(capturing:) and timestamp accessor calls can
+    /// otherwise pair older agent rows with the timestamp of newer telemetry.
+    public func capturePresentation(
+        sessionLimit: Int = Int.max
+    ) -> PaperclipPresentationCapture {
+        locked {
+            let snapshot = ConnectorSnapshot(
+                connectorName: cache.companyName.map { "Paperclip · \($0)" } ?? "Paperclip",
+                connectionState: cache.connectionState,
+                lastError: cache.connectionState == .error ? cache.lastError : nil,
+                currentActivity: cache.activity.first,
+                recentActivity: Array(cache.activity.prefix(8)),
+                pendingApprovals: cache.approvals,
+                usage: cache.usage,
+                agentSessions: Array(cache.agentSessions.prefix(max(sessionLimit, 0))),
+                tasks: Array(cache.tasks.prefix(64))
+            )
+            return PaperclipPresentationCapture(
+                snapshot: snapshot,
+                coreAt: cache.lastSuccessfulRefreshAt,
+                sessionsAt: cache.lastSuccessfulSessionRefreshAt
+            )
+        }
     }
 
     public func refresh() {
@@ -135,13 +179,28 @@ public final class PaperclipConnector:
             value.inFlight = false
             switch result {
             case let .success(state):
+                let companyChanged = value.companyID != state.companyID
                 applyCore(state, to: &value)
+                if companyChanged {
+                    value.lastSuccessfulSessionRefreshAt = nil
+                    publishedSessionGeneration = 0
+                    pendingSessions.removeAll()
+                }
                 publishedCoreGeneration = generation
+                if let coreTime = value.lastSuccessfulRefreshAt {
+                    pendingSessions[generation] = (state.companyID, coreTime)
+                }
+                // A bounded number of unresolved older queries may still return.
+                pendingSessions = pendingSessions.filter { generation - $0.key < 32 }
             case let .failure(error):
                 value.connectionState = .error
                 value.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 value.agentSessions = []
+                value.lastSuccessfulSessionRefreshAt = nil
+                value.tasks = []
                 publishedCoreGeneration = 0
+                publishedSessionGeneration = 0
+                pendingSessions.removeAll()
             }
         }
     }
@@ -151,12 +210,23 @@ public final class PaperclipConnector:
         generation: Int
     ) {
         update { value in
-            guard generation == publishedCoreGeneration else { return }
+            // Core refresh may advance independently while session fetch runs.
+            // Accept the newest completed session evidence for this SAME company,
+            // without allowing an older response to replace a newer session result.
+            guard let pending = pendingSessions.removeValue(forKey: generation),
+                  value.connectionState == .connected,
+                  pending.companyID == value.companyID,
+                  generation > publishedSessionGeneration else { return }
+            publishedSessionGeneration = generation
             switch result {
             case let .success(sessions):
                 value.agentSessions = sessions
+                // Date of the associated core fetch, not the later callback time:
+                // a slow response cannot make old telemetry appear newly fresh.
+                value.lastSuccessfulSessionRefreshAt = pending.coreTime
             case .failure:
                 value.agentSessions = []
+                value.lastSuccessfulSessionRefreshAt = nil
             }
         }
     }
@@ -165,11 +235,13 @@ public final class PaperclipConnector:
         let companyChanged = value.companyID != state.companyID
         value.connectionState = .connected
         value.lastError = nil
+        value.lastSuccessfulRefreshAt = Date()
         value.companyName = state.companyName
         value.companyID = state.companyID
         value.companies = state.companies
         value.activity = state.activity
         value.approvals = state.approvals
+        value.tasks = state.tasks
         value.usage = state.usage
         if companyChanged || value.agentSessions.isEmpty {
             value.agentSessions = state.agentSessions

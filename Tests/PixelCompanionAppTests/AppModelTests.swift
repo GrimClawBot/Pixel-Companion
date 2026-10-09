@@ -42,6 +42,20 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.mood, .offline)
     }
 
+    func testPaperclipConfigurationErrorDoesNotPresentCachedContentAsLive() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.connectorID = .paperclip
+        settings.paperclipBaseURL = "invalid-url"
+        let model = AppModel(settings: settings)
+        model.start()
+        XCTAssertEqual(model.feedFreshness, .unavailable)
+        XCTAssertNil(model.lastSuccessfulPaperclipSync)
+        XCTAssertFalse(model.feedFreshness.canPresentAsLive)
+        model.connectorID = .disabled
+        XCTAssertEqual(model.feedFreshness, .notApplicable)
+        XCTAssertNil(model.lastSuccessfulPaperclipSync)
+    }
+
     func testPresentationPreferenceNotifiesOnlyOnChangeAndPlacementPublishes() {
         let model = AppModel(settings: SettingsStore(defaults: defaults))
         var notifications = 0

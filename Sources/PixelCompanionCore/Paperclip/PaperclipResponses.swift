@@ -36,12 +36,16 @@ struct PaperclipAgentResponse: Sendable {
     let name: String
     let role: String?
     let title: String?
+    /// Parent agent identifier from Paperclip's reportsTo field.
+    var reportsTo: String?
     let status: String
     let adapterType: String?
     let adapterConfig: PaperclipAgentAdapterConfig?
     let runtimeConfig: PaperclipAgentRuntimeConfig?
     let lastHeartbeatAt: String?
     let updatedAt: String?
+    var spentMonthlyCents: Int?
+    var budgetMonthlyCents: Int?
 }
 
 extension PaperclipAgentResponse: Decodable {
@@ -50,12 +54,15 @@ extension PaperclipAgentResponse: Decodable {
         case name
         case role
         case title
+        case reportsTo
         case status
         case adapterType
         case adapterConfig
         case runtimeConfig
         case lastHeartbeatAt
         case updatedAt
+        case spentMonthlyCents
+        case budgetMonthlyCents
     }
 
     init(from decoder: Decoder) throws {
@@ -66,11 +73,14 @@ extension PaperclipAgentResponse: Decodable {
 
         role = try? container.decode(String.self, forKey: .role)
         title = try? container.decode(String.self, forKey: .title)
+        reportsTo = try? container.decode(String.self, forKey: .reportsTo)
         adapterType = try? container.decode(String.self, forKey: .adapterType)
         adapterConfig = try? container.decode(PaperclipAgentAdapterConfig.self, forKey: .adapterConfig)
         runtimeConfig = try? container.decode(PaperclipAgentRuntimeConfig.self, forKey: .runtimeConfig)
         lastHeartbeatAt = try? container.decode(String.self, forKey: .lastHeartbeatAt)
         updatedAt = try? container.decode(String.self, forKey: .updatedAt)
+        spentMonthlyCents = try? container.decode(Int.self, forKey: .spentMonthlyCents)
+        budgetMonthlyCents = try? container.decode(Int.self, forKey: .budgetMonthlyCents)
     }
 }
 
@@ -81,6 +91,9 @@ struct PaperclipHeartbeatRunResponse: Decodable, Sendable {
         let inputTokens: Int?
         let cachedInputTokens: Int?
         let outputTokens: Int?
+        /// Optional, authoritative runtime context metrics; absent in many Paperclip installs.
+        var contextUsedTokens: Int?
+        var contextWindowTokens: Int?
         let persistedSessionId: String?
     }
 
@@ -100,6 +113,36 @@ struct PaperclipHeartbeatRunResponse: Decodable, Sendable {
     let sessionIdBefore: String?
     let sessionIdAfter: String?
     let contextSnapshot: Context?
+}
+
+// Only OPTIONAL context metrics may be soft-failed. All other usage
+// fields retain Decodable's existing validation behavior, so a malformed
+// required run or unrelated usage field cannot silently appear valid.
+extension PaperclipHeartbeatRunResponse.Usage {
+    private enum CodingKeys: String, CodingKey {
+        case model
+        case provider
+        case inputTokens
+        case cachedInputTokens
+        case outputTokens
+        case contextUsedTokens
+        case contextWindowTokens
+        case persistedSessionId
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        provider = try container.decodeIfPresent(String.self, forKey: .provider)
+        inputTokens = try container.decodeIfPresent(Int.self, forKey: .inputTokens)
+        cachedInputTokens = try container.decodeIfPresent(Int.self, forKey: .cachedInputTokens)
+        outputTokens = try container.decodeIfPresent(Int.self, forKey: .outputTokens)
+        // A third-party runtime may encode these optional metrics with an
+        // incompatible type. Keep the run, omit only unreliable measurements.
+        contextUsedTokens = try? container.decode(Int.self, forKey: .contextUsedTokens)
+        contextWindowTokens = try? container.decode(Int.self, forKey: .contextWindowTokens)
+        persistedSessionId = try container.decodeIfPresent(String.self, forKey: .persistedSessionId)
+    }
 }
 
 struct PaperclipIssueResponse: Decodable, Sendable {
