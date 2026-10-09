@@ -109,6 +109,7 @@ struct NotchRootView: View {
                 clipboardHistoryEnabled: model.clipboardHistoryEnabled,
                 clipboardHistory: model.clipboardHistory,
                 localAgentFeed: model.localAgentFeed,
+                localInfrastructureMonitor: model.localInfrastructureMonitor,
                 codexProcessMonitor: model.codexProcessMonitor,
                 codexTurnMonitor: model.codexTurnMonitor,
                 claudeHookMonitor: model.claudeHookMonitor,
