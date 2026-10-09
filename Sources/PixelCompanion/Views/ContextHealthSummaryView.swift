@@ -82,6 +82,13 @@ struct ContextHealthSummaryView: View {
         // Keep the local acknowledgement button individually accessible.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("companion.context.health")
+        // A newer observation invalidates the local choice, even if a later
+        // reading happens to return to an earlier token count.
+        .onChange(of: activeEvidenceKey) { oldValue, newValue in
+            if oldValue != newValue {
+                acknowledgedEvidenceKey = nil
+            }
+        }
     }
 }
 
