@@ -90,6 +90,14 @@ struct AgentInspectorView: View {
             Text("Reported usage")
                 .font(.callout.weight(.semibold))
             AgentUsageCard(session: session, showsContext: false)
+            Text("Context & next steps")
+                .font(.callout.weight(.semibold))
+            ContextHealthSummaryView(
+                reportedUsed: session.contextUsedTokens,
+                reportedWindow: session.contextWindowTokens,
+                evidenceID: session.agentID + ":" + (session.runID ?? "")
+            )
+            .companionCard()
             if !assignedTasks.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {
                     HStack {
