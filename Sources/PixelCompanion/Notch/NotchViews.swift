@@ -158,6 +158,16 @@ enum CompactBarPresentation {
         }
     }
 
+    /// Center the quiet everyday state so the character and label read as one unit.
+    /// Alerts and approvals retain the left/status/right-badge hierarchy.
+    static func centersCompactStatus(
+        mood: CharacterMood, feedFreshness: FeedFreshness, hasPendingApprovals: Bool
+    ) -> Bool {
+        !hasPendingApprovals && !needsCompactIndicator(
+            mood: mood, feedFreshness: feedFreshness
+        )
+    }
+
     static func indicator(mood: CharacterMood, feedFreshness: FeedFreshness) -> String {
         switch feedFreshness {
         case .connecting: return "arrow.triangle.2.circlepath"
@@ -181,6 +191,12 @@ struct CompactBar: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
+            if showsStatusText && CompactBarPresentation.centersCompactStatus(
+                mood: mood, feedFreshness: feedFreshness,
+                hasPendingApprovals: !snapshot.pendingApprovals.isEmpty
+            ) {
+                Spacer(minLength: 0)
+            }
             CharacterView(
                 mood: CompactBarPresentation.displayMood(mood: mood, feedFreshness: feedFreshness),
                 pixelSize: 2.6
