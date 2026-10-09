@@ -32,176 +32,203 @@ final class AgentHookVerificationTests: XCTestCase {
         )
     }
 
-    func testFreshExistingCodexMarkerDoesNotProveNewDelivery() throws {
+    func testFreshExistingCodexMarkerDoesNotProveNewDelivery() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content = codexMarker(time)
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { time })
+        let probe = LockedLocalReportReader(codexMarker(time))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         monitor.refresh()
+        await awaitLocalReport { !monitor.isRefreshing }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         time = moment.addingTimeInterval(10)
-        content = codexMarker(time)
+        probe.set(codexMarker(time))
         monitor.refresh()
+        await awaitLocalReport { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         monitor.configure(enabled: false)
     }
 
-    func testFirstMarkerAfterPreviouslyMissingFileCounts() throws {
+    func testFirstMarkerAfterPreviouslyMissingFileCounts() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content: Data?
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { time })
+        let probe = LockedLocalReportReader()
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         time = moment.addingTimeInterval(5)
-        content = codexMarker(time)
+        probe.set(codexMarker(time))
         monitor.refresh()
+        await awaitLocalReport { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         monitor.configure(enabled: false)
     }
 
-    func testNoReadsBeforeStartBeyondExistingMonitorBehavior() throws {
+    func testNoReadsBeforeStartBeyondExistingMonitorBehavior() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        var reads = 0
+        let probe = LockedLocalReportReader()
         let monitor = CodexTurnMonitor(
-            read: { _ in reads += 1; return nil }, now: { self.moment }
+            read: { probe.read($0) }, now: { self.moment }
         )
         let verifier = AgentHookVerifier(now: { self.moment })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.calls, 0)
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         XCTAssertEqual(verifier.codexState, .needsSetup)
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.calls, 0)
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
-        let existingReads = reads
+        await awaitLocalReport { monitor.status == .unavailable && !monitor.isRefreshing }
+        let existingReads = probe.calls
         verifier.start(codex: monitor)
-        XCTAssertEqual(reads, existingReads + 1)
+        await awaitLocalReport { !monitor.isRefreshing }
+        await awaitLocalReport { probe.calls == existingReads + 1 }
         monitor.configure(enabled: false)
     }
 
-    func testStaleAtArmTimeDoesNotCountAsNewEvenIfFileChanges() throws {
+    func testStaleAtArmTimeDoesNotCountAsNewEvenIfFileChanges() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let stale = moment.addingTimeInterval(-130)
-        var content: Data? = codexMarker(stale)
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { self.moment })
+        let probe = LockedLocalReportReader(codexMarker(stale))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { self.moment })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { self.moment })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
-        content = codexMarker(moment.addingTimeInterval(-40))
+        await awaitLocalReport { !monitor.isRefreshing }
+        probe.set(codexMarker(moment.addingTimeInterval(-40)))
         monitor.refresh()
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         monitor.configure(enabled: false)
     }
 
-    func testSameSecondIdenticalEventCannotCountTwice() throws {
+    func testSameSecondIdenticalEventCannotCountTwice() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let data = codexMarker(moment)
-        let monitor = CodexTurnMonitor(read: { _ in data }, now: { self.moment })
+        let probe = LockedLocalReportReader(data)
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { self.moment })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { self.moment })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         for _ in 0..<4 { monitor.refresh() }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         monitor.configure(enabled: false)
     }
 
-    func testClaudeDifferentMilestoneTimestampAfterArmCanCount() throws {
+    func testClaudeDifferentMilestoneTimestampAfterArmCanCount() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content = claudeMarker("SessionStart", moment)
-        let monitor = ClaudeHookMonitor(read: { _ in content }, now: { time })
+        let probe = LockedLocalReportReader(claudeMarker("SessionStart", moment))
+        let monitor = ClaudeHookMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: CodexTurnMonitor(), claude: monitor)
         verifier.start(claude: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         time = time.addingTimeInterval(3)
-        content = claudeMarker("Stop", time)
+        probe.set(claudeMarker("Stop", time))
         monitor.refresh()
+        await awaitLocalReport { verifier.claudeState == .observed(time) }
         XCTAssertEqual(verifier.claudeState, .observed(time))
         monitor.configure(enabled: false)
     }
 
-    func testCodexAndClaudeChecksRemainIndependent() throws {
+    func testCodexAndClaudeChecksRemainIndependent() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var codexData: Data? = codexMarker(time)
-        var claudeData: Data? = claudeMarker("SessionStart", time)
-        let codex = CodexTurnMonitor(read: { _ in codexData }, now: { time })
-        let claude = ClaudeHookMonitor(read: { _ in claudeData }, now: { time })
+        let codexProbe = LockedLocalReportReader(codexMarker(time))
+        let claudeProbe = LockedLocalReportReader(claudeMarker("SessionStart", time))
+        let codex = CodexTurnMonitor(read: { codexProbe.read($0) }, now: { time })
+        let claude = ClaudeHookMonitor(read: { claudeProbe.read($0) }, now: { time })
         codex.configure(enabled: true)
         claude.configure(enabled: true)
         codex.connectDirectory(folder)
         claude.connectDirectory(folder)
+        await awaitLocalReport { !codex.isRefreshing && !claude.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: codex, claude: claude)
         verifier.start(codex: codex)
         verifier.start(claude: claude)
+        await awaitLocalReport { !codex.isRefreshing && !claude.isRefreshing }
         time = moment.addingTimeInterval(5)
-        codexData = codexMarker(time)
+        codexProbe.set(codexMarker(time))
         codex.refresh()
+        await awaitLocalReport { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         XCTAssertEqual(verifier.claudeState, .waiting(moment))
-        claudeData = claudeMarker("Stop", time)
+        claudeProbe.set(claudeMarker("Stop", time))
         claude.refresh()
+        await awaitLocalReport { verifier.claudeState == .observed(time) }
         XCTAssertEqual(verifier.claudeState, .observed(time))
         codex.configure(enabled: false)
         claude.configure(enabled: false)
     }
 
-    func testDisconnectClearsObservedResult() throws {
+    func testDisconnectClearsObservedResult() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var data = codexMarker(time)
-        let monitor = CodexTurnMonitor(read: { _ in data }, now: { time })
+        let probe = LockedLocalReportReader(codexMarker(time))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         time = moment.addingTimeInterval(2)
-        data = codexMarker(time)
+        probe.set(codexMarker(time))
         monitor.refresh()
+        await awaitLocalReport { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         monitor.disconnect()
         XCTAssertEqual(verifier.codexState, .needsSetup)
         monitor.configure(enabled: false)
     }
 
-    func testTimeoutRefusesLateMarkersAndDisplaysTimeout() throws {
+    func testTimeoutRefusesLateMarkersAndDisplaysTimeout() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var data: Data?
-        let monitor = CodexTurnMonitor(read: { _ in data }, now: { time })
+        let probe = LockedLocalReportReader()
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         XCTAssertEqual(
             verifier.state(for: .codex, at: time.addingTimeInterval(180)),
             .waiting(moment)
@@ -211,32 +238,37 @@ final class AgentHookVerificationTests: XCTestCase {
             .timedOut
         )
         time = moment.addingTimeInterval(190)
-        data = codexMarker(time)
+        probe.set(codexMarker(time))
         monitor.refresh()
-        XCTAssertEqual(verifier.codexState, .timedOut)
+        XCTAssertEqual(verifier.state(for: .codex, at: time), .timedOut)
         monitor.configure(enabled: false)
     }
 
-    func testStopAllResetsAndRemovesOldSubscriptions() throws {
+    func testStopAllResetsAndRemovesOldSubscriptions() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content: Data?
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { time })
+        let probe = LockedLocalReportReader()
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await awaitLocalReport { !monitor.isRefreshing }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await awaitLocalReport { !monitor.isRefreshing }
         verifier.stopAll()
         time = moment.addingTimeInterval(4)
-        content = codexMarker(time)
+        probe.set(codexMarker(time))
         monitor.refresh()
         XCTAssertEqual(verifier.codexState, .notStarted)
         XCTAssertEqual(verifier.claudeState, .notStarted)
         monitor.configure(enabled: false)
     }
 
+}
+
+extension AgentHookVerificationTests {
     func testOnlyExistingMarkersNoSensitiveDataInVerification() {
         XCTAssertNil(AgentHookMarker.codex(.off))
         XCTAssertNil(AgentHookMarker.codex(.unavailable))

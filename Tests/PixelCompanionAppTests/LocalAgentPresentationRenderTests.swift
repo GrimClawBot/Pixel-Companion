@@ -27,7 +27,7 @@ final class LocalAgentPresentationRenderTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    private func monitors() -> (CodexTurnMonitor, ClaudeHookMonitor) {
+    private func monitors() async -> (CodexTurnMonitor, ClaudeHookMonitor) {
         let now = Date()
         let date = ISO8601DateFormatter().string(from: now)
         let codexData = Data(
@@ -46,11 +46,17 @@ final class LocalAgentPresentationRenderTests: XCTestCase {
         claude.configure(enabled: true)
         codex.connectDirectory(tempDirectory)
         claude.connectDirectory(tempDirectory)
+        await awaitLocalReport {
+            if case .observed = codex.status, case .observed = claude.status {
+                return true
+            }
+            return false
+        }
         return (codex, claude)
     }
 
-    func testNativeAgentCardsRenderAtBothSurfaceWidths() throws {
-        let (codex, claude) = monitors()
+    func testNativeAgentCardsRenderAtBothSurfaceWidths() async throws {
+        let (codex, claude) = await monitors()
         defer {
             codex.configure(enabled: false)
             claude.configure(enabled: false)
@@ -69,8 +75,8 @@ final class LocalAgentPresentationRenderTests: XCTestCase {
         }
     }
 
-    func testNativeActivityCardRendersWithoutPaperclipData() throws {
-        let (codex, claude) = monitors()
+    func testNativeActivityCardRendersWithoutPaperclipData() async throws {
+        let (codex, claude) = await monitors()
         defer {
             codex.configure(enabled: false)
             claude.configure(enabled: false)
