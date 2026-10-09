@@ -168,6 +168,7 @@ enum PaperclipMapper {
             return AgentRunSnapshot(
                 id: run.id,
                 state: runState(run.status, agentStatus: ""),
+                issueID: run.contextSnapshot?.issueId.flatMap { $0.isEmpty ? nil : $0 },
                 taskTitle: task,
                 model: run.usageJson?.model,
                 provider: run.usageJson?.provider,
