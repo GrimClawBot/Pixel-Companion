@@ -101,6 +101,12 @@ public struct NotchGeometry: Equatable, Sendable {
         let height = min(max(size.height, notchRect.height), screenFrame.height)
         let centredX = notchRect.midX - width / 2
         let originX = min(max(centredX, screenFrame.minX), screenFrame.maxX - width)
+        // Preserve subpoint placement for the original width-based initializer
+        // (scale 1), so rounding cannot uncover the fractional notch edge.
+        // Real Retina measurements are snapped to the backing-pixel grid.
+        guard backingScaleFactor > 1 else {
+            return CGRect(x: originX, y: screenFrame.maxY - height, width: width, height: height)
+        }
         let alignedX = (originX * backingScaleFactor).rounded() / backingScaleFactor
         let boundedX = min(max(alignedX, screenFrame.minX), screenFrame.maxX - width)
         return CGRect(x: boundedX, y: screenFrame.maxY - height, width: width, height: height)
