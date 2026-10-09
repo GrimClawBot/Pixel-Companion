@@ -36,6 +36,23 @@ final class NotchLayoutTests: XCTestCase {
         )
     }
 
+    func testCompactCharacterNeverShowsWorkingWhenSourceIsStale() {
+        for state in [FeedFreshness.connecting, .stale, .unavailable] {
+            XCTAssertEqual(
+                CompactBarPresentation.displayMood(mood: .working, feedFreshness: state),
+                .offline
+            )
+        }
+        XCTAssertEqual(
+            CompactBarPresentation.displayMood(mood: .working, feedFreshness: .current),
+            .working
+        )
+        XCTAssertEqual(
+            CompactBarPresentation.displayMood(mood: .coding, feedFreshness: .notApplicable),
+            .coding
+        )
+    }
+
     func testStatusIndicatorMatchesActualFeedFreshness() {
         XCTAssertEqual(
             CompactBarPresentation.indicator(mood: .working, feedFreshness: .current),
