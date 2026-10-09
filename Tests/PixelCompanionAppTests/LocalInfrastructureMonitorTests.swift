@@ -2,6 +2,23 @@ import Foundation
 @testable import PixelCompanion
 import XCTest
 
+private final class LockedReadAvailability: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = true
+
+    func set(_ newValue: Bool) {
+        lock.lock()
+        value = newValue
+        lock.unlock()
+    }
+
+    func get() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 @MainActor
 final class LocalInfrastructureMonitorTests: XCTestCase {
     private let now = ISO8601DateFormatter().date(from: "2026-10-09T12:00:00Z")!
@@ -36,6 +53,14 @@ final class LocalInfrastructureMonitorTests: XCTestCase {
 
     private func parsed(_ rows: [[String: Any]]) -> LocalInfrastructureStatus {
         LocalInfrastructureParser.parse(data(rows), now: now)
+    }
+
+    private func waitFor(_ predicate: () -> Bool, file: StaticString = #filePath, line: UInt = #line) async {
+        for _ in 0..<200 {
+            if predicate() { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Timed out waiting for asynchronous infrastructure report", file: file, line: line)
     }
 
     func testFreshMetricsAndDeploymentAreReportedOnly() throws {
@@ -139,7 +164,7 @@ final class LocalInfrastructureMonitorTests: XCTestCase {
         XCTAssertEqual(parsed([row]), .unavailable)
     }
 
-    func testOptInLifecycleClearsLocalPathOnDisable() {
+    func testOptInLifecycleClearsLocalPathOnDisable() async {
         let url = URL(fileURLWithPath: "/tmp/owner-selected-infra.json")
         let bytes = data([host()])
         let monitor = LocalInfrastructureMonitor(read: { file in
@@ -152,6 +177,10 @@ final class LocalInfrastructureMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.status, .unconnected)
         monitor.connect(url)
         XCTAssertTrue(monitor.isConnected)
+        await waitFor {
+            if case .loaded = monitor.status { return true }
+            return false
+        }
         guard case .loaded = monitor.status else { return XCTFail("Not loaded") }
         monitor.configure(enabled: false)
         XCTAssertFalse(monitor.isConnected)
@@ -162,19 +191,82 @@ final class LocalInfrastructureMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.status, .unconnected)
     }
 
-    func testMissingSelectedFileImmediatelyInvalidatesLiveReport() {
+    func testMissingSelectedFileImmediatelyInvalidatesLiveReport() async {
         let url = URL(fileURLWithPath: "/tmp/owner-selected-infra.json")
-        var available = true
+        let availability = LockedReadAvailability()
         let bytes = data([host()])
         let monitor = LocalInfrastructureMonitor(
-            read: { _ in available ? bytes : nil }, now: { self.now }
+            read: { _ in availability.get() ? bytes : nil }, now: { self.now }
         )
         monitor.configure(enabled: true)
         monitor.connect(url)
-        guard case .loaded = monitor.status else { return XCTFail("Not loaded") }
-        available = false
+        await waitFor {
+            if case .loaded = monitor.status { return true }
+            return false
+        }
+        availability.set(false)
         monitor.refresh()
+        await waitFor { monitor.status == .unavailable }
         XCTAssertEqual(monitor.status, .unavailable)
         monitor.disconnect()
+    }
+
+    func testSlowReportReadNeverBlocksMainActorOrRestoresOldFile() async {
+        let first = URL(fileURLWithPath: "/tmp/owner-infrastructure-slow.json")
+        let second = URL(fileURLWithPath: "/tmp/owner-infrastructure-current.json")
+        let slowReadStarted = expectation(description: "background file read started")
+        let slowReadGate = DispatchSemaphore(value: 0)
+        defer { slowReadGate.signal() }
+        let older = data([host(id: "old", cpu: 99)])
+        let current = data([host(id: "current", cpu: 7)])
+        let monitor = LocalInfrastructureMonitor(read: { file in
+            if file == first {
+                slowReadStarted.fulfill()
+                slowReadGate.wait()
+                return older
+            }
+            return file == second ? current : nil
+        }, now: { self.now })
+
+        monitor.configure(enabled: true)
+        monitor.connect(first)
+        // The main actor must still run while the old read remains blocked.
+        await fulfillment(of: [slowReadStarted], timeout: 2)
+        XCTAssertEqual(monitor.status, .unavailable)
+        monitor.connect(second)
+        await waitFor {
+            if case let .loaded(hosts) = monitor.status {
+                return hosts.count == 1 && hosts[0].id == "current" && hosts[0].cpuPercent == 7
+            }
+            return false
+        }
+        slowReadGate.signal()
+        try? await Task.sleep(for: .milliseconds(60))
+        if case let .loaded(hosts) = monitor.status {
+            XCTAssertEqual(hosts.first?.id, "current")
+        } else {
+            XCTFail("Old source replaced the current report")
+        }
+        monitor.configure(enabled: false)
+        XCTAssertEqual(monitor.status, .disabled)
+    }
+
+    func testDisplayedMetricsDisappearAtStaleBoundary() throws {
+        guard case let .loaded(hosts) = parsed([host()]),
+              let node = hosts.first else {
+            return XCTFail("Expected fixture host")
+        }
+        let justBeforeLimit = now.addingTimeInterval(90)
+        let beyondLimit = now.addingTimeInterval(91)
+        let fresh = LocalInfrastructureHostDisplay(host: node, now: justBeforeLimit)
+        XCTAssertTrue(fresh.isFresh)
+        XCTAssertEqual(fresh.visibleMetrics?.cpuPercent, 42)
+        XCTAssertEqual(fresh.visibleMetrics?.deployment?.state, .healthy)
+
+        let stale = LocalInfrastructureHostDisplay(host: node, now: beyondLimit)
+        XCTAssertFalse(stale.isFresh)
+        XCTAssertNil(stale.visibleMetrics?.cpuPercent)
+        XCTAssertNil(stale.visibleMetrics?.deployment)
+        XCTAssertNil(stale.visibleMetrics)
     }
 }

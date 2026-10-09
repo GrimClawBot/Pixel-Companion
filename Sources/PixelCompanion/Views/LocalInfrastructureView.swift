@@ -2,6 +2,18 @@ import SwiftUI
 
 /// Source-reported local JSON telemetry only. This panel does not scan
 /// machines, ping servers, assert remote host trust or perform any actions.
+/// The sole gate that lets source-reported metrics enter the rendered view.
+/// Tests exercise the same state the SwiftUI rows consume at the 120s boundary.
+struct LocalInfrastructureHostDisplay {
+    let isFresh: Bool
+    let visibleMetrics: LocalInfrastructureHost?
+
+    init(host: LocalInfrastructureHost, now: Date) {
+        isFresh = host.isFresh(at: now)
+        visibleMetrics = isFresh ? host : nil
+    }
+}
+
 struct LocalInfrastructureView: View {
     @ObservedObject var monitor: LocalInfrastructureMonitor
 
@@ -45,22 +57,22 @@ struct LocalInfrastructureView: View {
     }
 
     private func hostRow(_ host: LocalInfrastructureHost, now: Date) -> some View {
-        let fresh = host.isFresh(at: now)
+        let display = LocalInfrastructureHostDisplay(host: host, now: now)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: fresh ? "server.rack" : "clock.badge.exclamationmark")
-                    .foregroundStyle(fresh ? .primary : .secondary)
+                Image(systemName: display.isFresh ? "server.rack" : "clock.badge.exclamationmark")
+                    .foregroundStyle(display.isFresh ? .primary : .secondary)
                     .accessibilityHidden(true)
                 Text(host.name)
                     .font(.callout.weight(.semibold))
                     .lineLimit(2)
                 Spacer(minLength: 0)
-                Text(fresh ? "Recent report" : "Stale report")
+                Text(display.isFresh ? "Recent report" : "Stale report")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
             }
-            if fresh {
-                metrics(host)
+            if let visible = display.visibleMetrics {
+                metrics(visible)
             } else {
                 Text("Metrics withheld because the source timestamp is not fresh.")
                     .font(.caption2)

@@ -175,16 +175,18 @@ enum LocalInfrastructureParser {
 @MainActor
 final class LocalInfrastructureMonitor: ObservableObject {
     @Published private(set) var status: LocalInfrastructureStatus = .disabled
-    private let read: (URL) -> Data?
+    private let read: @Sendable (URL) -> Data?
     private let now: () -> Date
     private var selectedFile: URL?
     private var timer: Timer?
+    private var readTask: Task<Void, Never>?
+    private var revision: UInt64 = 0
     private(set) var enabled = false
 
     static let refreshInterval: TimeInterval = 15
 
     init(
-        read: @escaping (URL) -> Data? = LocalAgentFeedFileReader.read,
+        read: @escaping @Sendable (URL) -> Data? = { LocalAgentFeedFileReader.read($0) },
         now: @escaping () -> Date = Date.init
     ) {
         self.read = read
@@ -212,19 +214,35 @@ final class LocalInfrastructureMonitor: ObservableObject {
     }
 
     func refresh() {
-        guard enabled, let selectedFile else { return }
-        guard let data = read(selectedFile) else {
-            status = .unavailable
-            return
+        // A slow mounted/cloud report must never block SwiftUI or overlap later polls.
+        guard enabled, let selectedFile, readTask == nil else { return }
+        let currentRevision = revision
+        let read = self.read
+        readTask = Task.detached(priority: .utility) { [weak self] in
+            let data = read(selectedFile)
+            // If cancelled while a synchronous filesystem call was waiting, do not
+            // deliver any stale result. The generation guard also covers reconnects.
+            guard !Task.isCancelled else { return }
+            await self?.finishRefresh(data, file: selectedFile, revision: currentRevision)
         }
-        status = LocalInfrastructureParser.parse(data, now: now())
+    }
+
+    private func finishRefresh(_ data: Data?, file: URL, revision candidate: UInt64) {
+        guard enabled, revision == candidate, selectedFile == file else { return }
+        readTask = nil
+        status = data.map { LocalInfrastructureParser.parse($0, now: now()) } ?? .unavailable
     }
 
     private func restart() {
         timer?.invalidate()
         timer = nil
+        revision &+= 1
+        readTask?.cancel()
+        readTask = nil
         guard enabled else { status = .disabled; return }
         guard selectedFile != nil else { status = .unconnected; return }
+        // Clear an old file's health immediately, even if the replacement blocks.
+        status = .unavailable
         refresh()
         let newTimer = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }

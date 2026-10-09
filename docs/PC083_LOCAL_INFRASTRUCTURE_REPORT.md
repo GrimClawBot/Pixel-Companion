@@ -21,6 +21,27 @@ The schema parser is strict: version 1; 0–8 unique ASCII host IDs;
 host labels have control/bidi characters removed; timestamps must be
 ISO 8601 and no more than 30 seconds ahead of the Mac clock.
 
+### Producer validation limits
+
+Reports are all-or-nothing: **any** malformed host rejects the whole file.
+Producer IDs must be unique, 1–80 ASCII characters matching
+`[A-Za-z0-9_-]+`. Host and deployment labels are sanitized of control
+and bidi characters, then trimmed, and must be 1–64 characters long.
+CPU must be finite and within 0–100%; temperatures must be finite
+and within **-40 to 150 °C**. Memory and disk used/total fields must
+both exist when either is supplied: totals must be **strictly positive**
+and used must lie between zero and total (inclusive). Receive/transmit
+rates must be integers from 0 to **1,000,000,000,000 bytes/sec**.
+Timestamps must use ISO 8601 and cannot be more than 30 seconds in
+the future. A record older than 120 seconds is displayed as stale
+without any of its metrics or deployment health. There may be at most
+eight uniquely identified hosts. Missing optional metrics are allowed.
+File size is at most 65,536 bytes.
+
+File reads run in the background; a slow or unavailable selected path
+must not freeze the notch, menu-bar, or settings UI. Late reads from
+a disconnected or replaced source are discarded.
+
 The Overview panel displays CPU %, RAM/disk used proportions, Celsius,
 receive/transmit bytes per second and deployment health **only if
 the source explicitly provides them**. No unreported fields are
@@ -129,3 +150,17 @@ verified, stopped QA83 bundle be moved to recoverable Trash.
 
 Greptile technical review and independent human approval are still
 required for merge; Mac verification does not satisfy those gates.
+
+
+## QA85 follow-up: async file reads and source health visibility
+
+Greptile review identified a P1 synchronous main-actor file read and
+P2 missing stale UI regression coverage/documented producer limits.
+QA85 moves reads off the main thread with one outstanding read per
+source, cancellation and generation-based late-result rejection.
+Both fresh-to-stale CPU/deployment suppression and blocked-read source
+switching are covered by native XCTest. Build a new isolated QA85 from
+the exact final commit using `--qa-number 85 --no-open`; do not modify
+or remove the running QA84 until strict CI, signature, metadata, and
+new launch checks pass. Owner visual/VoiceOver acceptance, Greptile
+exact-head review and independent human approval remain separate gates.
