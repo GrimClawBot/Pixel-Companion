@@ -29,7 +29,8 @@ class RetireOldQAMacTests(unittest.TestCase):
         contents = app / "Contents"
         binary_dir = contents / "MacOS"
         binary_dir.mkdir(parents=True)
-        shutil.copy2("/usr/bin/true", binary_dir / "PixelCompanion")
+        shutil.copyfile("/usr/bin/true", binary_dir / "PixelCompanion")
+        (binary_dir / "PixelCompanion").chmod(0o755)
         with (contents / "Info.plist").open("wb") as output:
             plistlib.dump({
                 "CFBundleName": "PixelCompanion",
