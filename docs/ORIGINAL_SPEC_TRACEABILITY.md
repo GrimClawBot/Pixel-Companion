@@ -4,6 +4,51 @@ Audit date: 2026-10-08
 Code baseline: QA24, SHA c5d58c054d08017f8b38bd5f103180d7650cbf4d.
 This is a requirements audit, not user acceptance or a complete-v1 claim.
 
+## Evidence refresh — October 8, 2026 (supersedes QA24 *current-status* labels below)
+
+The matrices following this section are an **archived QA24 discovery baseline**.
+Their `BUILT/PARTIAL/MISSING` judgments describe SHA `c5d58c0` only.
+Use this refresh to determine current Alpha implementation, not those old labels.
+
+- Current *installed local QA* at last verified Mac check: **QA61**, built from
+  PC-065 SHA `e20b4fa0d46e9156105b3895d12d37f4b8ea9ba5`.
+  QA61 does **not** contain later PC-066/PC-067 fixes and **cannot** modify
+  Launch at Login because it is deliberately marked as a disposable QA build.
+- Latest cumulative *source review candidate*: **draft PR #149**, exact SHA
+  `fe6fbc4e69c93d274c1daf23e385d4fc846b6bc7`, including PC-065,
+  PC-066 and PC-067. Not merged, deployed, or user-accepted. Its GitHub
+  Actions workflow `37877032944` passed **141 Python** and **455 Swift**
+  tests, lint, build, config and secret checks. CI proves test results, not
+  visual accessibility, actual backend permissions or macOS login behavior.
+- For post-QA24 source changes, cite the current code/test paths and the
+  relevant accepted-on-Mac test evidence; do not substitute file presence
+  for successful live functionality.
+
+| Original contract area | Evidence in current Alpha source | Updated status / still needed |
+| --- | --- | --- |
+| Native notch, menu-bar fallback, four detail tabs, keyboard | `Sources/PixelCompanion/Notch`, `Views/CompanionTabBar.swift`, presentation and keyboard XCTest | **BUILT / HUMAN QA PENDING**: external monitor, clamshell, VoiceOver, contrast/text scaling and sleep/wake matrix |
+| Generic independent public core and read-only Paperclip | `PixelCompanionCore/Connector`, `Paperclip`, MockConnector, `docs/ARCHITECTURE.md` | **BUILT READ-ONLY ALPHA**: additional trusted department/run/log data and authenticated connectors not yet complete |
+| Public GitHub workflow/PR status | `App/PublicGitHubMonitor.swift`, `Views/PublicGitHubPulseView.swift` | **BUILT, PUBLIC-ONLY**: no private auth, task-linked PR provenance or full branch drilldown |
+| Local Codex/Claude agent presence and notifications | `App/CodexTurnMonitor.swift`, `ClaudeHookMonitor.swift`, local-agent feed/alert tests | **BUILT LOCAL OPT-IN PIECES**: not a complete plugin SDK or all-agent integration; do not infer any remote actions |
+| Optional timer, Battery/Power, Calendar, Apple Music | `App/FocusTimerController.swift`, `BatteryPowerMonitor.swift`, `CalendarNextEventMonitor.swift`, `MusicNowPlayingMonitor.swift` and matching tests | **BUILT SOURCE + TESTS**: explicit permissions, off-by-default, native visual and privacy QA pending |
+| Optional volume/brightness/download HUD, file shelf, clipboard | `App/OutputVolumeMonitor.swift`, `DisplayBrightnessMonitor.swift`, `DownloadProgressMonitor.swift`, `TransientFileShelf.swift`, `TransientClipboardHistory.swift` and matching views/tests | **BUILT SOURCE + TESTS**: availability depends on OS/provider; behavior and privacy still need real hardware/permission acceptance |
+| Canonical activities, source priority, original character | `CompanionLiveActivity.swift`, `CharacterStateMachine.swift`, `CharacterView.swift`, live attention views/tests | **PARTIAL**: full priority vocabulary, normalized event envelope, source-specific animation and transient stack behavior not yet established |
+| Token usage, context health and safe recommendations | `Connector/ContextHealth.swift`, `Views/ContextHealthSummaryView.swift`, `AgentUsageDashboard.swift` | **PARTIAL**: reported-only metrics exist; do not call them a complete confidence/velocity/quotas or new-chat handoff engine |
+| Company/agent/task/run drilldown and approvals | `Views/CompanyTasksView.swift`, `AgentInspectorView.swift`, `AgentRunHistoryView.swift`, `ActivityTimelineView.swift` | **PARTIAL**: source-verified department hierarchy, redacted logs, trusted links, approval detail and server-authorized mutations remain missing/gated |
+| Private Pixel/Atlas chat, infrastructure, account/identity | Connector interface contracts; no authorized private backend action protocol | **MISSING OR SECURITY-GATED**: Keychain/Touch ID/Secure Enclave, authenticated ChatBackend, private host data, approvals and changes require server authority and separate human security review |
+| Launch at Login | `Settings/LaunchAtLoginController.swift`, `SettingsViewSections.swift`, **10 fake-ServiceManagement tests** on exact SHA | **IMPLEMENTATION + GREPTILE COMPLETE**: safe pending approval cancellation in PC-065 #144, second-pass Greptile 5/5 no findings; **actual user-controlled installed non-QA macOS registration/cancel/startup acceptance still OPEN (#148)** |
+| Packaging and protected integration | `scripts/package_macos.sh`, `quality/install_bundle.py`, `protected_cut_audit.py`, PC-066/#146 + PC-067/#147 | **TESTED DRAFT**: symlink-alias and late-link protection; latest CI passed. PC-067 corrected-head Greptile follow-up not yet confirmed. Protected `main` still needs an independent GitHub human approval and owner-authorized integration |
+
+**How to interpret the milestones:** passing a native test suite is sufficient to
+say *implemented and tested*, never to say *installed-release accepted* or
+*full-v1 finished*. The cumulative Alpha integration cut is separate from the
+remaining whole-v1 feature backlog (#48, #58-#65). Public app/binary distribution
+is expressly **deferred** (#17), so notarization/release are not active
+requirements for developing or testing the local Alpha. No accepted functionality
+may be removed to shorten the build (LOCKED-BUILT). PC-065 real-login acceptance
+is tracked independently at #148, and final cumulative review at #149.
+
+
 ## Authoritative sources
 
 - Original shared discussion: https://chatgpt.com/share/6ac0a132-0bc4-83ea-8b7c-29ba7cfeb8dc
