@@ -146,10 +146,9 @@ enum CompactBarPresentation {
     /// Show no duplicate icon for ordinary work: the visible label already says Working.
     /// Important alerts, approvals and freshness warnings keep their own symbols.
     static func needsCompactIndicator(
-        mood: CharacterMood, feedFreshness: FeedFreshness, hasApprovals: Bool
+        mood: CharacterMood, feedFreshness: FeedFreshness
     ) -> Bool {
         if !feedFreshness.canPresentAsLive { return true }
-        if hasApprovals { return true }
         switch mood {
         case .error, .offline, .waitingForApproval, .success,
              .budgetWarning, .infrastructureAlert, .securityAlert:
@@ -211,7 +210,7 @@ struct CompactBar: View {
                 .background(Capsule().fill(Color.orange))
                 .accessibilityLabel("\(snapshot.pendingApprovals.count) waiting for approval")
         } else if !showsStatusText || CompactBarPresentation.needsCompactIndicator(
-            mood: mood, feedFreshness: feedFreshness, hasApprovals: false
+            mood: mood, feedFreshness: feedFreshness
         ) {
             Image(systemName: CompactBarPresentation.indicator(
                 mood: mood, feedFreshness: feedFreshness
