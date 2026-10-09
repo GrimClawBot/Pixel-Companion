@@ -62,6 +62,12 @@ struct CompanyTasksView: View {
     let onSelectAgent: (String) -> Void
     @State private var query = ""
     @State private var expanded = false
+    @State private var selectedTaskID: String?
+
+    private var selectedTask: TaskSnapshot? {
+        guard isLive, let selectedTaskID else { return nil }
+        return tasks.first { $0.id == selectedTaskID }
+    }
 
     private var filtered: [TaskSnapshot] {
         CompanyTaskPresentation.filtered(tasks, query: query)
@@ -74,6 +80,11 @@ struct CompanyTasksView: View {
                     Placeholder(text: "Tasks unavailable until the feed is fresh.")
                 } else if tasks.isEmpty {
                     Placeholder(text: "No tasks reported by this connector.")
+                } else if let selectedTask {
+                    CompanyTaskEvidenceView(
+                        task: selectedTask, sessions: agents, isLive: isLive,
+                        onBack: { selectedTaskID = nil }, onSelectAgent: onSelectAgent
+                    )
                 } else {
                     TextField("Search tasks…", text: $query)
                         .textFieldStyle(.roundedBorder)
@@ -86,15 +97,25 @@ struct CompanyTasksView: View {
                         Placeholder(text: "No tasks match your search.")
                     }
                     ForEach(filtered.prefix(12)) { task in
-                        if let agentID = task.assigneeAgentID,
-                           agents.contains(where: { $0.agentID == agentID }) {
-                            Button { onSelectAgent(agentID) } label: {
+                        HStack(alignment: .top, spacing: 6) {
+                            Button { selectedTaskID = task.id } label: {
                                 ReadOnlyTaskRow(task: task)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Inspect assigned agent for " + task.title)
-                        } else {
-                            ReadOnlyTaskRow(task: task)
+                            .accessibilityLabel("Inspect task " + task.title)
+                            .accessibilityIdentifier("companion.task.select")
+                            // Preserve the existing direct navigation to an assigned agent.
+                            if let agentID = task.assigneeAgentID,
+                               agents.contains(where: { $0.agentID == agentID }) {
+                                Button { onSelectAgent(agentID) } label: {
+                                    Image(systemName: "person.crop.circle")
+                                        .font(.title3)
+                                        .frame(minWidth: 28, minHeight: 44)
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Inspect assigned agent for " + task.title)
+                                .accessibilityIdentifier("companion.task.agent-shortcut")
+                            }
                         }
                     }
                 }
@@ -104,5 +125,13 @@ struct CompanyTasksView: View {
             SectionTitle(text: isLive ? "Company tasks · \(tasks.count)" : "Company tasks")
         }
         .accessibilityIdentifier("companion.tasks.company")
+        .onChange(of: isLive) { _, live in
+            if !live { selectedTaskID = nil }
+        }
+        .onChange(of: tasks.map(\.id)) { _, currentIDs in
+            if let selectedTaskID, !currentIDs.contains(selectedTaskID) {
+                self.selectedTaskID = nil
+            }
+        }
     }
 }
