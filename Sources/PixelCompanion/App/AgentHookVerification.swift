@@ -49,8 +49,8 @@ final class AgentHookVerifier: ObservableObject {
 
     private var codexAttempt: Attempt?
     private var claudeAttempt: Attempt?
-    private var codexArmTask: Task<Void, Never>?
-    private var claudeArmTask: Task<Void, Never>?
+    private weak var codexBaselineMonitor: CodexTurnMonitor?
+    private weak var claudeBaselineMonitor: ClaudeHookMonitor?
     private var codexArmRevision: UInt64 = 0
     private var claudeArmRevision: UInt64 = 0
 
@@ -79,64 +79,71 @@ final class AgentHookVerifier: ObservableObject {
     }
 
     func start(codex monitor: CodexTurnMonitor) {
-        codexArmTask?.cancel()
+        codexBaselineMonitor?.cancelVerificationBaseline()
         codexArmRevision &+= 1
         let revision = codexArmRevision
         codexAttempt = nil
-        guard monitor.isConnected else { codexState = .needsSetup; return }
+        guard monitor.isConnected else {
+            codexBaselineMonitor = nil
+            codexState = .needsSetup
+            return
+        }
+        codexBaselineMonitor = monitor
         codexState = .waiting(now())
-        codexArmTask = Task { [weak self, weak monitor] in
-            guard let self, let monitor else { return }
-            let baseline = await monitor.refreshedStatusForVerification()
-            guard !Task.isCancelled, self.codexArmRevision == revision else { return }
+        // Weak captures prevent a stalled mount from retaining the verifier.
+        monitor.requestVerificationBaseline { [weak self, weak monitor] baseline in
+            guard let self, let monitor,
+                  self.codexArmRevision == revision,
+                  self.codexBaselineMonitor === monitor else { return }
+            self.codexBaselineMonitor = nil
             guard let baseline else {
-                codexState = .needsSetup
-                codexArmTask = nil
+                self.codexState = .needsSetup
                 return
             }
-            // Events received during preflight belong to the baseline.
-            // Arm only after that snapshot finishes, never before.
-            let started = now()
-            codexAttempt = Attempt(started: started, baseline: .codex(baseline))
-            codexState = .waiting(started)
-            codexArmTask = nil
+            let started = self.now()
+            self.codexAttempt = Attempt(started: started, baseline: .codex(baseline))
+            self.codexState = .waiting(started)
         }
     }
 
     func start(claude monitor: ClaudeHookMonitor) {
-        claudeArmTask?.cancel()
+        claudeBaselineMonitor?.cancelVerificationBaseline()
         claudeArmRevision &+= 1
         let revision = claudeArmRevision
         claudeAttempt = nil
-        guard monitor.isConnected else { claudeState = .needsSetup; return }
+        guard monitor.isConnected else {
+            claudeBaselineMonitor = nil
+            claudeState = .needsSetup
+            return
+        }
+        claudeBaselineMonitor = monitor
         claudeState = .waiting(now())
-        claudeArmTask = Task { [weak self, weak monitor] in
-            guard let self, let monitor else { return }
-            let baseline = await monitor.refreshedStatusForVerification()
-            guard !Task.isCancelled, self.claudeArmRevision == revision else { return }
+        monitor.requestVerificationBaseline { [weak self, weak monitor] baseline in
+            guard let self, let monitor,
+                  self.claudeArmRevision == revision,
+                  self.claudeBaselineMonitor === monitor else { return }
+            self.claudeBaselineMonitor = nil
             guard let baseline else {
-                claudeState = .needsSetup
-                claudeArmTask = nil
+                self.claudeState = .needsSetup
                 return
             }
-            let started = now()
-            claudeAttempt = Attempt(started: started, baseline: .claude(baseline))
-            claudeState = .waiting(started)
-            claudeArmTask = nil
+            let started = self.now()
+            self.claudeAttempt = Attempt(started: started, baseline: .claude(baseline))
+            self.claudeState = .waiting(started)
         }
     }
 
     func stop(_ source: AgentHookCheckSource) {
         switch source {
         case .codex:
-            codexArmTask?.cancel()
-            codexArmTask = nil
+            codexBaselineMonitor?.cancelVerificationBaseline()
+            codexBaselineMonitor = nil
             codexArmRevision &+= 1
             codexAttempt = nil
             codexState = .notStarted
         case .claude:
-            claudeArmTask?.cancel()
-            claudeArmTask = nil
+            claudeBaselineMonitor?.cancelVerificationBaseline()
+            claudeBaselineMonitor = nil
             claudeArmRevision &+= 1
             claudeAttempt = nil
             claudeState = .notStarted
