@@ -25,6 +25,26 @@ public final class SettingsStore {
         case mockStepInterval = "pixelCompanion.mockStepInterval"
         case paperclipBaseURL = "pixelCompanion.paperclipBaseURL"
         case paperclipCompanyID = "pixelCompanion.paperclipCompanyID"
+        case githubPublicRepository = "pixelCompanion.githubPublicRepository"
+        case conserveEnergy = "pixelCompanion.conserveEnergy"
+        case focusTimerEnabled = "pixelCompanion.focusTimerEnabled"
+        case batteryHUDEnabled = "pixelCompanion.batteryHUDEnabled"
+        case outputVolumeHUDEnabled = "pixelCompanion.outputVolumeHUDEnabled"
+        case displayBrightnessHUDEnabled = "pixelCompanion.displayBrightnessHUDEnabled"
+        case downloadHUDEnabled = "pixelCompanion.downloadHUDEnabled"
+        case fileShelfEnabled = "pixelCompanion.fileShelfEnabled"
+        case clipboardHistoryEnabled = "pixelCompanion.clipboardHistoryEnabled"
+        case localAgentFeedEnabled = "pixelCompanion.localAgentFeedEnabled"
+        case localInfrastructureEnabled = "pixelCompanion.localInfrastructureEnabled"
+        case codexPresenceEnabled = "pixelCompanion.codexPresenceEnabled"
+        case codexTurnEventsEnabled = "pixelCompanion.codexTurnEventsEnabled"
+        case claudeHookEventsEnabled = "pixelCompanion.claudeHookEventsEnabled"
+        case managedAgentHookAutoConnectEnabled = "pixelCompanion.managedAgentHookAutoConnectEnabled"
+        case localAgentAlertsEnabled = "pixelCompanion.localAgentAlertsEnabled"
+        case calendarWidgetEnabled = "pixelCompanion.calendarWidgetEnabled"
+        case calendarShowTitles = "pixelCompanion.calendarShowTitles"
+        case musicWidgetEnabled = "pixelCompanion.musicWidgetEnabled"
+        case musicShowTrackDetails = "pixelCompanion.musicShowTrackDetails"
     }
 
     public static let stepIntervalRange: ClosedRange<TimeInterval> = 1...30
@@ -89,6 +109,134 @@ public final class SettingsStore {
             let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             defaults.set(value, forKey: Key.paperclipCompanyID.rawValue)
         }
+    }
+
+    /// Optional public GitHub owner/repo; nonsecret and disconnected by default.
+    public var githubPublicRepository: String {
+        get { defaults.string(forKey: Key.githubPublicRepository.rawValue) ?? "" }
+        set {
+            defaults.set(
+                newValue.trimmingCharacters(in: .whitespacesAndNewlines),
+                forKey: Key.githubPublicRepository.rawValue
+            )
+        }
+    }
+
+    /// Default on: follow macOS Low Power Mode to reduce Paperclip polling.
+    public var conserveEnergy: Bool {
+        get { (defaults.object(forKey: Key.conserveEnergy.rawValue) as? Bool) ?? true }
+        set { defaults.set(newValue, forKey: Key.conserveEnergy.rawValue) }
+    }
+
+    /// Standalone focus utility is disabled by default and holds no session data on disk.
+    public var focusTimerEnabled: Bool {
+        get { (defaults.object(forKey: Key.focusTimerEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.focusTimerEnabled.rawValue) }
+    }
+
+    /// Purely local power-source indicator. Disabled unless explicitly enabled.
+    public var batteryHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.batteryHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.batteryHUDEnabled.rawValue) }
+    }
+
+    /// Read-only default output volume is disabled by default. No audio data is saved.
+    public var outputVolumeHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.outputVolumeHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.outputVolumeHUDEnabled.rawValue) }
+    }
+
+    /// Public IOKit display brightness read-only HUD, disabled by default.
+    public var displayBrightnessHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.displayBrightnessHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.displayBrightnessHUDEnabled.rawValue) }
+    }
+
+    /// Only registered, reviewed sources can supply download progress.
+    public var downloadHUDEnabled: Bool {
+        get { (defaults.object(forKey: Key.downloadHUDEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.downloadHUDEnabled.rawValue) }
+    }
+
+    /// Explicitly selected ephemeral file references; never persisted.
+    public var fileShelfEnabled: Bool {
+        get { (defaults.object(forKey: Key.fileShelfEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.fileShelfEnabled.rawValue) }
+    }
+
+    /// Manual RAM-only clipboard history; never auto-captures.
+    public var clipboardHistoryEnabled: Bool {
+        get { (defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.clipboardHistoryEnabled.rawValue) }
+    }
+
+    /// Only enables opt-in local status; selected file paths never persist.
+    public var localAgentFeedEnabled: Bool {
+        get { (defaults.object(forKey: Key.localAgentFeedEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.localAgentFeedEnabled.rawValue) }
+    }
+
+    /// Optional generic infrastructure status file; default off and path never persisted.
+    public var localInfrastructureEnabled: Bool {
+        get { (defaults.object(forKey: Key.localInfrastructureEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.localInfrastructureEnabled.rawValue) }
+    }
+
+    /// Local process presence only; never a claim about active Codex sessions.
+    public var codexPresenceEnabled: Bool {
+        get { (defaults.object(forKey: Key.codexPresenceEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.codexPresenceEnabled.rawValue) }
+    }
+
+    /// Explicit Codex notify-hook status file; location never persisted.
+    public var codexTurnEventsEnabled: Bool {
+        get { (defaults.object(forKey: Key.codexTurnEventsEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.codexTurnEventsEnabled.rawValue) }
+    }
+
+    /// Off-by-default local Claude hook status; path stored in RAM only.
+    public var claudeHookEventsEnabled: Bool {
+        get { (defaults.object(forKey: Key.claudeHookEventsEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.claudeHookEventsEnabled.rawValue) }
+    }
+
+    /// Secondary opt-in, requiring the existing macOS notification permission.
+    public var localAgentAlertsEnabled: Bool {
+        get { (defaults.object(forKey: Key.localAgentAlertsEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.localAgentAlertsEnabled.rawValue) }
+    }
+
+    /// Opt in to reconnect ONLY verified owner-private app-support folders at launch.
+    public var managedAgentHookAutoConnectEnabled: Bool {
+        get {
+            (defaults.object(forKey: Key.managedAgentHookAutoConnectEnabled.rawValue) as? Bool)
+                ?? false
+        }
+        set { defaults.set(newValue, forKey: Key.managedAgentHookAutoConnectEnabled.rawValue) }
+    }
+
+    /// Calendar access itself is always controlled by macOS, never by a preference.
+    public var calendarWidgetEnabled: Bool {
+        get { (defaults.object(forKey: Key.calendarWidgetEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.calendarWidgetEnabled.rawValue) }
+    }
+
+    /// Event titles are sensitive; show only after a separate explicit opt-in.
+    public var calendarShowTitles: Bool {
+        get { (defaults.object(forKey: Key.calendarShowTitles.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.calendarShowTitles.rawValue) }
+    }
+
+    /// Music.app Automation requires a separate explicit Connect action.
+    public var musicWidgetEnabled: Bool {
+        get { (defaults.object(forKey: Key.musicWidgetEnabled.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.musicWidgetEnabled.rawValue) }
+    }
+
+    /// Track details are sensitive and hidden until separately enabled.
+    public var musicShowTrackDetails: Bool {
+        get { (defaults.object(forKey: Key.musicShowTrackDetails.rawValue) as? Bool) ?? false }
+        set { defaults.set(newValue, forKey: Key.musicShowTrackDetails.rawValue) }
     }
 
     /// Removes every stored preference so the defaults apply again.

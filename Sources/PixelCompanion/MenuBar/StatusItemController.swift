@@ -27,8 +27,10 @@ final class StatusItemController: NSObject {
         statusItem.button?.action = #selector(togglePopover(_:))
 
         model.$mood
-            .combineLatest(model.$snapshot)
-            .sink { [weak self] mood, snapshot in self?.render(mood: mood, snapshot: snapshot) }
+            .combineLatest(model.$snapshot, model.$feedFreshness)
+            .sink { [weak self] mood, snapshot, freshness in
+                self?.render(mood: mood, snapshot: snapshot, freshness: freshness)
+            }
             .store(in: &subscriptions)
     }
 
@@ -47,13 +49,17 @@ final class StatusItemController: NSObject {
         }
     }
 
-    private func render(mood: CharacterMood, snapshot: ConnectorSnapshot) {
+    private func render(
+        mood: CharacterMood, snapshot: ConnectorSnapshot, freshness: FeedFreshness
+    ) {
         guard let button = statusItem.button else { return }
         let label = "Pixel Companion: \(mood.title)"
         let image = NSImage(systemSymbolName: mood.symbolName, accessibilityDescription: label)
         image?.isTemplate = true
         button.image = image
-        let activity = snapshot.currentActivity?.title ?? snapshot.connectionState.displayName
+        let activity = freshness.canPresentAsLive
+            ? (snapshot.currentActivity?.title ?? snapshot.connectionState.displayName)
+            : (freshness.warning ?? snapshot.connectionState.displayName)
         button.toolTip = "\(mood.title) · \(activity)"
     }
 }
@@ -63,8 +69,48 @@ struct MenuBarPopoverView: View {
     let openSettings: () -> Void
 
     var body: some View {
-        DetailContent(snapshot: model.snapshot, mood: model.mood, openSettings: openSettings)
+        detailContent
             .padding(16)
             .frame(width: 360, height: 440, alignment: .top)
+    }
+
+    // Expose the same detail composition to the notch and menu-bar fallback.
+    // Unit tests assert the optional monitoring source is actually connected.
+    var detailContent: DetailContent {
+        DetailContent(
+            snapshot: model.snapshot, mood: model.mood,
+            openSettings: openSettings, feedFreshness: model.feedFreshness,
+            agentFeedFreshness: model.agentFeedFreshness,
+            lastSuccessfulSync: model.lastSuccessfulPaperclipSync,
+            publicGitHubState: model.publicGitHubState,
+            focusTimerEnabled: model.focusTimerEnabled,
+            focusTimer: model.focusTimer,
+            batteryHUDEnabled: model.batteryHUDEnabled,
+            batteryMonitor: model.batteryMonitor,
+            outputVolumeHUDEnabled: model.outputVolumeHUDEnabled,
+            outputVolumeMonitor: model.outputVolumeMonitor,
+            displayBrightnessHUDEnabled: model.displayBrightnessHUDEnabled,
+            displayBrightnessMonitor: model.displayBrightnessMonitor,
+            downloadHUDEnabled: model.downloadHUDEnabled,
+            downloadMonitor: model.downloadMonitor,
+            fileShelfEnabled: model.fileShelfEnabled,
+            fileShelf: model.fileShelf,
+            clipboardHistoryEnabled: model.clipboardHistoryEnabled,
+            clipboardHistory: model.clipboardHistory,
+            localAgentFeed: model.localAgentFeed,
+            localInfrastructureMonitor: model.localInfrastructureMonitor,
+            codexProcessMonitor: model.codexProcessMonitor,
+            codexTurnMonitor: model.codexTurnMonitor,
+            claudeHookMonitor: model.claudeHookMonitor,
+            localActivityTimeline: model.localActivityTimeline,
+            localAgentAttention: model.localAgentAttention,
+            calendarWidgetEnabled: model.calendarWidgetEnabled,
+            calendarShowTitles: model.calendarShowTitles,
+            calendarMonitor: model.calendarMonitor,
+            musicWidgetEnabled: model.musicWidgetEnabled,
+            musicShowTrackDetails: model.musicShowTrackDetails,
+            musicMonitor: model.musicMonitor,
+            selectedTab: $model.selectedDetailTab
+        )
     }
 }
