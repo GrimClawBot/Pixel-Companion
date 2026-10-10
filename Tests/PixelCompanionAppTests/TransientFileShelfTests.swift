@@ -103,9 +103,9 @@ final class TransientFileShelfTests: XCTestCase {
         XCTAssertTrue(shelf.isChecking)
         // If metadata were still on the main actor, this line would never run.
         shelf.configure(enabled: false)
-        XCTAssertFalse(shelf.isChecking)
+        XCTAssertTrue(shelf.isChecking)
         gate.signal()
-        try? await Task.sleep(for: .milliseconds(80))
+        await awaitValidation(shelf)
         XCTAssertFalse(shelf.enabled)
         XCTAssertTrue(shelf.items.isEmpty)
     }
@@ -125,9 +125,78 @@ final class TransientFileShelfTests: XCTestCase {
         await fulfillment(of: [entered], timeout: 3)
         shelf.clear()
         gate.signal()
-        try? await Task.sleep(for: .milliseconds(80))
+        await awaitValidation(shelf)
         XCTAssertTrue(shelf.items.isEmpty)
         XCTAssertFalse(shelf.isChecking)
+    }
+
+    @MainActor
+    func testOldBlockedBatchesStillCountAcrossClearAndReenable() async {
+        let started = expectation(description: "two real blocked batches")
+        started.expectedFulfillmentCount = 2
+        let firstGate = DispatchSemaphore(value: 0)
+        let secondGate = DispatchSemaphore(value: 0)
+        defer { firstGate.signal(); secondGate.signal() }
+        let shelf = TransientFileShelf(isDirectory: { url in
+            if url.lastPathComponent == "slow-first.txt" {
+                started.fulfill()
+                firstGate.wait()
+            } else if url.lastPathComponent == "slow-second.txt" {
+                started.fulfill()
+                secondGate.wait()
+            }
+            return false
+        })
+        shelf.configure(enabled: true)
+        XCTAssertTrue(shelf.add([URL(fileURLWithPath: "/tmp/slow-first.txt")]))
+        XCTAssertTrue(shelf.add([URL(fileURLWithPath: "/tmp/slow-second.txt")]))
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertFalse(shelf.add([URL(fileURLWithPath: "/tmp/third.txt")]))
+        shelf.clear()
+        shelf.configure(enabled: false)
+        shelf.configure(enabled: true)
+        XCTAssertTrue(shelf.isChecking)
+        XCTAssertFalse(shelf.add([URL(fileURLWithPath: "/tmp/third.txt")]))
+        secondGate.signal()
+        for _ in 0..<200 {
+            if shelf.isChecking && shelf.add([URL(fileURLWithPath: "/tmp/fresh.txt")]) { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(shelf.isChecking)
+        // Old second result was discarded. The first remains outstanding.
+        XCTAssertFalse(shelf.items.contains { $0.url.lastPathComponent == "slow-second.txt" })
+        firstGate.signal()
+        await awaitValidation(shelf)
+        XCTAssertEqual(shelf.items.map(\.displayName), ["fresh.txt"])
+    }
+
+    @MainActor
+    func testOverlappingBatchCompletionKeepsEightItemLimitAndNoDuplicates() async {
+        let begun = expectation(description: "first batch held")
+        let gate = DispatchSemaphore(value: 0)
+        defer { gate.signal() }
+        let shelf = TransientFileShelf(isDirectory: { url in
+            if url.lastPathComponent == "item-1.txt" {
+                begun.fulfill()
+                gate.wait()
+            }
+            return false
+        })
+        shelf.configure(enabled: true)
+        func file(_ number: Int) -> URL { URL(fileURLWithPath: "/tmp/item-\(number).txt") }
+        XCTAssertTrue(shelf.add((1...8).map(file)))
+        await fulfillment(of: [begun], timeout: 3)
+        XCTAssertTrue(shelf.add((5...11).map(file)))
+        XCTAssertFalse(shelf.add([file(20)]))
+        for _ in 0..<200 {
+            if shelf.items.count == 7 { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(shelf.items.count, 7)
+        gate.signal()
+        await awaitValidation(shelf)
+        XCTAssertEqual(shelf.items.count, TransientFileShelf.maximumItems)
+        XCTAssertEqual(Set(shelf.items.map(\.url)).count, 8)
     }
 
     func testUntrustedFilenamesHaveBoundedSafeDisplayText() {

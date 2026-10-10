@@ -32,6 +32,7 @@ final class TransientFileShelf: ObservableObject {
     private(set) var enabled = false
     private var revision: UInt64 = 0
     private var pendingChecks = 0
+    // Includes old revisions until their actual filesystem work returns.
     var isChecking: Bool { pendingChecks > 0 }
     private let isDirectory: @Sendable (URL) -> Bool
     static let maximumItems = 8
@@ -76,9 +77,11 @@ final class TransientFileShelf: ObservableObject {
     }
 
     private func acceptVerified(_ urls: [URL], revision candidate: UInt64) {
-        guard candidate == revision else { return }
+        // Always release the physical in-flight slot, even when Clear or
+        // Disable invalidated the result. A stalled mount must never permit
+        // unbounded extra tasks through repeated disable/re-enable cycles.
         pendingChecks = max(0, pendingChecks - 1)
-        guard enabled else { return }
+        guard enabled, candidate == revision else { return }
         for url in urls {
             guard items.count < Self.maximumItems else { break }
             guard !items.contains(where: { $0.url == url }) else { continue }
@@ -98,7 +101,8 @@ final class TransientFileShelf: ObservableObject {
 
     func clear() {
         revision &+= 1
-        pendingChecks = 0
+        // Do not reset pendingChecks: old detached metadata lookups may
+        // still be running after the selected references have been cleared.
         items.removeAll()
     }
 }
