@@ -30,7 +30,7 @@ final class AppModel: ObservableObject {
     let localAgentFeed = LocalAgentFeedMonitor()
     let localInfrastructureMonitor = LocalInfrastructureMonitor()
     let codexProcessMonitor = CodexProcessMonitor()
-    let codexTurnMonitor = CodexTurnMonitor()
+    let codexTurnMonitor: CodexTurnMonitor
     let claudeHookMonitor = ClaudeHookMonitor()
     let localActivityTimeline = LocalAgentActivityTimeline()
     let localAgentAttention = LocalAgentAttention()
@@ -54,8 +54,10 @@ final class AppModel: ObservableObject {
         settings: SettingsStore,
         notificationManager: CompanionNotificationManager? = nil,
         publicGitHubMonitor: PublicGitHubMonitor? = nil,
-        injectedPaperclipConnector: PaperclipConnector? = nil
+        injectedPaperclipConnector: PaperclipConnector? = nil,
+        injectedCodexTurnMonitor: CodexTurnMonitor? = nil
     ) {
+        self.codexTurnMonitor = injectedCodexTurnMonitor ?? CodexTurnMonitor()
         self.settings = settings
         self.notificationManager = notificationManager ?? CompanionNotificationManager()
         self.publicGitHubMonitor = publicGitHubMonitor ?? PublicGitHubMonitor()

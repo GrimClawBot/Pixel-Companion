@@ -68,11 +68,15 @@ final class LocalAgentAttentionTests: XCTestCase {
     }
 
     func testNewCodexEndNotifiesOnlyOnce() {
-        let fixture = setup()
-        let (timeline, attention, notices) = (fixture.timeline, fixture.attention, fixture.notices)
+        var time = moment
+        let timeline = LocalAgentActivityTimeline(now: { time })
+        let attention = LocalAgentAttention(now: { time })
+        let notices = NoticeRecorder()
+        attention.bind(timeline: timeline) { notices.values.append($0) }
         attention.configureNotifications(enabled: true)
-        timeline.receive(codex: .observed(moment))
-        timeline.receive(codex: .observed(moment))
+        time = moment.addingTimeInterval(1)
+        timeline.receive(codex: .observed(time))
+        timeline.receive(codex: .observed(time))
         XCTAssertEqual(notices.values, [.codexTurnEnded])
     }
 
@@ -83,12 +87,13 @@ final class LocalAgentAttentionTests: XCTestCase {
         let recorder = NoticeRecorder()
         attention.bind(timeline: timeline) { recorder.values.append($0) }
         attention.configureNotifications(enabled: true)
+        time = moment.addingTimeInterval(1)
         timeline.receive(claude: .observed(event: .responseFailed, timestamp: time))
         XCTAssertEqual(recorder.values, [.claudeResponseFailed])
-        time = moment.addingTimeInterval(30)
+        time = moment.addingTimeInterval(31)
         timeline.receive(codex: .observed(time))
         XCTAssertEqual(recorder.values.count, 1)
-        time = moment.addingTimeInterval(90)
+        time = moment.addingTimeInterval(91)
         timeline.receive(codex: .observed(time))
         XCTAssertEqual(recorder.values, [.claudeResponseFailed, .codexTurnEnded])
         XCTAssertEqual(LocalAgentAttention.minimumNotificationGap, 90)
@@ -105,14 +110,21 @@ final class LocalAgentAttentionTests: XCTestCase {
     }
 
     func testDisablingThenEnablingDoesNotReplayCachedEntries() {
-        let fixture = setup()
-        let (timeline, attention, notices) = (fixture.timeline, fixture.attention, fixture.notices)
+        var time = moment
+        let timeline = LocalAgentActivityTimeline(now: { time })
+        let attention = LocalAgentAttention(now: { time })
+        let notices = NoticeRecorder()
+        attention.bind(timeline: timeline) { notices.values.append($0) }
         attention.configureNotifications(enabled: true)
-        timeline.receive(codex: .observed(moment.addingTimeInterval(-2)))
+        time = moment.addingTimeInterval(1)
+        timeline.receive(codex: .observed(time))
         attention.configureNotifications(enabled: false)
+        time = moment.addingTimeInterval(2)
         attention.configureNotifications(enabled: true)
-        timeline.receive(codex: .observed(moment.addingTimeInterval(-1)))
-        // Re-enable suppresses replay, and cooldown persists for new events.
+        timeline.receive(codex: .observed(time))
+        time = moment.addingTimeInterval(3)
+        timeline.receive(codex: .observed(time))
+        // Re-enable suppresses replay and the original cooldown survives.
         XCTAssertEqual(notices.values, [.codexTurnEnded])
     }
 
@@ -127,6 +139,31 @@ final class LocalAgentAttentionTests: XCTestCase {
         XCTAssertEqual(attention.latest.first?.source, .claudeCode)
         timeline.receive(claude: .unavailable)
         XCTAssertTrue(attention.latest.isEmpty)
+    }
+
+    func testDelayedInitialMarkerWithinThirtySecondsNeverBecomesAnAlert() {
+        var time = moment
+        let timeline = LocalAgentActivityTimeline(now: { time })
+        let attention = LocalAgentAttention(now: { time })
+        let recorder = NoticeRecorder()
+        attention.bind(timeline: timeline) { recorder.values.append($0) }
+        attention.configureNotifications(enabled: true)
+        time = moment.addingTimeInterval(8)
+        // This marker existed 3 seconds before opt-in, but its first async
+        // read arrives after opt-in. Previously, this triggered a new banner.
+        timeline.receive(codex: .observed(moment.addingTimeInterval(-3)))
+        XCTAssertTrue(recorder.values.isEmpty)
+        XCTAssertEqual(attention.latest.count, 1)
+        time = moment.addingTimeInterval(9)
+        timeline.receive(codex: .observed(time))
+        XCTAssertEqual(recorder.values, [.codexTurnEnded])
+    }
+
+    func testSameSecondMarkerAfterEnableIsConservativelySuppressed() {
+        let fixture = setup()
+        fixture.attention.configureNotifications(enabled: true)
+        fixture.timeline.receive(codex: .observed(moment))
+        XCTAssertTrue(fixture.notices.values.isEmpty)
     }
 
     func testOldMarkersCannotGenerateNewAttention() {
