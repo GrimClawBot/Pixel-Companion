@@ -199,6 +199,67 @@ class HookConnectorTransactionTests(unittest.TestCase):
         self.assertEqual(self.claude.read_bytes(), external)
         self.assert_private(self.codex)
 
+    def test_missing_claude_during_validation_does_not_block_codex_rollback(self):
+        real_read = installer.ensure_safe_file
+        removed = False
+
+        def remove_claude_during_validation(path):
+            nonlocal removed
+            if (path == self.codex and not removed
+                    and self.codex.read_bytes() != self.codex_blob
+                    and self.claude.is_file()
+                    and self.claude.read_bytes() != self.claude_blob):
+                self.claude.unlink()
+                removed = True
+            return real_read(path)
+
+        with mock.patch.object(installer, "ensure_safe_file", side_effect=remove_claude_during_validation):
+            with self.assertRaises(FileNotFoundError):
+                installer.run(apply=True)
+        self.assertTrue(removed)
+        self.assertFalse(self.claude.exists())
+        self.assertEqual(self.codex.read_bytes(), self.codex_blob)
+        self.assert_private(self.codex)
+
+    def test_late_external_rollback_edit_does_not_block_other_restores(self):
+        original_error = "simulated final validation failure"
+        external = b'{"editor":"Claude owns this newer version"}\n'
+        real_read = installer.ensure_safe_file
+        real_replace = installer.replace_if_exact
+        injected = False
+        rollback_race = False
+
+        def validation_failure(path):
+            nonlocal injected
+            if (path == self.codex and not injected
+                    and self.codex.read_bytes() != self.codex_blob
+                    and self.claude.read_bytes() != self.claude_blob):
+                injected = True
+                raise ValueError(original_error)
+            return real_read(path)
+
+        def concurrent_edit_during_rollback(path, expected, payload):
+            nonlocal rollback_race
+            if path == self.claude and expected != self.claude_blob and not rollback_race:
+                rollback_race = True
+                self.claude.write_bytes(external)
+                # Exercise the production guard rather than injecting its
+                # exception; rollback must continue after real detection.
+                return real_replace(path, expected, payload)
+            return real_replace(path, expected, payload)
+
+        with mock.patch.object(installer, "ensure_safe_file", side_effect=validation_failure):
+            with mock.patch.object(
+                installer, "replace_if_exact", side_effect=concurrent_edit_during_rollback
+            ):
+                with self.assertRaisesRegex(ValueError, original_error):
+                    installer.run(apply=True)
+        self.assertTrue(injected)
+        self.assertTrue(rollback_race)
+        self.assertEqual(self.codex.read_bytes(), self.codex_blob)
+        self.assertEqual(self.claude.read_bytes(), external)
+        self.assert_private(self.codex)
+
     def test_replace_if_exact_refuses_mismatched_provider_file(self):
         expected = self.codex_blob
         external = b'notify = ["/bin/echo", "provider changed"]\n'

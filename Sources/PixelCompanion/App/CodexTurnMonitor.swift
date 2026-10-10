@@ -86,7 +86,13 @@ final class CodexTurnMonitor: ObservableObject {
         // The owner-selected folder is validated by the native picker; the
         // read-only file reader safely reports unavailable for bad paths.
         guard enabled, directory.isFileURL else { return }
-        fileURL = directory.standardizedFileURL.appendingPathComponent(Self.eventFilename)
+        let nextSource = directory.standardizedFileURL.appendingPathComponent(Self.eventFilename)
+        if fileURL != nextSource {
+            // Also invalidate an already-armed verifier; a new folder cannot
+            // claim delivery for a check started against the old selection.
+            status = .unconnected
+        }
+        fileURL = nextSource
         restart()
     }
 
@@ -126,6 +132,14 @@ final class CodexTurnMonitor: ObservableObject {
         baselineRequiresSecondRead = false
     }
 
+    private func invalidateVerificationBaseline() {
+        // A selection change is different from the user pressing Stop:
+        // the verifier must leave Waiting and show Needs Setup immediately.
+        let completion = baselineCompletion
+        cancelVerificationBaseline()
+        completion?(nil)
+    }
+
     private func finishRead(_ data: Data?, from file: URL, generation: UInt64) {
         guard enabled, revision == generation, fileURL == file else { return }
         readTask = nil
@@ -146,7 +160,7 @@ final class CodexTurnMonitor: ObservableObject {
         timer?.invalidate()
         timer = nil
         revision &+= 1
-        cancelVerificationBaseline()
+        invalidateVerificationBaseline()
         readTask?.cancel()
         readTask = nil
         guard enabled else { status = .off; return }

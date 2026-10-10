@@ -85,9 +85,8 @@ def replace_if_exact(path: Path, expected: bytes, updated: bytes) -> None:
     """Refuse to replace provider bytes that changed since our last snapshot.
 
     This check is not a filesystem-wide compare-and-swap: other provider
-    processes may not honor Pixel's installation lock, so we also validate
-    immediately before each individual write and avoid overwriting a changed
-    file during rollback.
+    processes may write concurrently. Revalidate just before each individual
+    write and avoid overwriting a detected edit during rollback.
     """
     if ensure_safe_file(path) != expected:
         raise ValueError("Provider settings changed during transaction")
@@ -222,7 +221,7 @@ def run(apply: bool) -> None:
         raise ValueError("Provider settings changed during preparation")
     # Track only writes completed by this attempt. If any provider/user
     # saves new settings while the installer is running, never overwrite them
-    # during rollback. Provider editors do not necessarily honor our locks.
+    # during rollback. There is no cross-provider lock enforced on external editors.
     written: list[tuple[Path, bytes, bytes]] = []
     try:
         replace_if_exact(CODEX_CONFIG, codex_old, codex_new)
@@ -238,10 +237,16 @@ def run(apply: bool) -> None:
         # transaction. Never clobber an edit from the user or provider.
         # A later retry must re-read and revalidate all existing configs.
         for path, original, installed in reversed(written):
-            if ensure_safe_file(path) == installed:
-                replace_if_exact(path, installed, original)
-            else:
-                print("ROLLBACK SKIPPED: provider settings changed externally")
+            try:
+                if ensure_safe_file(path) == installed:
+                    replace_if_exact(path, installed, original)
+                else:
+                    print("ROLLBACK SKIPPED: provider settings changed externally")
+            except Exception:
+                # A file can disappear, become unsafe, or change between
+                # our two rollback reads. Continue restoring other files;
+                # preserve the original transaction error for the caller.
+                print("ROLLBACK SKIPPED: provider file changed or is unavailable")
         raise
     print("ACTION: APPLIED; prior Codex notifier preserved")
     print("Claude settings: original unrelated fields preserved")

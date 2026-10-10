@@ -130,6 +130,92 @@ final class HookVerifierCancellationTests: XCTestCase {
         monitor.configure(enabled: false)
     }
 
+    func testSwitchingCodexFolderCompletesPendingCheckAsNeedsSetup() async {
+        let prior = Data(
+            #"{"schemaVersion":1,"event":"agent-turn-complete","lastCompletedAt":"2027-01-15T08:00:00Z"}"#.utf8
+        )
+        let reader = DelayedBaselineReader(prior)
+        defer { reader.release() }
+        let monitor = CodexTurnMonitor(read: { reader.read($0) }, now: { self.moment })
+        monitor.configure(enabled: true)
+        monitor.connectDirectory(fixtureFolder())
+        await awaitLocalReport { reader.started }
+        let verifier = AgentHookVerifier(now: { self.moment })
+        verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
+        verifier.start(codex: monitor)
+        monitor.connectDirectory(fixtureFolder())
+        XCTAssertEqual(verifier.codexState, .needsSetup)
+        XCTAssertFalse(verifier.isCodexArmed)
+        reader.release()
+        await awaitLocalReport { !monitor.isRefreshing }
+        XCTAssertEqual(verifier.codexState, .needsSetup)
+        monitor.configure(enabled: false)
+    }
+
+    func testSwitchingClaudeFolderCompletesPendingCheckAsNeedsSetup() async {
+        let prior = Data(
+            #"{"schemaVersion":1,"event":"Stop","observedAt":"2027-01-15T08:00:00Z"}"#.utf8
+        )
+        let reader = DelayedBaselineReader(prior)
+        defer { reader.release() }
+        let monitor = ClaudeHookMonitor(read: { reader.read($0) }, now: { self.moment })
+        monitor.configure(enabled: true)
+        monitor.connectDirectory(fixtureFolder())
+        await awaitLocalReport { reader.started }
+        let verifier = AgentHookVerifier(now: { self.moment })
+        verifier.bind(codex: CodexTurnMonitor(), claude: monitor)
+        verifier.start(claude: monitor)
+        monitor.connectDirectory(fixtureFolder())
+        XCTAssertEqual(verifier.claudeState, .needsSetup)
+        XCTAssertFalse(verifier.isClaudeArmed)
+        reader.release()
+        await awaitLocalReport { !monitor.isRefreshing }
+        XCTAssertEqual(verifier.claudeState, .needsSetup)
+        monitor.configure(enabled: false)
+    }
+
+    func testAlreadyArmedCodexCheckRejectsNewFolderMarkers() async {
+        let data = Data(
+            #"{"schemaVersion":1,"event":"agent-turn-complete","lastCompletedAt":"2027-01-15T08:00:00Z"}"#.utf8
+        )
+        let probe = LockedLocalReportReader(data)
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { self.moment })
+        monitor.configure(enabled: true)
+        monitor.connectDirectory(fixtureFolder())
+        await awaitLocalReport { !monitor.isRefreshing }
+        let verifier = AgentHookVerifier(now: { self.moment })
+        verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
+        verifier.start(codex: monitor)
+        await awaitLocalReport { verifier.isCodexArmed }
+        monitor.connectDirectory(fixtureFolder())
+        XCTAssertFalse(verifier.isCodexArmed)
+        XCTAssertEqual(verifier.codexState, .needsSetup)
+        await awaitLocalReport { !monitor.isRefreshing }
+        XCTAssertEqual(verifier.codexState, .needsSetup)
+        monitor.configure(enabled: false)
+    }
+
+    func testAlreadyArmedClaudeCheckRejectsNewFolderMarkers() async {
+        let data = Data(
+            #"{"schemaVersion":1,"event":"Stop","observedAt":"2027-01-15T08:00:00Z"}"#.utf8
+        )
+        let probe = LockedLocalReportReader(data)
+        let monitor = ClaudeHookMonitor(read: { probe.read($0) }, now: { self.moment })
+        monitor.configure(enabled: true)
+        monitor.connectDirectory(fixtureFolder())
+        await awaitLocalReport { !monitor.isRefreshing }
+        let verifier = AgentHookVerifier(now: { self.moment })
+        verifier.bind(codex: CodexTurnMonitor(), claude: monitor)
+        verifier.start(claude: monitor)
+        await awaitLocalReport { verifier.isClaudeArmed }
+        monitor.connectDirectory(fixtureFolder())
+        XCTAssertFalse(verifier.isClaudeArmed)
+        XCTAssertEqual(verifier.claudeState, .needsSetup)
+        await awaitLocalReport { !monitor.isRefreshing }
+        XCTAssertEqual(verifier.claudeState, .needsSetup)
+        monitor.configure(enabled: false)
+    }
+
     func testDisconnectDuringBlockedClaudeBaselineNeverArmsCheck() async {
         let started = expectation(description: "Claude selected file reading")
         let marker = Data(
