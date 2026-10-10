@@ -1,0 +1,9 @@
+# PC-084 follow-up: nonblocking file shelf metadata
+
+Owner-selected file reference storage remains local-only, off by default and limited to eight URL references. No file bodies are read, uploaded or persisted.
+
+Finder drops and NSOpenPanel may return a slow SMB, cloud-backed or disconnected URL. The old main-actor shelf implementation queried resourceValues synchronously while accepting the file, potentially hanging Pixel Companion's UI. The new path queues the bounded metadata validation on a detached utility task and commits only validated non-directory references on the main actor. UI drop acceptance means queued for checking, not guaranteed added.
+
+Disable and Clear increment a revision so a delayed result cannot resurrect user-deleted references. The shelf caps outstanding validation batches to two to avoid creating unbounded blocked readers. Multiple overlapping requests still enforce uniqueness and the existing maximum of eight references at commit time. No host/network access is added apart from the user-initiated URL metadata validation already performed by this feature.
+
+Native tests exercise existing reference behavior, file-shaped directory rejection, blocked metadata reads without stalling the main actor, disable/clear while a lookup is blocked, and rejection of late results. The existing signed QA86 preview is not changed. Exact-head CI, Greptile, independent human approval, protected-cut audit and owner GUI acceptance are still required before integration.

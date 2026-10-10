@@ -67,9 +67,7 @@ struct TransientFileShelfView: View {
         .companionCard()
         .dropDestination(for: URL.self) { urls, _ in
             guard shelf.enabled else { return false }
-            let previous = shelf.items.count
-            shelf.add(urls)
-            return shelf.items.count > previous
+            return shelf.add(urls)
         }
         .accessibilityIdentifier("companion.utility.file-shelf")
     }
