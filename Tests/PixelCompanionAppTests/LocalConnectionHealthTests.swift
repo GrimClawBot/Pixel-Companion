@@ -112,24 +112,24 @@ final class LocalConnectionHealthTests: XCTestCase {
 
     func testRefreshWhileAllSourcesOffNeverReadsAnything() {
         var processCalls = 0
-        var codexCalls = 0
-        var claudeCalls = 0
-        var feedCalls = 0
+        let codexProbe = MonitorReadProbe(bytes: nil)
+        let claudeProbe = MonitorReadProbe(bytes: nil)
+        let feedProbe = MonitorReadProbe(bytes: nil)
         let process = CodexProcessMonitor(readNames: {
             processCalls += 1
             return ["codex"]
         })
-        let codex = CodexTurnMonitor(read: { _ in codexCalls += 1; return nil })
-        let claude = ClaudeHookMonitor(read: { _ in claudeCalls += 1; return nil })
-        let feed = LocalAgentFeedMonitor(read: { _ in feedCalls += 1; return nil })
+        let codex = CodexTurnMonitor(read: { codexProbe.read($0) })
+        let claude = ClaudeHookMonitor(read: { claudeProbe.read($0) })
+        let feed = LocalAgentFeedMonitor(read: { feedProbe.read($0) })
         process.refresh()
         codex.refresh()
         claude.refresh()
         feed.refresh()
         XCTAssertEqual(processCalls, 0)
-        XCTAssertEqual(codexCalls, 0)
-        XCTAssertEqual(claudeCalls, 0)
-        XCTAssertEqual(feedCalls, 0)
+        XCTAssertEqual(codexProbe.count, 0)
+        XCTAssertEqual(claudeProbe.count, 0)
+        XCTAssertEqual(feedProbe.count, 0)
     }
 
     func testProcessPresenceRefreshDoesNotEnableAnySource() {

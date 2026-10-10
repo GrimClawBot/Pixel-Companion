@@ -46,7 +46,7 @@ final class ManagedAgentHookConnectionTests: XCTestCase {
         claude.configure(enabled: false)
     }
 
-    func testEnabledOnlyConnectsExistingPrivateDirectories() throws {
+    func testEnabledOnlyConnectsExistingPrivateDirectories() async throws {
         let fixture = try fixture()
         let (root, settings) = (fixture.root, fixture.settings)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -63,8 +63,8 @@ final class ManagedAgentHookConnectionTests: XCTestCase {
         XCTAssertEqual(
             ManagedAgentHookConnection.directory(provider: .claudeCode, root: root), claudeFolder
         )
-        var codexReads = 0
-        let codex = CodexTurnMonitor(read: { _ in codexReads += 1; return nil })
+        let codexProbe = MonitorReadProbe(bytes: nil)
+        let codex = CodexTurnMonitor(read: { codexProbe.read($0) })
         let claude = ClaudeHookMonitor(read: { _ in nil })
         codex.configure(enabled: true)
         ManagedAgentHookConnection.connect(
@@ -73,7 +73,8 @@ final class ManagedAgentHookConnectionTests: XCTestCase {
         )
         XCTAssertTrue(codex.isConnected)
         XCTAssertFalse(claude.isConnected)
-        XCTAssertEqual(codexReads, 1)
+        await waitForMonitorStatus { codexProbe.count == 1 }
+        XCTAssertEqual(codexProbe.count, 1)
         codex.configure(enabled: false)
     }
 

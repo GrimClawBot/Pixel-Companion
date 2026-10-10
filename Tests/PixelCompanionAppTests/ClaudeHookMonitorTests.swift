@@ -73,28 +73,28 @@ final class ClaudeHookMonitorTests: XCTestCase {
 
     @MainActor
     func testDisabledAndUnconnectedNeverRead() {
-        var reads = 0
-        let monitor = ClaudeHookMonitor(read: { _ in reads += 1; return nil })
+        let probe = MonitorReadProbe(bytes: nil)
+        let monitor = ClaudeHookMonitor(read: { probe.read($0) })
         monitor.refresh()
         XCTAssertEqual(monitor.status, .off)
         monitor.configure(enabled: true)
         XCTAssertEqual(monitor.status, .unconnected)
         monitor.refresh()
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.count, 0)
         XCTAssertEqual(ClaudeHookMonitor.refreshInterval, 15)
         monitor.configure(enabled: false)
     }
 
     @MainActor
-    func testOptInFolderSelectionAndDisableForgetPath() throws {
+    func testOptInFolderSelectionAndDisableForgetPath() async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PC43Folder-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        var reads: [URL] = []
+        let data = payload()
+        let probe = MonitorReadProbe(bytes: data)
         let monitor = ClaudeHookMonitor(
-            read: { url in reads.append(url); return self.payload() },
-            now: { self.moment }
+            read: { probe.read($0) }, now: { self.moment }
         )
         monitor.connectDirectory(folder)
         XCTAssertFalse(monitor.isConnected)
@@ -102,35 +102,36 @@ final class ClaudeHookMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.status, .unconnected)
         monitor.connectDirectory(folder)
         XCTAssertTrue(monitor.isConnected)
-        XCTAssertEqual(
-            monitor.status, .observed(event: .responseStopped, timestamp: moment)
-        )
-        XCTAssertEqual(reads.count, 1)
-        XCTAssertEqual(reads[0].lastPathComponent, ClaudeHookMonitor.eventFilename)
+        await waitForMonitorStatus {
+            monitor.status == .observed(event: .responseStopped, timestamp: moment)
+        }
+        XCTAssertEqual(probe.count, 1)
+        XCTAssertEqual(probe.URLs[0].lastPathComponent, ClaudeHookMonitor.eventFilename)
         monitor.configure(enabled: false)
         XCTAssertEqual(monitor.status, .off)
         monitor.configure(enabled: true)
         XCTAssertFalse(monitor.isConnected)
         XCTAssertEqual(monitor.status, .unconnected)
-        XCTAssertEqual(reads.count, 1)
+        XCTAssertEqual(probe.count, 1)
         monitor.configure(enabled: false)
     }
 
     @MainActor
-    func testMissingMarkerAndDisconnectFailClosed() throws {
+    func testMissingMarkerAndDisconnectFailClosed() async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PC43Missing-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        var value: Data? = payload()
-        let monitor = ClaudeHookMonitor(read: { _ in value }, now: { self.moment })
+        let probe = MonitorReadProbe(bytes: payload())
+        let monitor = ClaudeHookMonitor(read: { probe.read($0) }, now: { self.moment })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
-        XCTAssertEqual(
-            monitor.status, .observed(event: .responseStopped, timestamp: moment)
-        )
-        value = nil
+        await waitForMonitorStatus {
+            monitor.status == .observed(event: .responseStopped, timestamp: moment)
+        }
+        probe.setBytes(nil)
         monitor.refresh()
+        await waitForMonitorStatus { monitor.status == .unavailable }
         XCTAssertEqual(monitor.status, .unavailable)
         monitor.disconnect()
         XCTAssertEqual(monitor.status, .unconnected)

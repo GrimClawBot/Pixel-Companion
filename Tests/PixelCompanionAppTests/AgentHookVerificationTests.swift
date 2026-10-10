@@ -32,91 +32,103 @@ final class AgentHookVerificationTests: XCTestCase {
         )
     }
 
-    func testFreshExistingCodexMarkerDoesNotProveNewDelivery() throws {
+    func testFreshExistingCodexMarkerDoesNotProveNewDelivery() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content = codexMarker(time)
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { time })
+        let probe = MonitorReadProbe(bytes: codexMarker(time))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await waitForMonitorStatus { probe.count >= 2 && !monitor.isReading }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         monitor.refresh()
+        await waitForMonitorStatus { !monitor.isReading && probe.count >= 3 }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         time = moment.addingTimeInterval(10)
-        content = codexMarker(time)
+        probe.setBytes(codexMarker(time))
         monitor.refresh()
+        await waitForMonitorStatus { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         monitor.configure(enabled: false)
     }
 
-    func testFirstMarkerAfterPreviouslyMissingFileCounts() throws {
+    func testFirstMarkerAfterPreviouslyMissingFileCounts() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content: Data?
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { time })
+        let probe = MonitorReadProbe(bytes: nil)
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await waitForMonitorStatus { probe.count >= 2 && !monitor.isReading }
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         time = moment.addingTimeInterval(5)
-        content = codexMarker(time)
+        probe.setBytes(codexMarker(time))
         monitor.refresh()
+        await waitForMonitorStatus { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         monitor.configure(enabled: false)
     }
 
-    func testNoReadsBeforeStartBeyondExistingMonitorBehavior() throws {
+    func testNoReadsBeforeStartBeyondExistingMonitorBehavior() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        var reads = 0
+        let probe = MonitorReadProbe(bytes: nil)
         let monitor = CodexTurnMonitor(
-            read: { _ in reads += 1; return nil }, now: { self.moment }
+            read: { probe.read($0) }, now: { self.moment }
         )
         let verifier = AgentHookVerifier(now: { self.moment })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.count, 0)
         verifier.start(codex: monitor)
         XCTAssertEqual(verifier.codexState, .needsSetup)
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.count, 0)
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
-        let existingReads = reads
+        await waitForMonitorStatus { probe.count == 1 && !monitor.isReading }
+        let existingReads = probe.count
         verifier.start(codex: monitor)
-        XCTAssertEqual(reads, existingReads + 1)
+        // An explicit verification attempts exactly one guarded fresh poll.
+        await waitForMonitorStatus { probe.count == existingReads + 1 && !monitor.isReading }
+        XCTAssertEqual(probe.count, existingReads + 1)
         monitor.configure(enabled: false)
     }
 
-    func testStaleAtArmTimeDoesNotCountAsNewEvenIfFileChanges() throws {
+    func testStaleAtArmTimeDoesNotCountAsNewEvenIfFileChanges() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let stale = moment.addingTimeInterval(-130)
-        var content: Data? = codexMarker(stale)
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { self.moment })
+        let probe = MonitorReadProbe(bytes: codexMarker(stale))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { self.moment })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { self.moment })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
-        content = codexMarker(moment.addingTimeInterval(-40))
+        probe.setBytes(codexMarker(moment.addingTimeInterval(-40)))
         monitor.refresh()
         XCTAssertEqual(verifier.codexState, .waiting(moment))
         monitor.configure(enabled: false)
     }
 
-    func testSameSecondIdenticalEventCannotCountTwice() throws {
+    func testSameSecondIdenticalEventCannotCountTwice() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let data = codexMarker(moment)
-        let monitor = CodexTurnMonitor(read: { _ in data }, now: { self.moment })
+        let probe = MonitorReadProbe(bytes: codexMarker(moment))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { self.moment })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { self.moment })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
@@ -125,80 +137,97 @@ final class AgentHookVerificationTests: XCTestCase {
         monitor.configure(enabled: false)
     }
 
-    func testClaudeDifferentMilestoneTimestampAfterArmCanCount() throws {
+    func testClaudeDifferentMilestoneTimestampAfterArmCanCount() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content = claudeMarker("SessionStart", moment)
-        let monitor = ClaudeHookMonitor(read: { _ in content }, now: { time })
+        let probe = MonitorReadProbe(bytes: claudeMarker("SessionStart", moment))
+        let monitor = ClaudeHookMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: CodexTurnMonitor(), claude: monitor)
         verifier.start(claude: monitor)
+        await waitForMonitorStatus { probe.count >= 2 && !monitor.isReading }
         time = time.addingTimeInterval(3)
-        content = claudeMarker("Stop", time)
+        probe.setBytes(claudeMarker("Stop", time))
         monitor.refresh()
+        await waitForMonitorStatus { verifier.claudeState == .observed(time) }
         XCTAssertEqual(verifier.claudeState, .observed(time))
         monitor.configure(enabled: false)
     }
 
-    func testCodexAndClaudeChecksRemainIndependent() throws {
+    func testCodexAndClaudeChecksRemainIndependent() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var codexData: Data? = codexMarker(time)
-        var claudeData: Data? = claudeMarker("SessionStart", time)
-        let codex = CodexTurnMonitor(read: { _ in codexData }, now: { time })
-        let claude = ClaudeHookMonitor(read: { _ in claudeData }, now: { time })
+        let codexProbe = MonitorReadProbe(bytes: codexMarker(time))
+        let claudeProbe = MonitorReadProbe(bytes: claudeMarker("SessionStart", time))
+        let codex = CodexTurnMonitor(read: { codexProbe.read($0) }, now: { time })
+        let claude = ClaudeHookMonitor(read: { claudeProbe.read($0) }, now: { time })
         codex.configure(enabled: true)
         claude.configure(enabled: true)
         codex.connectDirectory(folder)
         claude.connectDirectory(folder)
+        await waitForMonitorStatus {
+            codexProbe.count > 0 && claudeProbe.count > 0
+                && !codex.isReading && !claude.isReading
+        }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: codex, claude: claude)
         verifier.start(codex: codex)
         verifier.start(claude: claude)
+        await waitForMonitorStatus {
+            codexProbe.count >= 2 && claudeProbe.count >= 2
+                && !codex.isReading && !claude.isReading
+        }
         time = moment.addingTimeInterval(5)
-        codexData = codexMarker(time)
+        codexProbe.setBytes(codexMarker(time))
         codex.refresh()
+        await waitForMonitorStatus { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         XCTAssertEqual(verifier.claudeState, .waiting(moment))
-        claudeData = claudeMarker("Stop", time)
+        claudeProbe.setBytes(claudeMarker("Stop", time))
         claude.refresh()
+        await waitForMonitorStatus { verifier.claudeState == .observed(time) }
         XCTAssertEqual(verifier.claudeState, .observed(time))
         codex.configure(enabled: false)
         claude.configure(enabled: false)
     }
 
-    func testDisconnectClearsObservedResult() throws {
+    func testDisconnectClearsObservedResult() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var data = codexMarker(time)
-        let monitor = CodexTurnMonitor(read: { _ in data }, now: { time })
+        let probe = MonitorReadProbe(bytes: codexMarker(time))
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
+        await waitForMonitorStatus { probe.count >= 2 && !monitor.isReading }
         time = moment.addingTimeInterval(2)
-        data = codexMarker(time)
+        probe.setBytes(codexMarker(time))
         monitor.refresh()
+        await waitForMonitorStatus { verifier.codexState == .observed(time) }
         XCTAssertEqual(verifier.codexState, .observed(time))
         monitor.disconnect()
         XCTAssertEqual(verifier.codexState, .needsSetup)
         monitor.configure(enabled: false)
     }
 
-    func testTimeoutRefusesLateMarkersAndDisplaysTimeout() throws {
+    func testTimeoutRefusesLateMarkersAndDisplaysTimeout() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var data: Data?
-        let monitor = CodexTurnMonitor(read: { _ in data }, now: { time })
+        let probe = MonitorReadProbe(bytes: nil)
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
@@ -211,32 +240,40 @@ final class AgentHookVerificationTests: XCTestCase {
             .timedOut
         )
         time = moment.addingTimeInterval(190)
-        data = codexMarker(time)
+        probe.setBytes(codexMarker(time))
+        await waitForMonitorStatus { probe.count >= 2 && !monitor.isReading }
         monitor.refresh()
+        await waitForMonitorStatus { verifier.codexState == .timedOut }
         XCTAssertEqual(verifier.codexState, .timedOut)
         monitor.configure(enabled: false)
     }
 
-    func testStopAllResetsAndRemovesOldSubscriptions() throws {
+    func testStopAllResetsAndRemovesOldSubscriptions() async throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var time = moment
-        var content: Data?
-        let monitor = CodexTurnMonitor(read: { _ in content }, now: { time })
+        let probe = MonitorReadProbe(bytes: nil)
+        let monitor = CodexTurnMonitor(read: { probe.read($0) }, now: { time })
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
+        await waitForMonitorStatus { probe.count >= 1 && !monitor.isReading }
         let verifier = AgentHookVerifier(now: { time })
         verifier.bind(codex: monitor, claude: ClaudeHookMonitor())
         verifier.start(codex: monitor)
         verifier.stopAll()
         time = moment.addingTimeInterval(4)
-        content = codexMarker(time)
+        probe.setBytes(codexMarker(time))
         monitor.refresh()
         XCTAssertEqual(verifier.codexState, .notStarted)
         XCTAssertEqual(verifier.claudeState, .notStarted)
         monitor.configure(enabled: false)
     }
 
+}
+
+@MainActor
+final class AgentHookMarkerContractTests: XCTestCase {
+    private let moment = Date(timeIntervalSince1970: 1_800_000_000)
     func testOnlyExistingMarkersNoSensitiveDataInVerification() {
         XCTAssertNil(AgentHookMarker.codex(.off))
         XCTAssertNil(AgentHookMarker.codex(.unavailable))

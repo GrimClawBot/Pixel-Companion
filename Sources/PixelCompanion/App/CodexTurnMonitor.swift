@@ -46,16 +46,20 @@ enum CodexTurnParser {
 @MainActor
 final class CodexTurnMonitor: ObservableObject {
     @Published private(set) var status: CodexTurnStatus = .off
-    private let read: (URL) -> Data?
+    private let read: @Sendable (URL) -> Data?
     private let now: () -> Date
     private var fileURL: URL?
     private var timer: Timer?
+    private var readTask: Task<Void, Never>?
+    private var revision: UInt64 = 0
+    // Observable to internal diagnostics/tests; never exposes source contents.
+    var isReading: Bool { readTask != nil }
     private(set) var enabled = false
 
     static let refreshInterval: TimeInterval = 15
 
     init(
-        read: @escaping (URL) -> Data? = LocalAgentFeedFileReader.read,
+        read: @escaping @Sendable (URL) -> Data? = { LocalAgentFeedFileReader.read($0) },
         now: @escaping () -> Date = Date.init
     ) {
         self.read = read
@@ -89,16 +93,31 @@ final class CodexTurnMonitor: ObservableObject {
     }
 
     func refresh() {
-        guard enabled, let fileURL else { return }
-        guard let data = read(fileURL) else { status = .unavailable; return }
-        status = CodexTurnParser.parse(data, now: now())
+        guard enabled, let source = fileURL, readTask == nil else { return }
+        let currentRevision = revision
+        let reader = read
+        readTask = Task.detached(priority: .utility) { [weak self] in
+            let data = reader(source)
+            guard !Task.isCancelled else { return }
+            await self?.acceptRead(data, source: source, revision: currentRevision)
+        }
+    }
+
+    private func acceptRead(_ data: Data?, source: URL, revision candidate: UInt64) {
+        guard enabled, revision == candidate, fileURL == source else { return }
+        readTask = nil
+        status = data.map { CodexTurnParser.parse($0, now: now()) } ?? .unavailable
     }
 
     private func restart() {
         timer?.invalidate()
         timer = nil
+        revision &+= 1
+        readTask?.cancel()
+        readTask = nil
         guard enabled else { status = .off; return }
         guard fileURL != nil else { status = .unconnected; return }
+        status = .unavailable
         refresh()
         let ticker = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }

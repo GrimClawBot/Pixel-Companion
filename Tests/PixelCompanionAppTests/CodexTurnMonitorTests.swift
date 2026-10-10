@@ -55,39 +55,39 @@ final class CodexTurnMonitorTests: XCTestCase {
 
     @MainActor
     func testNoReadsUntilEnableAndFolderSelection() {
-        var reads = 0
-        let monitor = CodexTurnMonitor(read: { _ in reads += 1; return nil })
+        let probe = MonitorReadProbe(bytes: nil)
+        let monitor = CodexTurnMonitor(read: { probe.read($0) })
         monitor.refresh()
         XCTAssertEqual(monitor.status, .off)
         monitor.configure(enabled: true)
         XCTAssertEqual(monitor.status, .unconnected)
         monitor.refresh()
-        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(probe.count, 0)
         XCTAssertEqual(CodexTurnMonitor.refreshInterval, 15)
         monitor.configure(enabled: false)
     }
 
     @MainActor
-    func testNoFileReadOnSelectionWhileOff() throws {
+    func testNoFileReadOnSelectionWhileOff() async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PC42Directory-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        var requests: [URL] = []
+        let data = marker()
+        let probe = MonitorReadProbe(bytes: data)
         let monitor = CodexTurnMonitor(
-            read: { url in requests.append(url); return self.marker() },
-            now: { self.eventTime }
+            read: { probe.read($0) }, now: { self.eventTime }
         )
         monitor.connectDirectory(folder)
         XCTAssertFalse(monitor.isConnected)
-        XCTAssertTrue(requests.isEmpty)
+        XCTAssertEqual(probe.count, 0)
         monitor.configure(enabled: true)
         XCTAssertEqual(monitor.status, .unconnected)
         monitor.connectDirectory(folder)
         XCTAssertTrue(monitor.isConnected)
-        XCTAssertEqual(monitor.status, .observed(eventTime))
-        XCTAssertEqual(requests.count, 1)
-        XCTAssertEqual(requests[0].lastPathComponent, CodexTurnMonitor.eventFilename)
+        await waitForMonitorStatus { monitor.status == .observed(eventTime) }
+        XCTAssertEqual(probe.count, 1)
+        XCTAssertEqual(probe.URLs[0].lastPathComponent, CodexTurnMonitor.eventFilename)
         monitor.configure(enabled: false)
         XCTAssertEqual(monitor.status, .off)
         monitor.configure(enabled: true)
@@ -96,20 +96,21 @@ final class CodexTurnMonitorTests: XCTestCase {
     }
 
     @MainActor
-    func testFileUnavailableAndDisconnectClearCachedEvents() throws {
+    func testFileUnavailableAndDisconnectClearCachedEvents() async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PC42Missing-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        var response: Data? = marker()
+        let probe = MonitorReadProbe(bytes: marker())
         let monitor = CodexTurnMonitor(
-            read: { _ in response }, now: { self.eventTime }
+            read: { probe.read($0) }, now: { self.eventTime }
         )
         monitor.configure(enabled: true)
         monitor.connectDirectory(folder)
-        XCTAssertEqual(monitor.status, .observed(eventTime))
-        response = nil
+        await waitForMonitorStatus { monitor.status == .observed(eventTime) }
+        probe.setBytes(nil)
         monitor.refresh()
+        await waitForMonitorStatus { monitor.status == .unavailable }
         XCTAssertEqual(monitor.status, .unavailable)
         monitor.disconnect()
         XCTAssertEqual(monitor.status, .unconnected)
