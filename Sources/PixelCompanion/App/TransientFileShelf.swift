@@ -30,7 +30,21 @@ enum FileShelfLabel {
 final class TransientFileShelf: ObservableObject {
     @Published private(set) var items: [FileShelfItem] = []
     private(set) var enabled = false
+    private var revision: UInt64 = 0
+    private var pendingChecks = 0
+    // Includes old revisions until their actual filesystem work returns.
+    var isChecking: Bool { pendingChecks > 0 }
+    private let isDirectory: @Sendable (URL) -> Bool
     static let maximumItems = 8
+    private static let maximumPendingBatches = 2
+
+    init(
+        isDirectory: @escaping @Sendable (URL) -> Bool = {
+            (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        }
+    ) {
+        self.isDirectory = isDirectory
+    }
 
     func configure(enabled newValue: Bool) {
         guard enabled != newValue else { return }
@@ -38,20 +52,38 @@ final class TransientFileShelf: ObservableObject {
         if !newValue { clear() }
     }
 
-    /// Called only after a user explicitly selects file URLs from NSOpenPanel.
-    /// Reject directories, nonfile URLs and repeats before retaining a URL.
-    func add(_ urls: [URL]) {
-        guard enabled else { return }
-        for input in urls {
-            guard items.count < Self.maximumItems else { break }
-            guard input.isFileURL, !input.hasDirectoryPath else { continue }
+    /// Accept candidate references immediately without touching file metadata on
+    /// the UI actor. Finder shares and iCloud providers may stall on resourceValues.
+    @discardableResult
+    func add(_ urls: [URL]) -> Bool {
+        guard enabled, items.count < Self.maximumItems,
+              pendingChecks < Self.maximumPendingBatches else { return false }
+        let candidates = urls.compactMap { input -> URL? in
+            guard input.isFileURL, !input.hasDirectoryPath else { return nil }
             let url = input.standardizedFileURL
-            guard url.lastPathComponent != "/", !url.lastPathComponent.isEmpty else { continue }
-            // Finder drags may encode a directory without a trailing slash.
-            // Read only URL metadata to reject folders; never inspect content.
-            let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]))
-                .flatMap { $0.isDirectory } == true
-            guard !isDirectory else { continue }
+            guard !url.lastPathComponent.isEmpty, url.lastPathComponent != "/",
+                  !items.contains(where: { $0.url == url }) else { return nil }
+            return url
+        }
+        guard !candidates.isEmpty else { return false }
+        let currentRevision = revision
+        pendingChecks += 1
+        let directoryCheck = isDirectory
+        Task.detached(priority: .utility) { [weak self] in
+            let verified = candidates.filter { !directoryCheck($0) }
+            await self?.acceptVerified(verified, revision: currentRevision)
+        }
+        return true
+    }
+
+    private func acceptVerified(_ urls: [URL], revision candidate: UInt64) {
+        // Always release the physical in-flight slot, even when Clear or
+        // Disable invalidated the result. A stalled mount must never permit
+        // unbounded extra tasks through repeated disable/re-enable cycles.
+        pendingChecks = max(0, pendingChecks - 1)
+        guard enabled, candidate == revision else { return }
+        for url in urls {
+            guard items.count < Self.maximumItems else { break }
             guard !items.contains(where: { $0.url == url }) else { continue }
             items.append(
                 FileShelfItem(
@@ -68,6 +100,9 @@ final class TransientFileShelf: ObservableObject {
     }
 
     func clear() {
+        revision &+= 1
+        // Do not reset pendingChecks: old detached metadata lookups may
+        // still be running after the selected references have been cleared.
         items.removeAll()
     }
 }
