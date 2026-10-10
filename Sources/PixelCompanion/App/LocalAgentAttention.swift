@@ -50,6 +50,7 @@ final class LocalAgentAttention: ObservableObject {
     private var recognizedIDs = Set<String>()
     private var lastNotificationAt: Date?
     private var notificationsEnabled = false
+    private var enabledAfter: Date?
     private let now: () -> Date
     private var deliver: ((LocalAgentAlert) -> Void)?
 
@@ -70,6 +71,11 @@ final class LocalAgentAttention: ObservableObject {
     func configureNotifications(enabled: Bool) {
         guard notificationsEnabled != enabled else { return }
         notificationsEnabled = enabled
+        // Reads can complete AFTER opt-in even when their marker was already
+        // present before app launch. An ID-only baseline cannot guard them.
+        // Source timestamps have second precision: fail closed for events
+        // in the activation second rather than risk a replayed banner.
+        enabledAfter = enabled ? now() : nil
         // Enabling notification delivery NEVER replays already-observed events.
         recognizedIDs.formUnion(latest.map(\.id))
         // Preserve cooldown across OFF/ON changes to avoid alert bursts.
@@ -83,12 +89,13 @@ final class LocalAgentAttention: ObservableObject {
         if recognizedIDs.count > 100 {
             recognizedIDs = Set(events.map(\.id))
         }
-        guard notificationsEnabled else { return }
+        guard notificationsEnabled, let enabledAfter else { return }
         let reference = now()
         let newEvents = events.filter { !previouslySeen.contains($0.id) }
             .sorted { $0.timestamp < $1.timestamp }
         for event in newEvents {
             guard let alert = LocalAgentAlert.from(event) else { continue }
+            guard event.timestamp > enabledAfter else { continue }
             let age = reference.timeIntervalSince(event.timestamp)
             guard age >= -5 && age <= Self.maximumNotificationAge else { continue }
             if let lastNotificationAt,
