@@ -51,6 +51,8 @@ final class CodexTurnMonitor: ObservableObject {
     private var fileURL: URL?
     private var timer: Timer?
     private var readTask: Task<Void, Never>?
+    private var baselineCompletion: (@MainActor (CodexTurnStatus?) -> Void)?
+    private var baselineRequiresSecondRead = false
     private var revision: UInt64 = 0
     private(set) var enabled = false
 
@@ -104,29 +106,47 @@ final class CodexTurnMonitor: ObservableObject {
         }
     }
 
-    /// Explicit verification must capture its baseline only after a completed
-    /// owner-selected source read. This never blocks the MainActor.
-    func refreshedStatusForVerification() async -> CodexTurnStatus? {
-        guard enabled, let source = fileURL else { return nil }
-        let generation = revision
-        if let existing = readTask { await existing.value }
-        guard enabled, revision == generation, fileURL == source else { return nil }
-        refresh()
-        if let pending = readTask { await pending.value }
-        guard enabled, revision == generation, fileURL == source else { return nil }
-        return status
+    /// A callback rather than an awaiting verifier task: a stalled filesystem
+    /// read never retains the verification controller. A read already in flight
+    /// is completed first, then one fresh poll is used as the baseline.
+    func requestVerificationBaseline(
+        _ completion: @escaping @MainActor (CodexTurnStatus?) -> Void
+    ) {
+        guard enabled, fileURL != nil else { completion(nil); return }
+        baselineCompletion = completion
+        baselineRequiresSecondRead = readTask != nil
+        if readTask == nil { refresh() }
+    }
+
+    /// Stopping or replacing a check drops its callback immediately. The one
+    /// existing read may still be blocked in the OS, but retries cannot spawn
+    /// a new worker until it returns.
+    func cancelVerificationBaseline() {
+        baselineCompletion = nil
+        baselineRequiresSecondRead = false
     }
 
     private func finishRead(_ data: Data?, from file: URL, generation: UInt64) {
         guard enabled, revision == generation, fileURL == file else { return }
         readTask = nil
         status = data.map { CodexTurnParser.parse($0, now: now()) } ?? .unavailable
+        if baselineCompletion != nil {
+            if baselineRequiresSecondRead {
+                baselineRequiresSecondRead = false
+                refresh()
+            } else {
+                let completion = baselineCompletion
+                baselineCompletion = nil
+                completion?(status)
+            }
+        }
     }
 
     private func restart() {
         timer?.invalidate()
         timer = nil
         revision &+= 1
+        cancelVerificationBaseline()
         readTask?.cancel()
         readTask = nil
         guard enabled else { status = .off; return }
