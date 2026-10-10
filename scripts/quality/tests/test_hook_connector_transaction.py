@@ -243,7 +243,9 @@ class HookConnectorTransactionTests(unittest.TestCase):
             if path == self.claude and expected != self.claude_blob and not rollback_race:
                 rollback_race = True
                 self.claude.write_bytes(external)
-                raise ValueError("simulated concurrent change during rollback")
+                # Exercise the production guard rather than injecting its
+                # exception; rollback must continue after real detection.
+                return real_replace(path, expected, payload)
             return real_replace(path, expected, payload)
 
         with mock.patch.object(installer, "ensure_safe_file", side_effect=validation_failure):
