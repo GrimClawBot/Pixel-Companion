@@ -143,6 +143,70 @@ class HookConnectorTransactionTests(unittest.TestCase):
         self.assert_private(self.claude)
         self.assertEqual(len(list(self.backups.glob("*"))), 2)
 
+    def test_concurrent_claude_edit_between_writes_is_never_reverted(self):
+        external = b'{"changedBy":"Claude external editor"}\n'
+        real_save = installer.save_atomic
+
+        def edited_after_codex(path, payload, mode=0o600):
+            real_save(path, payload, mode)
+            if path == self.codex and payload != self.codex_blob:
+                self.claude.write_bytes(external)
+
+        with mock.patch.object(installer, "save_atomic", side_effect=edited_after_codex):
+            with self.assertRaisesRegex(ValueError, "changed during transaction"):
+                installer.run(apply=True)
+        self.assertEqual(self.codex.read_bytes(), self.codex_blob)
+        self.assertEqual(self.claude.read_bytes(), external)
+        self.assert_private(self.codex)
+
+    def test_codex_external_edit_during_second_write_failure_skips_rollback(self):
+        external = b'notify = ["/bin/true"]\nmodel = "external editor"\n'
+        real_save = installer.save_atomic
+
+        def fail_claude_and_edit_codex(path, payload, mode=0o600):
+            if path == self.claude and payload != self.claude_blob:
+                self.codex.write_bytes(external)
+                raise OSError("injected second provider write failure")
+            real_save(path, payload, mode)
+
+        with mock.patch.object(installer, "save_atomic", side_effect=fail_claude_and_edit_codex):
+            with self.assertRaisesRegex(OSError, "injected second provider"):
+                installer.run(apply=True)
+        self.assertEqual(self.codex.read_bytes(), external)
+        self.assertEqual(self.claude.read_bytes(), self.claude_blob)
+        self.assert_private(self.codex)
+        self.assert_private(self.claude)
+
+    def test_post_write_claude_edit_survives_conditional_rollback(self):
+        external = b'{"provider":"newer Claude settings"}\n'
+        real_read = installer.ensure_safe_file
+        edited = False
+
+        def edit_before_verification(path):
+            nonlocal edited
+            if (path == self.codex and not edited
+                    and self.codex.read_bytes() != self.codex_blob
+                    and self.claude.read_bytes() != self.claude_blob):
+                self.claude.write_bytes(external)
+                edited = True
+            return real_read(path)
+
+        with mock.patch.object(installer, "ensure_safe_file", side_effect=edit_before_verification):
+            with self.assertRaisesRegex(ValueError, "changed during post-write"):
+                installer.run(apply=True)
+        self.assertTrue(edited)
+        self.assertEqual(self.codex.read_bytes(), self.codex_blob)
+        self.assertEqual(self.claude.read_bytes(), external)
+        self.assert_private(self.codex)
+
+    def test_replace_if_exact_refuses_mismatched_provider_file(self):
+        expected = self.codex_blob
+        external = b'notify = ["/bin/echo", "provider changed"]\n'
+        self.codex.write_bytes(external)
+        with self.assertRaisesRegex(ValueError, "changed during transaction"):
+            installer.replace_if_exact(self.codex, expected, b"unsafe overwritten")
+        self.assertEqual(self.codex.read_bytes(), external)
+
     def test_changed_provider_config_fails_before_replacing_either_config(self):
         real_read = installer.ensure_safe_file
         reads = 0

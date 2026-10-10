@@ -81,6 +81,19 @@ def save_atomic(path: Path, data: bytes, mode: int = 0o600) -> None:
             os.unlink(name)
 
 
+def replace_if_exact(path: Path, expected: bytes, updated: bytes) -> None:
+    """Refuse to replace provider bytes that changed since our last snapshot.
+
+    This check is not a filesystem-wide compare-and-swap: other provider
+    processes may not honor Pixel's installation lock, so we also validate
+    immediately before each individual write and avoid overwriting a changed
+    file during rollback.
+    """
+    if ensure_safe_file(path) != expected:
+        raise ValueError("Provider settings changed during transaction")
+    save_atomic(path, updated)
+
+
 def prepare_codex(blob: bytes) -> tuple[list[str], bytes]:
     content = blob.decode("utf-8")
     config = tomllib.loads(content)
@@ -207,17 +220,28 @@ def run(apply: bool) -> None:
     # Recheck after backups (do not race against user edits).
     if ensure_safe_file(CODEX_CONFIG) != codex_old or ensure_safe_file(CLAUDE_CONFIG) != claude_old:
         raise ValueError("Provider settings changed during preparation")
+    # Track only writes completed by this attempt. If any provider/user
+    # saves new settings while the installer is running, never overwrite them
+    # during rollback. Provider editors do not necessarily honor our locks.
+    written: list[tuple[Path, bytes, bytes]] = []
     try:
-        save_atomic(CODEX_CONFIG, codex_new)
-        save_atomic(CLAUDE_CONFIG, claude_new)
-        if tomllib.loads(ensure_safe_file(CODEX_CONFIG).decode("utf-8")).get("notify") != tomllib.loads(codex_new.decode("utf-8"))["notify"]:
-            raise ValueError("Codex post-write validation failed")
-        if json.loads(ensure_safe_file(CLAUDE_CONFIG)) != json.loads(claude_new):
-            raise ValueError("Claude post-write validation failed")
+        replace_if_exact(CODEX_CONFIG, codex_old, codex_new)
+        written.append((CODEX_CONFIG, codex_old, codex_new))
+        replace_if_exact(CLAUDE_CONFIG, claude_old, claude_new)
+        written.append((CLAUDE_CONFIG, claude_old, claude_new))
+        if ensure_safe_file(CODEX_CONFIG) != codex_new:
+            raise ValueError("Codex settings changed during post-write validation")
+        if ensure_safe_file(CLAUDE_CONFIG) != claude_new:
+            raise ValueError("Claude settings changed during post-write validation")
     except Exception:
-        # Explicit transaction rollback: exact original bytes, owner-only.
-        save_atomic(CODEX_CONFIG, codex_old)
-        save_atomic(CLAUDE_CONFIG, claude_old)
+        # Reverse order and only restore bytes still belonging to *this*
+        # transaction. Never clobber an edit from the user or provider.
+        # A later retry must re-read and revalidate all existing configs.
+        for path, original, installed in reversed(written):
+            if ensure_safe_file(path) == installed:
+                replace_if_exact(path, installed, original)
+            else:
+                print("ROLLBACK SKIPPED: provider settings changed externally")
         raise
     print("ACTION: APPLIED; prior Codex notifier preserved")
     print("Claude settings: original unrelated fields preserved")
