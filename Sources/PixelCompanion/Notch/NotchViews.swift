@@ -46,22 +46,28 @@ struct NotchRootView: View {
             if state.surface == .compact {
                 Color.clear
                     .frame(height: state.notchSize.height)
-                CompactBar(
-                    snapshot: model.snapshot, mood: model.mood,
-                    feedFreshness: model.feedFreshness, showsStatusText: true
-                )
-                    .frame(height: NotchLayout.compactBarHeight)
-                    .padding(.horizontal, 8)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onClick)
+                Button(action: onClick) {
+                    CompactBar(
+                        snapshot: model.snapshot, mood: model.mood,
+                        feedFreshness: model.feedFreshness, showsStatusText: true
+                    )
+                        .frame(height: NotchLayout.compactBarHeight)
+                        .padding(.horizontal, 8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("companion.notch.statusButton")
             } else {
-                CompactBar(
-                    snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
-                )
-                    .frame(height: state.notchSize.height)
-                    .padding(.horizontal, 12)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onClick)
+                Button(action: onClick) {
+                    CompactBar(
+                        snapshot: model.snapshot, mood: model.mood, feedFreshness: model.feedFreshness
+                    )
+                        .frame(height: state.notchSize.height)
+                        .padding(.horizontal, 12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("companion.notch.statusButton")
                 expandedContent
             }
         }
@@ -217,7 +223,6 @@ struct CompactBar: View {
         }
         .frame(maxHeight: .infinity, alignment: .center)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder private var trailingIndicator: some View {
