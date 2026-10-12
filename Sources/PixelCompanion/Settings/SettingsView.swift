@@ -42,6 +42,10 @@ enum CompanionSettingsPane: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    // One source of truth for the native sidebar; tests verify every destination is reachable.
+    static let companionPanes: [Self] = [.general, .utilities, .notifications]
+    static let integrationPanes: [Self] = [.connections]
+
     var title: String {
         switch self {
         case .general: return "General"
@@ -86,8 +90,15 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedPane) {
-                Section("Preferences") {
-                    ForEach(CompanionSettingsPane.allCases) { pane in
+                Section("Companion") {
+                    ForEach(CompanionSettingsPane.companionPanes) { pane in
+                        Label(pane.title, systemImage: pane.symbol)
+                            .tag(pane)
+                            .accessibilityIdentifier("companion.settings.pane." + pane.rawValue)
+                    }
+                }
+                Section("Integrations") {
+                    ForEach(CompanionSettingsPane.integrationPanes) { pane in
                         Label(pane.title, systemImage: pane.symbol)
                             .tag(pane)
                             .accessibilityIdentifier("companion.settings.pane." + pane.rawValue)
