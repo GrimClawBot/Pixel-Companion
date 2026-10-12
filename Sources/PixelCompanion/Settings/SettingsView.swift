@@ -86,12 +86,18 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedPane) {
-                Section("Preferences") {
-                    ForEach(CompanionSettingsPane.allCases) { pane in
+                Section("Companion") {
+                    ForEach([CompanionSettingsPane.general, .utilities, .notifications]) { pane in
                         Label(pane.title, systemImage: pane.symbol)
                             .tag(pane)
                             .accessibilityIdentifier("companion.settings.pane." + pane.rawValue)
                     }
+                }
+                Section("Integrations") {
+                    Label(CompanionSettingsPane.connections.title,
+                          systemImage: CompanionSettingsPane.connections.symbol)
+                        .tag(CompanionSettingsPane.connections)
+                        .accessibilityIdentifier("companion.settings.pane.connections")
                 }
             }
             .listStyle(.sidebar)
