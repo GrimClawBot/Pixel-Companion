@@ -17,4 +17,12 @@ final class SettingsNavigationTests: XCTestCase {
         XCTAssertEqual(CompanionSettingsPane.utilities.title, "Utilities")
         XCTAssertEqual(CompanionSettingsPane.notifications.title, "Notifications")
     }
+    func testGroupedSidebarContainsAllOriginalSettingsDestinationsExactlyOnce() {
+        let groups = CompanionSettingsPane.companionPanes + CompanionSettingsPane.integrationPanes
+        XCTAssertEqual(CompanionSettingsPane.companionPanes, [.general, .utilities, .notifications])
+        XCTAssertEqual(CompanionSettingsPane.integrationPanes, [.connections])
+        XCTAssertEqual(groups.count, CompanionSettingsPane.allCases.count)
+        XCTAssertEqual(Set(groups), Set(CompanionSettingsPane.allCases))
+    }
+
 }
