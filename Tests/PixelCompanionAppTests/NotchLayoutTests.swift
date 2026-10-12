@@ -152,4 +152,23 @@ final class NotchLayoutTests: XCTestCase {
             CGSize(width: 500, height: 480)
         )
     }
+
+    // Source wiring regression: manual VoiceOver activation remains a separate hardware QA gate.
+    func testBothNotchSurfacesUseNativeStatusButtonForKeyboardAndVoiceOverActivation() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let source = testFile.deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PixelCompanion/Notch/NotchViews.swift")
+        let content = try String(contentsOf: source, encoding: .utf8)
+        let buttonCount = content.components(separatedBy: "Button(action: onClick)").count - 1
+        let identifierCount = content.components(
+            separatedBy: ".accessibilityIdentifier(\"companion.notch.statusButton\")"
+        ).count - 1
+        XCTAssertEqual(buttonCount, 2, "Compact and expanded status must both expose real buttons")
+        XCTAssertEqual(identifierCount, 2, "Both surfaces need the stable accessible identifier")
+        XCTAssertFalse(content.contains(".accessibilityAddTraits(.isButton)"),
+                       "Do not use a button trait without native activation semantics")
+    }
+
 }
