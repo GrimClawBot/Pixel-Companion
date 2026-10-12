@@ -216,6 +216,8 @@ struct CompactBar: View {
             trailingIndicator
         }
         .frame(maxHeight: .infinity, alignment: .center)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder private var trailingIndicator: some View {
