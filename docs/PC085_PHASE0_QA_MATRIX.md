@@ -107,7 +107,6 @@ Out of scope for this matrix: PC-065 real Launch at Login acceptance, provider h
 | Date | Environment | Check | Result |
 |---|---|---|---|
 | 2026-10-13 22:52 EDT | Owner Mac, separate QA worktree (patch of `9d24492` as `c2d73df`), Xcode 26.6 / Swift 6.3.3 | `PIXEL_DESIGN_REFERENCE_DIR=… swift test --jobs 4 --filter DesignReferenceRenderTests` | PASS: 1 test, 0 failures, 200 PNG references generated (= 2 widths × 2 schemes × 2 text sizes × 5 freshness × 5 moods) |
-
 | 2026-10-14 | Owner Mac QA (ChatGPT-assisted) hash review of the 200 PNGs above | SHA comparison of the outputs | 112 unique, 88 duplicates. **All 100 std-vs-ax3 pairs pixel-identical.** Header showed the relative "Last synced" age of `MockScript.referenceDate` (~9 months 13 days), so output depends on the wall clock |
 | 2026-10-14 | Linux worker, Phase 0B | Fixture now passes `lastSuccessfulSync: nil` and adds name/coverage assertions; docs corrected | **Not compiled. Awaiting Mac revalidation** |
 
