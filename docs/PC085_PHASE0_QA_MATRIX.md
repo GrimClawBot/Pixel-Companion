@@ -77,3 +77,11 @@ Reduce Transparency, **E** Reduce Motion, **F** VoiceOver on. Mark each cell Pas
 | 17 | Existing installed QA86 build untouched | | | | | | |
 
 Out of scope for this matrix: PC-065 real Launch at Login acceptance, provider hooks, release governance.
+
+## Evidence log
+
+| Date | Environment | Check | Result |
+|---|---|---|---|
+| 2026-10-13 22:52 EDT | Owner Mac, separate QA worktree (patch of `9d24492` as `c2d73df`), Xcode 26.6 / Swift 6.3.3 | `PIXEL_DESIGN_REFERENCE_DIR=… swift test --jobs 4 --filter DesignReferenceRenderTests` | PASS: 1 test, 0 failures, 200 PNG references generated (= 2 widths × 2 schemes × 2 text sizes × 5 freshness × 5 moods) |
+
+Still open: manual pixel inspection of the 200 PNGs, VoiceOver pass, and every row of the matrix above.
