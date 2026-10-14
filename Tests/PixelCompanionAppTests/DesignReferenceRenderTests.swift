@@ -7,6 +7,9 @@ import XCTest
 
 /// PC-085 Phase 0 fixture-only reference harness. Renders production header and compact
 /// views with synthetic `noConnector` data; writes PNGs only when PIXEL_DESIGN_REFERENCE_DIR is set.
+/// The PNGs are review references, not approved golden images: nothing here compares pixels.
+/// `lastSuccessfulSync` is nil so the header never shows the wall-clock-relative "Last synced"
+/// label; that label needs its own time-controlled QA (see docs/PC085_PHASE0_QA_MATRIX.md).
 @MainActor
 final class DesignReferenceRenderTests: XCTestCase {
     private let widths: [CGFloat] = [360, 440]
@@ -18,9 +21,24 @@ final class DesignReferenceRenderTests: XCTestCase {
     ]
     private let moods: [CharacterMood] = [.idle, .working, .waitingForApproval, .error, .offline]
 
-    func testReferenceLayoutsRenderDeterministically() throws {
+    func testReferenceMatrixCoversEveryFreshnessStateWithUniqueNames() {
+        // Exhaustive switch: adding a FeedFreshness case stops this compiling until it is listed above.
+        func covered(_ state: FeedFreshness) -> Bool {
+            switch state {
+            case .notApplicable, .connecting, .current, .stale, .unavailable:
+                return freshness.contains { $0.1 == state }
+            }
+        }
+        for state in [FeedFreshness.notApplicable, .connecting, .current, .stale, .unavailable] {
+            XCTAssertTrue(covered(state), "\(state)")
+        }
+        let names = referenceNames()
+        XCTAssertEqual(names.count, 200)
+        XCTAssertEqual(Set(names).count, names.count)
+    }
+
+    func testReferenceLayoutsRenderWithoutWallClockText() throws {
         let snapshot = ConnectorSnapshot.noConnector
-        let syncDate = MockScript.referenceDate
         for width in widths {
             for scheme in schemes {
                 for size in sizes {
@@ -35,16 +53,13 @@ final class DesignReferenceRenderTests: XCTestCase {
                                 .background(Color.black)
                                 SummaryHeader(
                                     snapshot: snapshot, mood: mood,
-                                    feedFreshness: state, lastSuccessfulSync: syncDate
+                                    feedFreshness: state, lastSuccessfulSync: nil
                                 )
                             }
                             .padding(16)
                             .frame(width: width, alignment: .leading)
                             .dynamicTypeSize(size)
-                            let name = [
-                                "w\(Int(width))", scheme == .dark ? "dark" : "light",
-                                size == .large ? "std" : "ax3", freshnessName, mood.rawValue
-                            ].joined(separator: "-")
+                            let name = referenceName(width, scheme, size, freshnessName, mood)
                             let png = try render(content, width: width, scheme: scheme)
                             XCTAssertFalse(png.isEmpty, name)
                             try saveOptional(png, name: name)
@@ -53,6 +68,28 @@ final class DesignReferenceRenderTests: XCTestCase {
                 }
             }
         }
+    }
+
+    private func referenceNames() -> [String] {
+        widths.flatMap { width in
+            schemes.flatMap { scheme in
+                sizes.flatMap { size in
+                    freshness.flatMap { entry in
+                        moods.map { referenceName(width, scheme, size, entry.0, $0) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func referenceName(
+        _ width: CGFloat, _ scheme: ColorScheme, _ size: DynamicTypeSize,
+        _ freshnessName: String, _ mood: CharacterMood
+    ) -> String {
+        [
+            "w\(Int(width))", scheme == .dark ? "dark" : "light",
+            size == .large ? "std" : "ax3", freshnessName, mood.rawValue
+        ].joined(separator: "-")
     }
 
     private func render(_ view: some View, width: CGFloat, scheme: ColorScheme) throws -> Data {
