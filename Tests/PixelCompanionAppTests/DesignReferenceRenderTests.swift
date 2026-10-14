@@ -10,6 +10,10 @@ import XCTest
 /// The PNGs are review references, not approved golden images: nothing here compares pixels.
 /// `lastSuccessfulSync` is nil so the header never shows the wall-clock-relative "Last synced"
 /// label; that label needs its own time-controlled QA (see docs/PC085_PHASE0_QA_MATRIX.md).
+/// The PNGs are still NOT pixel-deterministic: both views embed `CharacterView`, whose
+/// `TimelineView(.periodic(from: .now, by: 0.6))` picks the sprite frame from the capture time.
+/// Pinning that frame needs a production seam (owner-gated Phase 6), so sprite-region pixel
+/// differences between runs or between std/ax3 pairs are capture-time variance, not text scaling.
 @MainActor
 final class DesignReferenceRenderTests: XCTestCase {
     private let widths: [CGFloat] = [360, 440]
@@ -37,7 +41,7 @@ final class DesignReferenceRenderTests: XCTestCase {
         XCTAssertEqual(Set(names).count, names.count)
     }
 
-    func testReferenceLayoutsRenderWithoutWallClockText() throws {
+    func testReferenceLayoutsRenderWithoutRelativeSyncLabel() throws {
         let snapshot = ConnectorSnapshot.noConnector
         for width in widths {
             for scheme in schemes {

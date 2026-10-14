@@ -16,8 +16,13 @@ chrome is native semantic macOS. The character carries the personality.
 
 ### Phase 0 verification status
 - The fixture harness ran on the owner's Mac (Xcode 26.6 / Swift 6.3.3) and passed 1/1 with 200 reference PNGs. A
-  hash review found 112 unique images, and **all 100 standard vs accessibility3 pairs were pixel-identical**. The
-  harness shows the views render. It does not show large-text support, which is consistent with finding 1.
+  hash review found 112 unique images. A corrected RGB comparison found 58 of 100 standard vs accessibility3 pairs
+  identical and 42 different (all 42 in dark theme). The differences are in the pixel-character regions, not text,
+  so they reflect `CharacterView` animation timing, not Dynamic Type. The harness shows the views render.
+  **Large-text scaling is not demonstrated**, which is consistent with finding 1.
+- The PNGs are not pixel-deterministic: `CharacterView` picks its sprite frame from
+  `TimelineView(.periodic(from: .now, by: 0.6))`. Pinning the frame needs a production seam (Phase 6), so Phase 0B
+  documents the variance instead of changing `CharacterView`.
 - The first run displayed a wall-clock-relative "Last synced" age. Phase 0B removes it from the fixture
   (`lastSuccessfulSync: nil`) and moves that label to manual QA. The Phase 0B commit still needs a Mac re-run.
 - The PNGs are review references, not approved golden images.
@@ -28,13 +33,14 @@ chrome is native semantic macOS. The character carries the personality.
 - **Phase 0 (this):** `docs/DESIGN_SYSTEM.md`, inventory + QA matrix, fixture-only render harness. No production
   change.
 - **Phase 1:** tokens (`CompanionSpacing`, typography roles) and shared `StatusPill`/`EmptyState`/`ErrorState`.
-  Acceptance: the std/ax3 fixture pairs become hash-distinct with no clipping at 360 pt, and a test-only seam makes
-  "Last synced" deterministic. See `docs/PC085_PHASE0_QA_MATRIX.md` §5.
+  Acceptance: std/ax3 pairs show larger text (compared with sprite regions masked; whole-image hashes are not
+  evidence) with no clipping at 360 pt, and a test-only seam makes "Last synced" deterministic. See `docs/PC085_PHASE0_QA_MATRIX.md` §5.
 - **Phase 2:** compact notch + glance hierarchy.
 - **Phase 3:** Overview hierarchy + tab presentation.
 - **Phase 4:** menu-bar fallback parity.
 - **Phase 5:** Settings regrouping (General/Agents/Sources/Utilities/Notifications/Advanced; no key changes).
-- **Phase 6:** motion/character energy polish + full Mac QA pass.
+- **Phase 6:** motion/character energy polish + full Mac QA pass, including a seam that pins the `CharacterView`
+  frame so reference PNGs can become deterministic.
 
 Invariants across all phases: no feature removal, no key or accessibility-ID renames, no false healthy state, and
 connectors stay off by default.

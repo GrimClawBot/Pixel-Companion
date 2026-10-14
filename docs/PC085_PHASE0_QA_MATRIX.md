@@ -53,7 +53,7 @@ waitingForApproval/error/offline (5 of the 13 `CharacterMood` cases). PNGs are w
 What it asserts (none of it compares pixels, so it does not depend on the OS version):
 - `testReferenceMatrixCoversEveryFreshnessStateWithUniqueNames`: all 5 `FeedFreshness` states are listed (an
   exhaustive `switch` stops it compiling if a case is added), and the matrix yields 200 unique file names.
-- `testReferenceLayoutsRenderWithoutWallClockText`: each of the 200 configurations renders a non-empty PNG.
+- `testReferenceLayoutsRenderWithoutRelativeSyncLabel`: each of the 200 configurations renders a non-empty PNG.
 
 **The PNGs are reference fixtures for human review, not approved golden images.** No visual regression baseline
 exists. One should be adopted only after owner visual acceptance and a decision on how to pin OS/fonts.
@@ -64,11 +64,20 @@ The first Mac run used `MockScript.referenceDate` (2026-01-01) and the PNGs show
 change on every run. Coverage for the "Last synced" label is now the manual matrix row 18 below. Production code is
 unchanged.
 
-**Known limitation: standard vs accessibility text.** On the first Mac run, all 100 std/ax3 pairs were
-pixel-identical (see the evidence log). Setting `.dynamicTypeSize` on this macOS hosting path did not change the
-rendered output: `CompactBar` uses a fixed 12 pt font, and the semantic fonts in `SummaryHeader` did not scale
-either. The ax3 configurations stay in the matrix to show they render. They do **not** show large-text support.
-Fixing that is production work and belongs to owner-gated Phase 1/2 (see the acceptance criteria below).
+**Known limitation: the PNGs are not pixel-deterministic.** `CompactBar` and `SummaryHeader` both embed
+`CharacterView`, which uses `TimelineView(.periodic(from: .now, by: 0.6))`. The sprite frame shown depends on when the
+view is created, so sprite pixels can differ between runs and between otherwise identical configurations. A test
+cannot pin this without a production seam in `CharacterView`, and that is owner-gated Phase 6 work. Until then:
+- hash or pixel differences inside the sprite region are capture-time variance, not a regression or a text change;
+- do not compare PNG hashes across runs as a pass/fail signal;
+- compare text regions only by eye, or by diffing with the sprite rectangles masked out.
+
+**Known limitation: standard vs accessibility text.** A corrected RGB comparison of the first Mac run found 58 of 100
+std/ax3 pairs identical and 42 different (light: 50/50 identical; dark: 8 identical, 42 different). The differences
+are in the pixel-character regions, not in text, so they come from sprite animation timing (above) and **do not**
+show Dynamic Type scaling. Large-text scaling is **not demonstrated**: `CompactBar` uses a fixed 12 pt font, and no
+text difference between std and ax3 has been observed. The ax3 configurations stay in the matrix to show they render.
+Fixing text scaling is production work and belongs to owner-gated Phase 1/2 (see the acceptance criteria below).
 
 Run on the Mac: `PIXEL_DESIGN_REFERENCE_DIR=/tmp/pc085-ref swift test --filter DesignReferenceRenderTests`.
 The Linux worker has no Swift toolchain, so the Phase 0B edits to this file have not been compiled.
@@ -107,19 +116,24 @@ Out of scope for this matrix: PC-065 real Launch at Login acceptance, provider h
 | Date | Environment | Check | Result |
 |---|---|---|---|
 | 2026-10-13 22:52 EDT | Owner Mac, separate QA worktree (patch of `9d24492` as `c2d73df`), Xcode 26.6 / Swift 6.3.3 | `PIXEL_DESIGN_REFERENCE_DIR=… swift test --jobs 4 --filter DesignReferenceRenderTests` | PASS: 1 test, 0 failures, 200 PNG references generated (= 2 widths × 2 schemes × 2 text sizes × 5 freshness × 5 moods) |
-| 2026-10-14 | Owner Mac QA (ChatGPT-assisted) hash review of the 200 PNGs above | SHA comparison of the outputs | 112 unique, 88 duplicates. **All 100 std-vs-ax3 pairs pixel-identical.** Header showed the relative "Last synced" age of `MockScript.referenceDate` (~9 months 13 days), so output depends on the wall clock |
+| 2026-10-14 | Owner Mac QA (ChatGPT-assisted) hash review of the 200 PNGs above | SHA comparison of the outputs | 112 unique, 88 duplicates. Std-vs-ax3 pairs first reported as 100/100 identical; **superseded by the correction below**. Header showed the relative "Last synced" age of `MockScript.referenceDate` (~9 months 13 days), so output depends on the wall clock |
+| 2026-10-14 | Owner Mac QA correction (same 200 PNGs) | RGB diff (`ImageChops` on RGB; the first pass used RGBA, where a zero-difference alpha plane hid the colour differences) | **58/100 std-vs-ax3 pairs identical, 42 differ** (light 50/50 identical; dark 8 identical, 42 differ). Diff boxes sit on the pixel-character regions, not text. Cause: `CharacterView` `TimelineView(.periodic(from: .now, by: 0.6))` animation. Harness is **not** pixel-deterministic; large-text scaling **not** demonstrated |
 | 2026-10-14 | Linux worker, Phase 0B | Fixture now passes `lastSuccessfulSync: nil` and adds name/coverage assertions; docs corrected | **Not compiled. Awaiting Mac revalidation** |
 
-Still open: Mac re-run of the Phase 0B harness (expect 2 tests to pass, 200 PNGs, no "Last synced" row), visual
-inspection of the PNGs, a VoiceOver pass, and every row of the matrix above.
+Still open: Mac re-run of the Phase 0B harness (expect 2 tests to pass, 200 PNGs, no "Last synced" row; sprite-region
+pixel differences are expected and are not a failure), visual inspection of the PNGs, a VoiceOver pass, and every row
+of the matrix above. UI corrections and VoiceOver fixes are deferred to approved later phases.
 
 ## 5. Phase 1 acceptance criteria from Phase 0 evidence
 
 Phase 1+ needs owner approval and is not authorised by this document.
 1. Compact status and glance text use semantic or `@ScaledMetric` sizes, so at `.accessibility3` the std/ax3
-   fixture pairs **differ** (hash-distinct) for every width/scheme/freshness/mood, with no clipping at 360 pt.
+   pairs show larger **text** (measured on text regions with sprite rectangles masked, or after the Phase 6 frame
+   seam) for every width/scheme/freshness/mood, with no clipping at 360 pt. Whole-image hash difference is not
+   evidence, because sprite animation alone changes hashes.
 2. A test-only clock or formatter seam lets the "Last synced" label render deterministically in the fixture without
    changing what users see.
-3. Before any PNG becomes a golden baseline, the owner signs off on it visually and the macOS/Xcode version is pinned.
+3. Before any PNG becomes a golden baseline, `CharacterView` gains a seam that pins the sprite frame (Phase 6, or
+   earlier if the owner approves), the owner signs off on it visually, and the macOS/Xcode version is pinned.
 4. Matrix rows 3, 18 and 19 pass under VoiceOver (column F) and largest text (column C).
 5. The accessibility identifier list in §2 shows no removals or renames.
