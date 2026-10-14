@@ -24,8 +24,8 @@ chrome is native semantic macOS. The character carries the personality.
   `TimelineView(.periodic(from: .now, by: 0.6))`. Pinning the frame needs a production seam (Phase 6), so Phase 0B
   documents the variance instead of changing `CharacterView`.
 - The first run displayed a wall-clock-relative "Last synced" age. Phase 0B removes it from the fixture
-  (`lastSuccessfulSync: nil`) and moves that label to manual QA. The Phase 0B commit still needs a Mac re-run.
-- The PNGs are review references, not approved golden images.
+  (`lastSuccessfulSync: nil`) and moves that label to manual QA. The final Swift fixture passed Mac revalidation (2 tests, 0 failures, 200 images).
+- The PNGs are reference renders, not golden images: 96/200 same-named images differed on repeat due to animated character frames.
 - VoiceOver, visual acceptance and every other matrix row are still outstanding. Screens other than `CompactBar` and
   `SummaryHeader` have not been rendered or inspected.
 

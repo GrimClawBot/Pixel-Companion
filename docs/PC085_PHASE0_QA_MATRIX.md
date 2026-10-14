@@ -80,7 +80,7 @@ text difference between std and ax3 has been observed. The ax3 configurations st
 Fixing text scaling is production work and belongs to owner-gated Phase 1/2 (see the acceptance criteria below).
 
 Run on the Mac: `PIXEL_DESIGN_REFERENCE_DIR=/tmp/pc085-ref swift test --filter DesignReferenceRenderTests`.
-The Linux worker has no Swift toolchain, so the Phase 0B edits to this file have not been compiled.
+The Linux worker lacks Swift, but the Phase 0B fixture was compiled and rerun on the owner Mac (Xcode 26.6 / Swift 6.3.3): 2 tests, zero failures, 200 reference PNGs.
 
 ## 4. Human Mac QA matrix
 
@@ -118,11 +118,14 @@ Out of scope for this matrix: PC-065 real Launch at Login acceptance, provider h
 | 2026-10-13 22:52 EDT | Owner Mac, separate QA worktree (patch of `9d24492` as `c2d73df`), Xcode 26.6 / Swift 6.3.3 | `PIXEL_DESIGN_REFERENCE_DIR=… swift test --jobs 4 --filter DesignReferenceRenderTests` | PASS: 1 test, 0 failures, 200 PNG references generated (= 2 widths × 2 schemes × 2 text sizes × 5 freshness × 5 moods) |
 | 2026-10-14 | Owner Mac QA (ChatGPT-assisted) hash review of the 200 PNGs above | SHA comparison of the outputs | 112 unique, 88 duplicates. Std-vs-ax3 pairs first reported as 100/100 identical; **superseded by the correction below**. Header showed the relative "Last synced" age of `MockScript.referenceDate` (~9 months 13 days), so output depends on the wall clock |
 | 2026-10-14 | Owner Mac QA correction (same 200 PNGs) | RGB diff (`ImageChops` on RGB; the first pass used RGBA, where a zero-difference alpha plane hid the colour differences) | **58/100 std-vs-ax3 pairs identical, 42 differ** (light 50/50 identical; dark 8 identical, 42 differ). Diff boxes sit on the pixel-character regions, not text. Cause: `CharacterView` `TimelineView(.periodic(from: .now, by: 0.6))` animation. Harness is **not** pixel-deterministic; large-text scaling **not** demonstrated |
-| 2026-10-14 | Linux worker, Phase 0B | Fixture now passes `lastSuccessfulSync: nil` and adds name/coverage assertions; docs corrected | **Not compiled. Awaiting Mac revalidation** |
+| 2026-10-13 23:13 EDT | Owner Mac; exact final Swift fixture SHA256 4fa9bc3b7190edb721245c569490e5379b4c09c122cb94ac182137d0ebc3c547 matched isolated worker 673fcb5 | Phase 0B Swift fixture in cached QA worktree, Xcode 26.6 | PASS: 2 tests, 0 failures, 200 PNGs; last-sync relative text excluded. Sample contact sheet reviewed; VoiceOver and full manual QA not complete |
 
-Still open: Mac re-run of the Phase 0B harness (expect 2 tests to pass, 200 PNGs, no "Last synced" row; sprite-region
-pixel differences are expected and are not a failure), visual inspection of the PNGs, a VoiceOver pass, and every row
-of the matrix above. UI corrections and VoiceOver fixes are deferred to approved later phases.
+Still open: full manual screenshot inspection, VoiceOver, and the remaining QA matrix checks.
+A prior Phase 0B repeat generated 200 images on each run; 96 of 200 same-named images
+changed because the sprite animation frame is not pinned. These are reference renders,
+NOT deterministic approved golden regressions. Production UI and accessibility changes
+remain gated for later phases.
+
 
 ## 5. Phase 1 acceptance criteria from Phase 0 evidence
 
