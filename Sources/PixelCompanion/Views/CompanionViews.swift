@@ -11,9 +11,13 @@ struct SummaryHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CharacterView(mood: mood, pixelSize: 4)
+            CharacterView(
+                mood: CompactBarPresentation.displayMood(mood: mood, feedFreshness: feedFreshness),
+                pixelSize: 4
+            )
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(mood.title)
+                Text(CompactBarPresentation.status(mood: mood, feedFreshness: feedFreshness))
                     .font(.headline)
                 Text(statusLine)
                     .font(.caption)
@@ -30,6 +34,7 @@ struct SummaryHeader: View {
             }
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private var statusLine: String {
@@ -253,6 +258,8 @@ struct SectionTitle: View {
         Text(text.uppercased())
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
+            .accessibilityLabel(text)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
