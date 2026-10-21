@@ -56,6 +56,8 @@ struct NotchRootView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint("Opens companion details.")
+                .accessibilitySortPriority(1)
                 .accessibilityIdentifier("companion.notch.statusButton")
             } else {
                 Button(action: onClick) {
@@ -67,8 +69,14 @@ struct NotchRootView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint(state.surface == .detail
+                    ? "Companion details are open. Navigate forward to explore."
+                    : "Opens companion details.")
+                .accessibilitySortPriority(1)
                 .accessibilityIdentifier("companion.notch.statusButton")
                 expandedContent
+                    .accessibilityElement(children: .contain)
+                    .accessibilitySortPriority(0)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -76,6 +84,7 @@ struct NotchRootView: View {
             UnevenRoundedRectangle(bottomLeadingRadius: cornerRadius, bottomTrailingRadius: cornerRadius)
                 .fill(Color.black)
         )
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder private var expandedContent: some View {
@@ -93,6 +102,7 @@ struct NotchRootView: View {
                 .padding(.top, 8)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onClick)
+                .accessibilityAction(named: Text("Open companion details"), onClick)
         case .detail:
             DetailContent(
                 snapshot: model.snapshot, mood: model.mood,
@@ -148,6 +158,15 @@ enum CompactBarPresentation {
         case .unavailable: return "Disconnected"
         case .current, .notApplicable: return mood.title
         }
+    }
+
+    /// One announcement for either status-button layout; old approvals never sound current.
+    static func accessibilityLabel(
+        mood: CharacterMood, feedFreshness: FeedFreshness, pendingApprovalCount: Int
+    ) -> String {
+        let status = "Companion status: " + status(mood: mood, feedFreshness: feedFreshness)
+        guard feedFreshness.canPresentAsLive, pendingApprovalCount > 0 else { return status }
+        return status + ". " + ApprovalPresentation.countLabel(pendingApprovalCount)
     }
 
     /// Show no duplicate icon for ordinary work: the visible label already says Working.
@@ -222,7 +241,11 @@ struct CompactBar: View {
             trailingIndicator
         }
         .frame(maxHeight: .infinity, alignment: .center)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CompactBarPresentation.accessibilityLabel(
+            mood: mood, feedFreshness: feedFreshness,
+            pendingApprovalCount: snapshot.pendingApprovals.count
+        ))
     }
 
     @ViewBuilder private var trailingIndicator: some View {

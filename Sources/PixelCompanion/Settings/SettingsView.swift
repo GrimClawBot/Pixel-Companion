@@ -94,6 +94,8 @@ struct SettingsView: View {
                     ForEach(CompanionSettingsPane.companionPanes) { pane in
                         Label(pane.title, systemImage: pane.symbol)
                             .tag(pane)
+                            .accessibilityLabel(pane.title)
+                            .accessibilityHint(pane.detail)
                             .accessibilityIdentifier("companion.settings.pane." + pane.rawValue)
                     }
                 }
@@ -101,12 +103,15 @@ struct SettingsView: View {
                     ForEach(CompanionSettingsPane.integrationPanes) { pane in
                         Label(pane.title, systemImage: pane.symbol)
                             .tag(pane)
+                            .accessibilityLabel(pane.title)
+                            .accessibilityHint(pane.detail)
                             .accessibilityIdentifier("companion.settings.pane." + pane.rawValue)
                     }
                 }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 195, max: 225)
+            .accessibilityLabel("Settings categories")
             .accessibilityIdentifier("companion.settings.sidebar")
         } detail: {
             VStack(spacing: 0) {
@@ -120,6 +125,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(selectedPane.title)
                             .font(.title2.weight(.semibold))
+                            .accessibilityAddTraits(.isHeader)
                         Text(selectedPane.detail)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -171,6 +177,7 @@ struct SettingsView: View {
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
                 .background(Color(nsColor: .windowBackgroundColor))
+                .accessibilityLabel(selectedPane.title + " settings")
                 .accessibilityIdentifier("companion.settings.details")
             }
             .navigationTitle(selectedPane.title)

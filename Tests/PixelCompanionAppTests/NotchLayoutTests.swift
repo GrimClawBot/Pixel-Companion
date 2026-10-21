@@ -54,6 +54,43 @@ final class NotchLayoutTests: XCTestCase {
         )
     }
 
+    func testStatusAnnouncementIncludesOnlyVerifiedApprovalCounts() {
+        XCTAssertEqual(
+            CompactBarPresentation.accessibilityLabel(
+                mood: .working, feedFreshness: .current, pendingApprovalCount: 1
+            ),
+            "Companion status: Working. 1 pending approval"
+        )
+        XCTAssertEqual(
+            CompactBarPresentation.accessibilityLabel(
+                mood: .coding, feedFreshness: .notApplicable, pendingApprovalCount: 3
+            ),
+            "Companion status: Coding. 3 pending approvals"
+        )
+        XCTAssertEqual(
+            CompactBarPresentation.accessibilityLabel(
+                mood: .working, feedFreshness: .current, pendingApprovalCount: 0
+            ),
+            "Companion status: Working"
+        )
+    }
+
+    func testUnverifiedAnnouncementOmitsOldMoodAndApprovalCount() {
+        let states: [(FeedFreshness, String)] = [
+            (.connecting, "Companion status: Connecting"),
+            (.stale, "Companion status: Updates delayed"),
+            (.unavailable, "Companion status: Disconnected")
+        ]
+        for (freshness, expected) in states {
+            XCTAssertEqual(
+                CompactBarPresentation.accessibilityLabel(
+                    mood: .working, feedFreshness: freshness, pendingApprovalCount: 4
+                ),
+                expected
+            )
+        }
+    }
+
     func testStatusIndicatorMatchesActualFeedFreshness() {
         XCTAssertEqual(
             CompactBarPresentation.indicator(mood: .working, feedFreshness: .current),
